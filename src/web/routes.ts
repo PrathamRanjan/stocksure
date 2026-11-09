@@ -1,3 +1,7 @@
+import { countersignThreshold } from "../guard/dryrun.js";
+import { guardCard } from "./safetyui.js";
+import { icon } from "./icons.js";
+import { landing } from "./landing.js";
 import { Router, type Request, type Response } from "express";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
@@ -53,21 +57,7 @@ export function routes() {
 
   r.get("/", async (req, res) => {
     const p = await me(req);
-    res.send(
-      page(
-        req,
-        p,
-        "Receive it. Resolve it. Pay correctly.",
-        html`<section class="hero"><h1>Receive it. Resolve it. Pay correctly. Keep trading.</h1>
-<p class="lead">A shared receiving and resolution workspace for a wholesaler and its café, shop and restaurant customers. When a delivery is short, damaged or mis-billed, StockSure agrees what arrived, corrects what is owed on PayPal and gets the missing stock on its way, with evidence kept at every step.</p>
-<p class="actions"><a class="btn primary" href="${p ? "/home" : "/login"}">${p ? "Open your orders" : "Sign in"}</a><a class="btn" href="/demo">Demo setup</a></p></section>
-<section class="grid g3">
-<div class="card"><h2>1 · Agree and hold</h2><p>The buyer sets quantities, acceptable substitutes, a deadline and a spending limit. The supplier confirms the quote. Accepting it places a PayPal hold, not a charge.</p></div>
-<div class="card"><h2>2 · Receive and agree facts</h2><p>Receiving uploads the delivery note and photos. AI proposes counts and flags uncertain units or products. A person confirms; the supplier agrees or disputes each line.</p></div>
-<div class="card"><h2>3 · Resolve and settle</h2><p>StockSure matches quote, receipt and invoice, picks a compatible replacement within budget, and both sides approve one version. PayPal captures only what was agreed.</p></div>
-</section>`,
-      ),
-    );
+    await landing(req, res, Boolean(p));
   });
 
   // ---------- Sign in ----------
@@ -111,23 +101,26 @@ ${people.length ? html`<h2 style="margin-top:1.5rem">Demo people</h2>${people.ma
       const col = p.org_kind === "buyer" ? "buyer_id" : "supplier_id";
       const pos = (await db.query<PO & { buyer_name: string }>(`SELECT po.*, b.name AS buyer_name FROM purchase_orders po JOIN orgs b ON b.id = po.buyer_id WHERE po.${col} = $1 ORDER BY (po.status = 'closed'), po.created_at DESC LIMIT 100`, [p.org_id])).rows;
       const org = await orgById(db, p.org_id);
-      const rows = [];
       const risky = await riskyPos(db, p.org_id);
-      for (const po of pos) {
-        const total = quoteTotal(await linesOf(db, po.id));
-        rows.push(html`<tr><td><a href="/po/${po.id}">${po.number}</a>${po.kind === "replacement" ? html` <span class="flag info">replacement</span>` : ""}${po.note.startsWith("Imported") ? html` <span class="flag info">history</span>` : ""}${risky.has(po.id) ? html` <span class="flag bad">late ETA</span>` : ""}</td>${p.org_kind === "supplier" ? html`<td>${po.buyer_name}</td>` : ""}<td>${pill(po.status)}</td><td>${fmtDate(po.deliver_by)}</td><td class="num">${total ? fmt(total) : "—"}</td><td class="num">${po.kind === "original" ? fmt(po.spend_limit_cents) : ""}</td></tr>`);
-      }
-      const attention = pos.filter((po) => risky.has(po.id) || (p.org_kind === "supplier" ? ["submitted", "funded", "part_delivered", "in_review", "resolving", "exception"] : ["draft", "quoted", "dispatched", "in_review", "resolving", "exception"]).includes(po.status));
+      const totals = new Map<string, number>();
+      for (const po of pos) totals.set(po.id, quoteTotal(await linesOf(db, po.id)));
+      const needStates = p.org_kind === "supplier" ? ["submitted", "funded", "part_delivered", "in_review", "resolving", "exception"] : ["draft", "quoted", "dispatched", "in_review", "resolving", "exception"];
+      const attention = pos.filter((po) => risky.has(po.id) || needStates.includes(po.status));
+      const NEXT: Record<string, string> = p.org_kind === "supplier"
+        ? { submitted: "Confirm the quote", funded: "Dispatch the order", part_delivered: "Send the rest", in_review: "Agree or dispute what arrived", resolving: "Approve the fix", exception: "Needs a look" }
+        : { draft: "Finish and submit", quoted: "Accept the quote (places a PayPal hold)", dispatched: "Count it in at the dock", in_review: "Waiting on the supplier to agree", resolving: "Approve the fix", exception: "Needs a look" };
+      const row = (po: (typeof pos)[number]) => html`<a class="r" href="/po/${po.id}"><span class="av ${po.status === "closed" ? "muted" : ""}">${raw(icon(po.kind === "replacement" ? "repeat" : po.status === "dispatched" ? "truck" : "package"))}</span><span><div class="t">${po.number}${po.kind === "replacement" ? html` <span class="pill info">replacement</span>` : ""}${po.note.startsWith("Imported") ? html` <span class="pill">history</span>` : ""}${risky.has(po.id) ? html` <span class="pill bad">late ETA</span>` : ""}</div><div class="s">${p.org_kind === "supplier" ? html`${po.buyer_name} · ` : ""}${NEXT[po.status] ?? `deliver by ${fmtDate(po.deliver_by)}`}</div></span><span class="m"><span class="amt">${totals.get(po.id) ? fmt(totals.get(po.id)!) : "—"}</span>${po.kind === "original" && po.spend_limit_cents ? `limit ${fmt(po.spend_limit_cents)}` : fmtDate(po.deliver_by)}</span><span class="act">${pill(po.status)}</span></a>`;
+      const rest = pos.filter((po) => !attention.includes(po));
       res.send(
         page(
           req,
           p,
           "Orders",
-          html`<h1>${org?.name}</h1>
-${p.org_kind === "buyer" ? html`<p>${org?.vault_token_id ? html`PayPal connected${org.vault_payer ? ` (${org.vault_payer})` : ""}. Holds and captures follow approved amounts only.` : p.role === "owner" ? html`<form method="post" action="/connect-paypal" class="inline"><button class="btn primary" type="submit">Connect PayPal</button></form> <span class="muted">One approval lets StockSure place holds for your orders.</span>` : "PayPal not connected yet (owner action)."}</p>` : ""}
-${attention.length ? html`<div class="banner info">${attention.length} order${attention.length > 1 ? "s need" : " needs"} you: ${attention.map((a, i) => html`${i ? ", " : ""}<a href="/po/${a.id}">${a.number}</a> (${a.status.replace(/_/g, " ")})`)}</div>` : ""}
-<section class="card"><div class="spread"><h2>Purchase orders</h2>${p.org_kind === "buyer" && p.role === "owner" ? html`<a class="btn primary small" href="/po/new">New order</a>` : ""}</div>
-<div class="table-wrap"><table><thead><tr><th>PO</th>${p.org_kind === "supplier" ? raw("<th>Buyer</th>") : ""}<th>Status</th><th>Deliver by</th><th class="num">Quote</th><th class="num">Limit</th></tr></thead><tbody>${rows.length ? rows : html`<tr><td colspan="6" class="muted">No orders yet.</td></tr>`}</tbody></table></div></section>`,
+          html`<div class="page-head"><div><h1>Orders</h1><p>${org?.name}${p.org_kind === "buyer" ? html` · ${org?.vault_token_id ? html`PayPal connected${org.vault_payer ? ` as ${org.vault_payer}` : ""}` : "PayPal not connected"}` : ""}</p></div>${p.org_kind === "buyer" && p.role === "owner" ? html`<a class="btn primary" href="/po/new">${raw(icon("cart"))}New order</a>` : ""}</div>
+${p.org_kind === "buyer" && !org?.vault_token_id ? html`<section class="card"><h2>Connect PayPal</h2><p class="sub muted">One approval lets StockSure place a hold when you accept a quote. Nothing is charged until both sides agree what arrived.</p>${p.role === "owner" ? html`<form method="post" action="/connect-paypal"><button class="btn primary" type="submit">${raw(icon("wallet"))}Connect PayPal</button></form>` : html`<p class="muted">The owner connects PayPal.</p>`}</section>` : ""}
+<div class="section-title"><h2>Needs you</h2><p>${attention.length ? `${attention.length} order${attention.length === 1 ? "" : "s"}` : ""}</p></div>
+${attention.length ? html`<div class="rows">${attention.map(row)}</div>` : html`<div class="empty">Nothing waiting on you. ${p.org_kind === "buyer" && p.role === "owner" ? html`<a href="/po/new">Start a new order</a>.` : ""}</div>`}
+${rest.length ? html`<div class="section-title"><h2>All orders</h2></div><div class="rows">${rest.map(row)}</div>` : ""}`,
           { refresh: pos.some((x) => x.status === "settling" || x.status === "part_settling" || x.status === "funding") ? 4 : undefined },
         ),
       );
@@ -193,10 +186,11 @@ ${[0, 1, 2].map(row)}
           req,
           p,
           po.number,
-          html`<div class="spread"><div><h1>${po.number} ${pill(po.status)}</h1><p class="muted">${po.buyer_name} → ${po.supplier_name} · deliver by ${fmtDate(po.deliver_by)}${po.kind === "original" ? ` · limit ${fmt(po.spend_limit_cents)}` : ""}${po.note ? ` · ${po.note}` : ""}</p></div>
-<div class="row">${po.status !== "draft" ? html`<a class="btn small" href="/po/${po.root_id}/record.csv">CSV</a><a class="btn small" href="/po/${po.root_id}/record.json">JSON</a>` : ""}</div></div>
+          html`<p class="small"><a href="/home">← Orders</a></p><div class="page-head"><div><h1>${po.number} ${pill(po.status)}</h1><p>${po.buyer_name} → ${po.supplier_name} · deliver by ${fmtDate(po.deliver_by)}${po.kind === "original" ? ` · limit ${fmt(po.spend_limit_cents)}` : ""}${po.note ? ` · ${po.note}` : ""}</p></div>
+<div class="row">${po.status !== "draft" ? html`<a class="btn small" href="/po/${po.root_id}/record.csv">${raw(icon("file"))}CSV</a><a class="btn small" href="/po/${po.root_id}/record.json">JSON</a>` : ""}</div></div>
 ${await treeNav(db, po)}
 ${po.exception && po.status !== "exception" && po.status !== "funding" ? html`<p class="banner warn">${po.exception}</p>` : ""}
+${p.org_kind === "buyer" && p.role === "owner" ? (await db.query<any>("SELECT * FROM approvals WHERE owner_id = $1 AND status = 'pending' AND payload->>'entity' = 'po' AND payload->>'entity_id' = $2 ORDER BY created_at", [p.org_id, po.id])).rows.map((a) => { const pl = typeof a.payload === "string" ? JSON.parse(a.payload) : a.payload; const big = Number(pl.cents) > countersignThreshold(); return html`<div id="ap-${a.id}">${guardCard({ level: pl.safety_reasons?.length ? "hold" : "caution", reasons: pl.safety_reasons?.length ? pl.safety_reasons : [`This ${a.action} is above the amount StockSure may move without you.`] }, { approve: big ? null : `/guard/approvals/${a.id}`, next: `/po/${po.id}`, title: `${a.action === "refund" ? "Refund" : "PayPal capture"} of ${fmt(Number(pl.cents))} waits for you`, doText: pl.safety_reasons?.length ? "A message on this order looks like invoice fraud. Call the supplier on a number you already have before approving." : big ? "This amount needs your passkey: approve it on the Approvals page." : "Approve to let it go ahead, or decline and nothing moves." })}${big ? html`<p class="small"><a class="btn small primary" href="/guard#approvals">Sign with your passkey</a></p>` : ""}</div>`; }) : ""}
 ${await actionsCard(db, po, p)}
 ${lines.some((l) => l.unit_price_cents !== null) || po.auth_id ? await fundingPanel(db, po) : ""}
 ${await resolutionCard(db, po, p)}

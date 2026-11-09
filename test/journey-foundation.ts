@@ -166,9 +166,15 @@ export async function walkFoundation(c: FoundationCtx) {
   const heldId = (held as any).approvalId as string;
   const bigId = (big as any).approvalId as string;
   expect((await jordan.get("/guard")).text).toMatch(/Waiting for you \(2\)/);
+  // Both holds show on the order itself, as guard cards.
+  const poPage = (await jordan.get(`/po/${ids.demoPo}`)).text;
+  expect(poPage).toContain(`ap-${heldId}`);
+  expect(poPage).toContain(`/guard/approvals/${heldId}/approve`);
   expect(decodeURIComponent((await jordan.post(`/guard/approvals/${bigId}/click`, { approve: "1" })).location ?? "")).toMatch(/passkey/);
-  okRedirect(await jordan.post(`/guard/approvals/${bigId}/click`, { approve: "0" }));
-  okRedirect(await jordan.post(`/guard/approvals/${heldId}/click`, { approve: "1" }));
+  expect(decodeURIComponent((await jordan.post(`/guard/approvals/${bigId}/approve`, { next: `/po/${ids.demoPo}` })).location ?? "")).toMatch(/passkey/);
+  okRedirect(await jordan.post(`/guard/approvals/${bigId}/decline`, { next: `/po/${ids.demoPo}` }));
+  const fromOrder = await jordan.post(`/guard/approvals/${heldId}/approve`, { next: `/po/${ids.demoPo}` });
+  expect(fromOrder.location).toMatch(new RegExp(`^/po/${ids.demoPo}\\?ok=`));
   expect((await one("SELECT status, method FROM approvals WHERE id = $1", [heldId])).status).toBe("approved");
   expect((await one("SELECT status FROM approvals WHERE id = $1", [bigId])).status).toBe("declined");
   const allowedNow = await dryRun({ action: "capture", ownerId: laneway, agentScope: `org:${laneway}`, entity: "po", entityId: ids.demoPo, cents: 50000, trustedCents: [50000] });
@@ -215,7 +221,9 @@ export async function walkFoundation(c: FoundationCtx) {
 
   // ---- Channels: simulator shows what live channels would send; replies work; webhooks accept bodies ----
   const channels = await jordan.get("/channels");
-  expect(channels.text).toMatch(/Channels/);
+  expect(channels.text).toMatch(/Messages and alerts/);
+  expect(channels.text).toMatch(/Connect Telegram/);
+  expect(channels.text).not.toMatch(/WhatsApp/);
   okRedirect(await jordan.post("/channels/reply", { address: `buyer:${laneway}`, text: "pending" }));
   okRedirect(await jordan.post("/channels/reply", { address: `supplier:${ids.supplier}`, text: "orders" }));
   expect((await jordan.post("/channels/reply", { address: "nobody", text: "hi" })).status).toBe(302);
@@ -225,6 +233,17 @@ export async function walkFoundation(c: FoundationCtx) {
   expect((await jordan.postJson("/channels/link", { channel: "pigeon", address: "1" })).status).toBe(422);
   expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: 123456 }, text: "pending" } })).json).toEqual({ ok: true });
   expect((await anon.postJson("/webhooks/telegram", { callback_query: { data: `${msgs.rows[0]?.id ?? "m"}:decline:x`, message: { chat: { id: 123456 } } } })).json).toEqual({ ok: true });
+  // One-tap connect: a one-time code links the chat once; typing an org id does not link anything.
+  const tg = await jordan.post("/connect/telegram", {});
+  expect(tg.status).toBe(303);
+  const code = String(tg.location ?? "").split("start=stocksure-")[1];
+  expect(code).toBeTruthy();
+  expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: 777001 }, text: "link buyer:" + laneway } })).json).toEqual({ ok: true });
+  expect((await db.query<any>("SELECT count(*)::int AS n FROM channel_links WHERE address = '777001'")).rows[0].n).toBe(0);
+  expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: 777001 }, text: "/start " + code } })).json).toEqual({ ok: true });
+  expect((await db.query<any>("SELECT count(*)::int AS n FROM channel_links WHERE address = '777001'")).rows[0].n).toBe(1);
+  expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: 777002 }, text: "/start " + code } })).json).toEqual({ ok: true });
+  expect((await db.query<any>("SELECT count(*)::int AS n FROM channel_links WHERE address = '777002'")).rows[0].n).toBe(0);
   expect((await anon.get("/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=1")).status).toBe(403);
   expect((await anon.get("/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=stocksure-verify&hub.challenge=abc")).text).toBe("abc");
   expect((await anon.postJson("/webhooks/whatsapp", { entry: [{ changes: [{ value: { messages: [{ type: "text", from: "6591234567", text: { body: "link buyer:" + laneway } }] } }] }] })).json).toEqual({ ok: true });

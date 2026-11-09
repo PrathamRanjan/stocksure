@@ -7,8 +7,10 @@ export const flashOf = (req: Request) => ({
 });
 
 export function back(res: Response, to: string, msg: string, isErr = false) {
-  const sep = to.includes("?") ? "&" : "?";
-  res.redirect(`${to}${sep}${isErr ? "err" : "ok"}=${encodeURIComponent(msg)}`);
+  // The message goes in the query, before any #fragment, or the page never sees it.
+  const [path, hash] = to.split("#");
+  const sep = path.includes("?") ? "&" : "?";
+  res.redirect(`${path}${sep}${isErr ? "err" : "ok"}=${encodeURIComponent(msg)}${hash ? `#${hash}` : ""}`);
 }
 
 /** Wraps a page handler: GtErrors become a redirect back with the message; JSON routes get JSON errors. */

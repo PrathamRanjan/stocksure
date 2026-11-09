@@ -1,3 +1,5 @@
+import { icon } from "./icons.js";
+import { randomBytes } from "node:crypto";
 /**
  * Trace, evidence, judge mode, channels simulator, webhooks and PWA routes (roadmap B.2, B.3, B.4, B.8, B.9, B.10).
  */
@@ -158,7 +160,7 @@ ${t.run.entity === "po" ? html`<p class="small"><a href="/po/${t.run.entity_id}"
 <tr><th>Models</th><td>${providerLabel()}. ${ai.calls} calls recorded (${ai.ok} ok), about $${ai.cost_usd.toFixed(3)} at list prices. Every call's input hash, model, latency and output is stored in <span class="mono">ai_calls</span>. Models read documents and write negotiation wording; they never set a price, a quantity or a payee.</td></tr>
 <tr><th>Documents</th><td>${labels.length} eval delivery notes, ${labels.filter((l) => l.trap).length} traps (instruction injections, payee changes, invented lines, count drift). Production documents come from uploads, the dock camera or the supplier's dispatch.</td></tr>
 <tr><th>Agents</th><td>Buyer and supplier agents negotiate under the owner's mandate and the supplier's floor; code guards every offer, and the agreement is hashed and signed by both sides before any hold. MCP at <span class="mono">/mcp</span>, merchant cart API at <span class="mono">/api/merchant</span>.</td></tr>
-<tr><th>Channels</th><td>Telegram ${telegramReady() ? "live" : "not configured"} · WhatsApp ${whatsappReady() ? "live" : "not configured"} · Web push ${pushReady() ? "live" : "not configured"} · Simulator always on at <a href="/channels">/channels</a>.</td></tr>
+<tr><th>Channels</th><td>Telegram ${telegramReady() ? "live" : "not configured"} · Web push ${pushReady() ? "live" : "not configured"} · Simulator always on at <a href="/channels">/channels</a>.</td></tr>
 <tr><th>Audit chain</th><td>${chain.ok ? `intact, ${chain.rows} rows` : `BROKEN at row ${chain.broken_at}`}, head <span class="mono">${chain.head.slice(0, 16)}…</span></td></tr>
 </tbody></table></div>
 
@@ -312,10 +314,13 @@ Guarantees: a capture never exceeds what was received against the signed agreeme
       const p = await me(req);
       const addr = typeof req.query.address === "string" ? req.query.address : p ? addressOf(p) : "";
       const msgs = addr ? await conversation(addr, 60) : await recentMessages(60);
+      const tgLinked = p ? Number((await (await getDb()).query<any>("SELECT count(*)::int AS n FROM channel_links WHERE channel = 'telegram' AND party_id = $1", [p.org_id])).rows[0]?.n ?? 0) > 0 : false;
       res.send(
         layout(
-          { title: "Channels", who: whoOf(p), flash: flashOf(req), scripts: raw(`<script>setTimeout(()=>location.reload(), 8000)</script>`) },
-          html`<h1>Channels</h1><p class="sub">Owners, suppliers and drivers get every decision and approval request on the channel they already use. Telegram ${telegramReady() ? pill("live") : pill("not configured")} · WhatsApp ${whatsappReady() ? pill("live") : pill("not configured")} · Web push ${pushReady() ? pill("live") : pill("not configured")}. The simulator below shows exactly what the live channels would send and lets you reply.</p>
+          { title: "Messages", who: whoOf(p), flash: flashOf(req) },
+          html`<div class="page-head"><div><h1>Messages and alerts</h1><p>Orders, approvals and receipts reach owners and suppliers on their phone.</p></div></div>
+${p ? html`<section class="card" id="phone"><h2>Alerts on your phone</h2><p class="sub muted">${p.org_kind === "buyer" ? "Held captures and refunds arrive on Telegram with Approve and Decline buttons." : "New orders, quotes and receipts arrive on Telegram as they happen."}</p><div class="row">${tgLinked ? html`<span class="pill good">Telegram connected</span>` : html`<span class="pill">Telegram not connected</span>`}<form method="post" action="/connect/telegram" class="inline" target="_blank"><button class="btn primary" type="submit">${raw(icon("message"))}${tgLinked ? "Connect another chat" : "Connect Telegram"}</button></form><button class="btn" id="push-sub" type="button">${raw(icon("zap"))}Turn on notifications in this browser</button></div><p class="small muted">Telegram opens with a one-time code that expires in 15 minutes; press Start and you're done.</p></section><script src="/static/pwa.js" defer></script>` : ""}
+<div class="section-title"><h2>Message simulator</h2><p>What the live channels would send, and your replies.</p></div>
 <form class="row" method="get" action="/channels"><input type="text" name="address" value="${addr}" placeholder="buyer:<org id>, supplier:<org id> or driver:<person id>"><button class="btn small">Show</button></form>
 <div class="chat">${raw(
   (msgs as any[])
@@ -324,11 +329,21 @@ Guarantees: a capture never exceeds what was received against the signed agreeme
     .map((m) => `<div class="msg ${m.direction}"><div class="meta small muted">${m.channel} · ${String(m.address).replace(/</g, "&lt;")} · ${fmtDate(m.created_at)} · ${m.status}</div><div class="body">${String(m.body).replace(/</g, "&lt;")}</div>${m.buttons && m.direction === "out" ? `<div class="row">${(m.buttons as any[]).map((b) => `<form method="post" action="/channels/reply" class="inline"><input type="hidden" name="address" value="${String(m.address).replace(/"/g, "&quot;")}"><input type="hidden" name="replyTo" value="${m.id}"><input type="hidden" name="buttonId" value="${String(b.id).replace(/"/g, "&quot;")}"><button class="btn small">${String(b.label).replace(/</g, "&lt;")}</button></form>`).join("")}</div>` : ""}</div>`)
     .join(""),
 )}</div>
-${addr ? html`<form method="post" action="/channels/reply" class="row"><input type="hidden" name="address" value="${addr}"><input type="text" name="text" placeholder="Reply as this party (try: pending, orders, today)" required maxlength="500"><button class="btn primary small">Send</button></form>` : ""}
-${p ? html`<div class="card small"><h3>Link a real channel</h3><p class="muted">Telegram: message the bot and send <span class="mono">/link ${addressOf(p)}</span>. WhatsApp: send the same text to the business number. Web push: <button class="btn small" id="push-sub" type="button">enable on this device</button>.</p></div><script src="/static/pwa.js" defer></script>` : ""}`,
+${addr ? html`<form method="post" action="/channels/reply" class="row"><input type="hidden" name="address" value="${addr}"><input type="text" name="text" placeholder="Reply as this party (try: pending, orders, today)" required maxlength="500"><button class="btn primary small">Send</button></form>` : ""}`,
         ),
       );
     }, () => "/"),
+  );
+  /** One tap: a 15-minute one-time code, then straight into Telegram; the shared bot routes "stocksure-<code>" here. */
+  r.post(
+    "/connect/telegram",
+    page(async (req, res) => {
+      const p = await me(req);
+      if (!p) return res.redirect("/login?next=/channels");
+      const code = randomBytes(12).toString("base64url").replace(/[-_]/g, "x");
+      await (await getDb()).query("INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [`tglink:${code}`, JSON.stringify({ party: p.org_kind === "buyer" ? "buyer" : "supplier", party_id: p.org_id, exp: Date.now() + 15 * 60_000 })]);
+      res.redirect(303, `https://t.me/${config.channels.telegramBot}?start=stocksure-${code}`);
+    }),
   );
   r.post(
     "/channels/reply",

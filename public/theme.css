@@ -1,0 +1,28 @@
+/* StockSure: a loading dock. Concrete grey, graphite, forklift yellow; IBM Plex Sans and Plex Mono for counts and money. */
+:root {
+  --ui-bg: #f4f4f2; --ui-fg: #17191c; --ui-card: #ffffff; --ui-card-fg: #17191c;
+  --ui-primary: #1f2328; --ui-primary-fg: #ffffff;
+  --ui-secondary: #e9e9e6; --ui-secondary-fg: #1f2328;
+  --ui-muted-bg: #ececea; --ui-muted-fg: #62666d;
+  --ui-accent-bg: #fff4cc; --ui-accent-fg: #5c4400;
+  --ui-border: #dfdfdb; --ui-input: #cfcfca; --ui-ring: #e0a400;
+  --ui-sidebar: #ebebe8;
+  --ui-success: #1d6b3a; --ui-success-bg: #e9f5ed;
+  --ui-warning: #8a5a00; --ui-warning-bg: #fff4d6;
+  --ui-destructive: #b42318; --ui-destructive-bg: #fdeeec;
+  --ui-info: #24548a; --ui-info-bg: #ebf2fa;
+  --radius: 0.4rem;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --hazard: #f5b301;
+}
+h1, h2, .lp-title, .lp-h2 { letter-spacing: -0.02em; font-weight: 600; }
+td.num, th.num, .amt, .qty, code, .kpi .value { font-family: var(--font-mono); }
+.lp-title em { font-style: normal; background: linear-gradient(transparent 62%, var(--hazard) 62%); }
+.sb-brand .mark { background: var(--hazard); color: #1f2328; }
+.sidebar { border-right: 1px solid var(--ui-border); }
+.sb-nav a.active { box-shadow: inset 3px 0 0 var(--hazard); }
+.lp-hero { background-image: repeating-linear-gradient(-45deg, transparent 0 22px, rgba(31,35,40,.025) 22px 44px); }
+.hazard-strip { height: 6px; background: repeating-linear-gradient(-45deg, var(--hazard) 0 12px, #1f2328 12px 24px); border-radius: 2px; }
+.kpi { border-top: 3px solid var(--ui-primary); }

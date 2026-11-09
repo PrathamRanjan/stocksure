@@ -15,17 +15,23 @@ export function installChannelHandlers() {
   onInbound(async (m) => {
     const text = m.text.trim();
     const db = await getDb();
-    const linkMatch = text.match(/^\/?link\s+(buyer|supplier|driver):(\S+)$/i);
-    if (linkMatch && m.channel !== "simulator") {
-      const party = linkMatch[1].toLowerCase() as Party;
-      const id = linkMatch[2];
-      const exists = party === "driver" ? await personById(db, id) : await orgById(db, id);
-      if (!exists) return "That id does not exist. Copy it from the Channels page while signed in.";
-      await link(m.channel, m.address, party, id);
-      return `Linked. You will get ${party === "buyer" ? "approval requests and order events" : party === "supplier" ? "new orders, quotes and receipts" : "your stops"} here.`;
+    // Linking needs a one-time code made by a signed-in person (Messages, Connect Telegram). An org id alone is not a
+    // secret, so "link buyer:<org id>" from a chat is refused: otherwise anyone could receive a café's approval buttons.
+    const st = text.match(/^\/start(?:\s+(\S+))?$/i);
+    if (st && m.channel !== "simulator") {
+      const code = st[1] ?? "";
+      const row = code ? (await db.query<{ value: string }>("SELECT value FROM settings WHERE key = $1", [`tglink:${code}`])).rows[0] : undefined;
+      if (code) await db.query("DELETE FROM settings WHERE key = $1", [`tglink:${code}`]);
+      const v = row ? (JSON.parse(row.value) as { party: Party; party_id: string; exp: number }) : null;
+      if (!v || v.exp < Date.now()) return code ? "That connect link has expired. In StockSure, open Messages and tap “Connect Telegram” again." : "Hi, this is StockSure. Sign in, open Messages and tap “Connect Telegram” to link this chat.";
+      const exists = v.party === "driver" ? await personById(db, v.party_id) : await orgById(db, v.party_id);
+      if (!exists) return "That account no longer exists.";
+      await link(m.channel, m.address, v.party, v.party_id);
+      return `Connected. You will get ${v.party === "buyer" ? "approval requests and order events" : v.party === "supplier" ? "new orders, quotes and receipts" : "your stops"} here.`;
     }
+    if (/^\/?link\s+(buyer|supplier|driver):/i.test(text) && m.channel !== "simulator") return "For safety, chats are linked from the app: sign in to StockSure, open Messages and tap “Connect Telegram”.";
     const party = m.party ?? (m.channel === "simulator" && /^(buyer|supplier|driver):/.test(m.address) ? { party: m.address.split(":")[0], party_id: m.address.split(":").slice(1).join(":") } : null);
-    if (!party) return "This address is not linked yet. Send: link buyer:<org id>, link supplier:<org id> or link driver:<person id>.";
+    if (!party) return "This chat is not linked yet. Sign in to StockSure, open Messages and tap “Connect Telegram”.";
 
     const cmd = (m.buttonId ?? text).match(/^(approve|decline):(\S+)$/i);
     if (cmd && party.party === "buyer") {

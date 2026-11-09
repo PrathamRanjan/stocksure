@@ -1,3 +1,4 @@
+import { nextOf } from "./safetyui.js";
 /**
  * Buyer owner's guard console (roadmap B.6, S3): mandate in plain words -> compiled rules, backtest over the
  * buyer's own orders, earned autonomy, kill switch (organisation and per agent), approvals with passkey
@@ -278,6 +279,23 @@ ${compiled.unexpressed.length ? html`<p class="banner warn"><b>Could not express
       back(res, "/guard", engaged ? `Kill switch engaged for ${scope}` : `Kill switch released for ${scope}`);
     }, () => "/guard"),
   );
+
+  // In-place decisions from the order page (guard card): same checks as the Approvals page, back to where you were.
+  for (const op of ["approve", "decline"] as const)
+    r.post(
+      `/guard/approvals/:id/${op}`,
+      page(async (req, res) => {
+        const p = await needOwner(req, res);
+        if (!p) return;
+        const db = await getDb();
+        const a = (await db.query<any>("SELECT * FROM approvals WHERE id = $1 AND owner_id = $2", [req.params.id, p.org_id])).rows[0];
+        if (!a) throw new GtError("Approval not found", "not_found", 404);
+        if (op === "approve" && a.payload.cents > countersignThreshold()) throw new GtError("This amount needs your passkey", "passkey_required", 403);
+        const payload = await decideApproval(a.id, p.org_id, op === "approve", "click");
+        if (payload && op === "approve") await release(a.id);
+        back(res, nextOf(req.body?.next, "/guard"), op === "approve" ? "Approved. The capture goes ahead now." : "Declined. Nothing moves.");
+      }, (req) => nextOf(req.body?.next, "/guard")),
+    );
 
   r.post(
     "/guard/approvals/:id/click",
