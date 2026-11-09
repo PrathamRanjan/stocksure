@@ -187,3 +187,17 @@ From the 8 Nov independent review: each defect its probes reproduced is fixed, a
 - An agreed defect removes the spoiled units from the buyer's stock.
 - The budget-limited planner can split a tight budget across lines (for example A4 + B2 rather than all on one line).
 - A declined part capture becomes an exception, and retry places a new capture request.
+
+## Scam and fraud protection (9 Nov 2026)
+
+StockSure's PayPal calls never take a payee, so a message or invoice cannot redirect settlement. The tampering risk is in the paper and the thread, and that is what the layer checks (`SAFETY_ACCESSIBILITY_SPEC.md` §4, StockSure row of §6). Three layers, strictest wins, none can approve a payment:
+
+- **Rules in the gate** (`src/safety/index.ts`, called from `src/guard/dryrun.ts` before the approval threshold): a supplier message on the order that announces new bank or PayPal details, or asks to be paid outside PayPal, holds the capture or refund (`supplier_details_changed_in_message`, `supplier_asks_off_platform`) with the reasons in the approval payload; an invoice that bills more than the settlement computed from accepted quantities is noted and the difference is not paid; documents whose instruction-like lines were removed are counted; the amount against the buyer's history with that supplier is a caution. Protected mode (per buyer organisation) holds every capture and refund.
+- **Scam text model in the browser** (`public/safety/`, 23 MB int8 ONNX, fine-tuned MiniLM) scores a pasted supplier email or invoice text on the owner's device at `/safety`. Advisory; its score never reaches the gate. Supplier messages on the order thread carry a red or amber scam banner from the rules.
+- **Payment-risk model** (`public/safety/risk_lgbm.json`): monotone LightGBM, **trained on synthetic data**, a ranking signal shown with the rule reasons.
+
+Tests: `test/safety.test.ts`; the model's measured results are on `/safety/model-card`.
+
+## Accessibility (9 Nov 2026)
+
+`public/a11y.js` and `public/a11y.css` on every page: a **Display and help** button with text size, high contrast, Atkinson Hyperlegible, read-aloud, voice input (on-device where the browser supports it), plain words, bigger targets, more time (removes the dock page's auto-refresh) and no motion. A first-visit card offers the same choices. The profile stays in this browser's `localStorage`; typing and buttons always work without it. AG Grid keeps its own keyboard navigation and ARIA grid roles.

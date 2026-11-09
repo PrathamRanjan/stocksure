@@ -5,6 +5,7 @@
  * payload hash above SS_COUNTERSIGN_ABOVE_CENTS).
  */
 import { createHash } from "node:crypto";
+import { assessSettlement } from "../safety/index.js";
 import { config } from "../config.js";
 import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
@@ -101,8 +102,15 @@ export async function dryRun(m: MoneyMove, run?: Run | null, q?: Queryable): Pro
     return refuse(`PayPal state could not be read: ${(e as Error).message.slice(0, 160)}`);
   }
 
-  if ((m.action === "capture" || m.action === "refund") && m.cents >= rules.approve_above_cents && !(await approvedFor(m.entity, m.entityId, m.action, m.cents, db))) {
-    const payload = { action: m.action, entity: m.entity, entity_id: m.entityId, cents: m.cents };
+  // Scam check (SAFETY_ACCESSIBILITY_SPEC §4): supplier messages on the order, invoice against settlement, protected mode.
+  let safety: Awaited<ReturnType<typeof assessSettlement>> | null = null;
+  if ((m.action === "capture" || m.action === "refund") && m.entity === "po") {
+    safety = await assessSettlement(m.entityId, m.action, m.cents, db);
+    checks.push(`scam check: ${safety.summary}`);
+  }
+  const safetyHold = safety?.level === "hold";
+  if ((m.action === "capture" || m.action === "refund") && (safetyHold || m.cents >= rules.approve_above_cents) && !(await approvedFor(m.entity, m.entityId, m.action, m.cents, db))) {
+    const payload = { action: m.action, entity: m.entity, entity_id: m.entityId, cents: m.cents, ...(safetyHold ? { safety_rule: safety!.rule ?? "rule", safety_reasons: safety!.reasons, safety_risk: safety!.risk } : {}) };
     const existing = (await db.query<{ id: string }>("SELECT id FROM approvals WHERE owner_id = $1 AND payload_hash = $2 AND status = 'pending'", [m.ownerId, payloadHash(payload)])).rows[0];
     const approvalId = existing?.id ?? newId("apr");
     if (!existing) await db.query("INSERT INTO approvals (id, owner_id, action, payload_hash, payload) VALUES ($1,$2,$3,$4,$5)", [approvalId, m.ownerId, m.action, payloadHash(payload), JSON.stringify(payload)]);
@@ -112,7 +120,7 @@ export async function dryRun(m: MoneyMove, run?: Run | null, q?: Queryable): Pro
       const big = m.cents > config.guard.countersignAboveCents;
       await notifyParty("buyer", m.ownerId, `StockSure wants to ${m.action} ${(m.cents / 100).toFixed(2)} on ${m.entity} ${m.entityId}. It is at or above your approval threshold.${big ? ` Above ${(config.guard.countersignAboveCents / 100).toFixed(2)} it needs your passkey in the guard console.` : ""}`, big ? [{ id: `decline:${approvalId}`, label: "Decline" }] : [{ id: `approve:${approvalId}`, label: "Approve" }, { id: `decline:${approvalId}`, label: "Decline" }], "approval", approvalId, db).catch(() => undefined);
     }
-    return { gate: "held", approvalId, reason: `${m.action} ${m.cents} cents is at or above the mandate's approval threshold ${rules.approve_above_cents}`, checks };
+    return { gate: "held", approvalId, reason: safetyHold ? `paused by the scam check: ${safety!.reasons[0]}` : `${m.action} ${m.cents} cents is at or above the mandate's approval threshold ${rules.approve_above_cents}`, checks };
   }
 
   await run?.step({ actor: "guard", tool: `dry_run:${m.action}`, args: { cents: m.cents, entity: m.entity, entity_id: m.entityId }, gate: "allowed", result: { checks } });

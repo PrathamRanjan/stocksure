@@ -7,6 +7,7 @@ import { GtError } from "./lib/util.js";
 import { receiveWebhook } from "./webhooks.js";
 import { routes } from "./web/routes.js";
 import { guardRouter } from "./web/guard.js";
+import { safetyRouter } from "./web/safety.js";
 import { traceRouter } from "./web/trace.js";
 import { ledgerRouter } from "./web/ledger.js";
 import { deliveriesRouter } from "./web/deliveries.js";
@@ -57,6 +58,7 @@ export function createApp() {
   });
   app.use(merchantRouter());
   app.use(guardRouter());
+  app.use(safetyRouter());
   app.use(traceRouter());
   app.use(ledgerRouter());
   app.use(deliveriesRouter());

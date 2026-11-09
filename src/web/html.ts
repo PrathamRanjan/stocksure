@@ -39,7 +39,7 @@ export const AGGRID = raw(`<script src="https://cdn.jsdelivr.net/npm/ag-grid-com
 export function layout(o: LayoutOpts, body: Raw): string {
   const nav = o.who
     ? (o.who.kind === "buyer"
-        ? [["/home", "Orders"], ...(o.who.role === "owner" ? [["/po/new", "New order"], ["/guard", "Guard"]] : []), ["/stock", "Stock"], ["/dock", "Dock"], ["/ledger", "Ledger"], ["/deliveries", "Deliveries"], ["/negotiations", "Agents"], ["/channels", "Channels"]]
+        ? [["/home", "Orders"], ...(o.who.role === "owner" ? [["/po/new", "New order"], ["/guard", "Guard"], ["/safety", "Safety"]] : []), ["/stock", "Stock"], ["/dock", "Dock"], ["/ledger", "Ledger"], ["/deliveries", "Deliveries"], ["/negotiations", "Agents"], ["/channels", "Channels"]]
         : [["/home", "Orders"], ["/catalog", "Catalog"], ["/performance", "Performance"], ["/ledger", "Ledger"], ["/deliveries", "Deliveries"], ["/negotiations", "Agents"], ["/disputes", "Disputes"], ["/channels", "Channels"]]
       )
         .concat([["/evidence", "Evidence"], ["/demo", "Demo"]])
@@ -65,6 +65,7 @@ ${o.head ? o.head.value : ""}
 <header class="topbar"><div class="wrap"><a class="brand" href="/"><span class="dot">S</span>StockSure</a><nav class="nav" aria-label="Main">${nav}${signout}</nav></div></header>
 <main id="main"><div class="wrap">${flash}${body.value}</div></main>
 <footer><div class="wrap">StockSure · PayPal sandbox only: no real money moves. Payments follow agreed quantities and quote prices, never document text.</div></footer>
+<link rel="stylesheet" href="/static/a11y.css"><script src="/static/a11y.js" defer></script>
 ${o.scripts ? o.scripts.value : ""}
 </body>
 </html>`;

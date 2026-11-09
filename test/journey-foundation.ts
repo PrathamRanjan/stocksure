@@ -13,6 +13,7 @@ import type { DemoIds } from "../src/services/seed.js";
 import { setting } from "../src/store.js";
 import { dryRun } from "../src/guard/dryrun.js";
 import { DEFAULT_RULES } from "../src/guard/policy.js";
+import { DEMO_SUPPLIER_CHANGE } from "../src/web/safety.js";
 import type { Client } from "./client.js";
 
 export interface FoundationCtx {
@@ -126,6 +127,17 @@ export async function walkFoundation(c: FoundationCtx) {
   okRedirect(await ana.post(`/disputes/${encodeURIComponent(dispute.dispute_id)}/evidence`, { po: capture.po_id }));
   expect((await ana.get("/disputes")).text).toMatch(new RegExp(dispute.dispute_id));
   expect((await jordan.get("/disputes")).status).toBe(302);
+
+  // ---- Scam and fraud protection (SAFETY_ACCESSIBILITY_SPEC §4) ----
+  expect((await jordan.get("/safety")).text).toMatch(/No payee, ever/);
+  expect((await jordan.get("/safety/model-card")).text).toMatch(/ScamShield/);
+  expect((await sam.get("/safety")).status).toBe(302);
+  const scan = await jordan.req("POST", "/safety/scan", { json: { text: DEMO_SUPPLIER_CHANGE } });
+  expect(scan.status).toBe(200);
+  expect(JSON.parse(scan.text).level).toBe("hold");
+  okRedirect(await jordan.post("/safety/protected", { on: "1" }));
+  expect((await jordan.get("/safety")).text).toMatch(/Turn protected mode off/);
+  okRedirect(await jordan.post("/safety/protected", { on: "0" }));
 
   // ---- Guard console ----
   expect((await jordan.get("/guard")).text).toMatch(/Mandate/);
