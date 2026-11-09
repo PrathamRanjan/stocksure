@@ -1,0 +1,291 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource-variable/source-sans-3";
+
+/* StockSure "Docket" identity. See docs/DESIGN_BRIEF.md. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Archivo Variable", "Source Sans 3 Variable", ui-sans-serif, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-carbon: var(--carbon);
+  --color-carbon-soft: var(--carbon-soft);
+  --color-held: var(--held);
+  --color-held-soft: var(--held-soft);
+  --color-paid: var(--paid);
+  --color-paid-soft: var(--paid-soft);
+  --color-stop: var(--stop);
+  --color-stop-soft: var(--stop-soft);
+  --color-released: var(--released);
+  --color-released-soft: var(--released-soft);
+  --color-paper-2: var(--paper-2);
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --ease-docket: cubic-bezier(.2, .7, .2, 1);
+}
+
+:root {
+  --radius: 6px;
+  --background: #f4efe4;
+  --paper-2: #ebe4d4;
+  --foreground: #1b1a16;
+  --card: #fffcf5;
+  --card-foreground: #1b1a16;
+  --popover: #fffcf5;
+  --popover-foreground: #1b1a16;
+  --primary: #1b1a16;
+  --primary-foreground: #fffcf5;
+  --secondary: #ebe4d4;
+  --secondary-foreground: #1b1a16;
+  --muted: #ebe4d4;
+  --muted-foreground: #5a564c;
+  --accent: #e6dfcd;
+  --accent-foreground: #1b1a16;
+  --destructive: #b0261c;
+  --border: #d9d1bf;
+  --input: #bdb39d;
+  --ring: #2a3f8f;
+  --carbon: #2a3f8f;
+  --carbon-soft: #e3e7f5;
+  --held: #8a5300;
+  --held-soft: #f8ead0;
+  --paid: #1d6b3b;
+  --paid-soft: #dcefe1;
+  --stop: #b0261c;
+  --stop-soft: #f8e0dc;
+  --released: #5a5f6b;
+  --released-soft: #e6e7ea;
+  --shadow-raise: 0 1px 0 var(--border), 0 8px 24px rgb(27 26 22 / 0.1);
+  --dur-press: 120ms;
+  --dur-stamp: 180ms;
+  --dur-sheet: 240ms;
+  color-scheme: light;
+
+  /* Names the shared accessibility kit (public/a11y.css) reads. */
+  --surface: var(--card);
+  --ink: var(--foreground);
+  --line: var(--border);
+  --accent-ink: var(--card);
+  --bad: var(--stop);
+  --bad-soft: var(--stop-soft);
+  --ui-primary: var(--foreground);
+  --ui-primary-fg: var(--card);
+  --ui-accent-bg: var(--carbon-soft);
+  --ui-warning: var(--held);
+  --ui-bg: var(--background);
+  --shadow: var(--shadow-raise);
+}
+
+.dark {
+  --background: #14130f;
+  --paper-2: #1a1914;
+  --foreground: #f2ede1;
+  --card: #1d1c17;
+  --card-foreground: #f2ede1;
+  --popover: #232219;
+  --popover-foreground: #f2ede1;
+  --primary: #f2ede1;
+  --primary-foreground: #14130f;
+  --secondary: #26251e;
+  --secondary-foreground: #f2ede1;
+  --muted: #26251e;
+  --muted-foreground: #b3ad9f;
+  --accent: #2c2b23;
+  --accent-foreground: #f2ede1;
+  --destructive: #ff8a7a;
+  --border: #34322a;
+  --input: #4a473c;
+  --ring: #9db0f2;
+  --carbon: #9db0f2;
+  --carbon-soft: #1e2440;
+  --held: #f0b45a;
+  --held-soft: #33270f;
+  --paid: #7fcf98;
+  --paid-soft: #12301c;
+  --stop: #ff8a7a;
+  --stop-soft: #3a1915;
+  --released: #a9afbc;
+  --released-soft: #24262b;
+  --shadow-raise: 0 1px 0 var(--border), 0 8px 24px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+
+/* High contrast from the Display panel. */
+html[data-a11y-contrast="high"] {
+  --foreground: #000;
+  --muted-foreground: #222;
+  --border: #000;
+  --input: #000;
+  --background: #fff;
+  --card: #fff;
+}
+html.dark[data-a11y-contrast="high"] {
+  --foreground: #fff;
+  --muted-foreground: #eee;
+  --border: #fff;
+  --input: #fff;
+  --background: #000;
+  --card: #000;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/60;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 1rem;
+    line-height: 1.5;
+    min-height: 100dvh;
+  }
+  h1, h2, h3, .font-heading {
+    font-family: var(--font-heading);
+    font-variation-settings: "wdth" 112;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  h1 { font-weight: 800; }
+  h2, h3 { font-weight: 700; }
+  p { text-wrap: pretty; }
+  a { text-underline-offset: 3px; }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection { background: var(--carbon-soft); }
+}
+
+/* Money, dates, counts and statuses: tabular figures, always. */
+.num, .tabular { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1; }
+.mono { font-family: var(--font-mono); font-size: 0.8125em; }
+.prose-width { max-width: 68ch; }
+
+/* Stamps: PayPal money states. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: var(--font-heading);
+  font-variation-settings: "wdth" 125;
+  font-weight: 800;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 0.35em 0.55em 0.3em;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  white-space: nowrap;
+  transform: rotate(-2deg);
+}
+.stamp[data-tone="held"] { color: var(--held); background: var(--held-soft); }
+.stamp[data-tone="paid"] { color: var(--paid); background: var(--paid-soft); }
+.stamp[data-tone="stop"] { color: var(--stop); background: var(--stop-soft); }
+.stamp[data-tone="released"] { color: var(--released); background: var(--released-soft); border-style: dashed; }
+.stamp[data-tone="carbon"] { color: var(--carbon); background: var(--carbon-soft); }
+.stamp[data-tone="ink"] { color: var(--foreground); background: transparent; }
+.stamp[data-tone="quiet"] { color: var(--muted-foreground); background: transparent; border-width: 1px; transform: none; }
+.stamp-in { animation: stamp-in var(--dur-stamp) var(--ease-docket) both; }
+@keyframes stamp-in {
+  from { transform: rotate(-8deg) scale(1.35); opacity: 0; }
+  to { transform: rotate(-2deg) scale(1); opacity: 1; }
+}
+
+/* Tally strip: one mark per pack. */
+.tally { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.tally i {
+  display: block;
+  width: 7px;
+  height: 18px;
+  border-radius: 1.5px;
+  background: var(--foreground);
+}
+.tally i[data-k="damaged"] { background: transparent; border: 1.5px solid var(--stop); position: relative; }
+.tally i[data-k="damaged"]::after { content: ""; position: absolute; left: -3px; right: -3px; top: 50%; height: 2px; background: var(--stop); transform: rotate(-55deg); }
+.tally i[data-k="short"], .tally i[data-k="wrong"] { background: transparent; border: 1.5px dashed var(--muted-foreground); }
+.tally i[data-k="ordered"] { background: var(--input); }
+.tally i[data-k="gap"] { width: 6px; background: transparent; }
+.tally.sm i { width: 5px; height: 13px; }
+
+/* Settlement bar: the spend limit split into what happened to it. */
+.sbar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--paper-2); border: 1px solid var(--border); }
+.sbar > span { display: block; height: 100%; }
+.sbar [data-k="captured"] { background: var(--paid); }
+.sbar [data-k="held"] { background: var(--held); }
+.sbar [data-k="expected"] { background: repeating-linear-gradient(135deg, var(--released) 0 3px, transparent 3px 6px); }
+.sbar [data-k="refunded"] { background: var(--carbon); }
+
+/* Perforated docket edge. */
+.perf { background-image: radial-gradient(circle at 6px 0, transparent 4px, var(--card) 4.5px); background-size: 12px 8px; background-repeat: repeat-x; height: 8px; }
+.rule-dash { border-top: 1px dashed var(--input); }
+
+/* Shared accessibility kit pieces rendered by public/a11y.js. */
+.a11y-panel .btn, .a11y-first .btn { min-height: 40px; padding: 0 12px; border: 1px solid var(--input); border-radius: 4px; background: var(--card); color: var(--foreground); font: inherit; font-weight: 600; cursor: pointer; }
+.a11y-panel .small, .a11y-first .small { font-size: 0.875rem; }
+.a11y-panel .muted, .a11y-first .muted { color: var(--muted-foreground); }
+.a11y-panel .spread { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.a11y-panel h2 { font-family: var(--font-heading); }
+.a11y-first .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 20px; }
+.a11y-fab { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+  .stamp { transform: none; }
+}
+html[data-a11y-motion="off"] *, html[data-a11y-motion="off"] *::before, html[data-a11y-motion="off"] *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+html[data-a11y-motion="off"] .stamp { transform: none; }
+
+/* driver.js tour, in the docket identity. */
+.driver-popover.ss-tour {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--foreground);
+  border-radius: 6px;
+  box-shadow: var(--shadow-raise);
+  font-family: var(--font-sans);
+  max-width: min(360px, calc(100vw - 32px));
+}
+.driver-popover.ss-tour .driver-popover-title { font-family: var(--font-heading); font-size: 1.05rem; font-weight: 800; }
+.driver-popover.ss-tour .driver-popover-description { font-size: 0.95rem; line-height: 1.45; color: var(--foreground); }
+.driver-popover.ss-tour .driver-popover-progress-text { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.driver-popover.ss-tour button { font: inherit; font-weight: 600; text-shadow: none; border-radius: 4px; padding: 8px 12px; min-height: 40px; border: 1px solid var(--input); background: var(--card); color: var(--foreground); }
+.driver-popover.ss-tour .driver-popover-next-btn { background: var(--foreground); color: var(--card); border-color: var(--foreground); }
+.driver-popover.ss-tour .driver-popover-arrow { border-color: var(--foreground); }
+.driver-popover.ss-tour .driver-popover-close-btn { min-height: 0; border: 0; background: transparent; color: var(--muted-foreground); }
+.driver-popover.ss-tour { max-width: min(24rem, calc(100vw - 24px)); min-width: min(19rem, calc(100vw - 24px)); padding: 18px 18px 14px; }
+.driver-popover.ss-tour .driver-popover-title { padding-right: 28px; }
+.driver-popover.ss-tour .driver-popover-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.driver-popover.ss-tour .driver-popover-progress-text { order: -1; flex-basis: 100%; font-size: 0.8125rem; }
+.driver-popover.ss-tour .driver-popover-navigation-btns { display: flex; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+.driver-popover.ss-tour .ss-skip { border: 0; background: transparent; padding: 8px 4px; text-decoration: underline; text-underline-offset: 2px; color: var(--muted-foreground); }
+.driver-popover.ss-tour button { min-height: 44px; white-space: nowrap; }
+.driver-popover.ss-tour .driver-popover-close-btn { width: 44px; height: 44px; top: 2px; right: 2px; font-size: 1.25rem; }
+.driver-popover.ss-tour button:disabled { opacity: 0.45; }
+.driver-popover.ss-tour button:focus-visible { outline: 3px solid var(--carbon); outline-offset: 2px; }
+

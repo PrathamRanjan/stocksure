@@ -5,7 +5,7 @@ const BRYNTUM = "https://cdn.jsdelivr.net/npm/@bryntum/scheduler-trial@7.3.8";
 const el = document.getElementById("bryntum-deliveries");
 const out = document.getElementById("bryntum-verdict");
 if (el) {
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+  if (document.documentElement.classList.contains("dark")) {
     const link = document.getElementById("bryntum-theme");
     if (link) link.href = `${BRYNTUM}/svalbard-dark.css`;
   }

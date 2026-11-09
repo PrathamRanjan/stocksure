@@ -154,8 +154,9 @@ describe("StockSure flows", () => {
     const json = (await jordan.get(`/po/${ids.demoPo}/record.json`)).json;
     expect(json.purchase_orders).toHaveLength(2);
     expect(json.funding.captured_cents).toBe(20400);
-    const page = await jordan.get(`/po/${ids.demoPo}`);
-    expect(page.text).toContain("Ignored text in invoice");
+    const view = (await jordan.get(`/api/ui/po/${ids.demoPo}`)).json;
+    expect(view.docs.find((d: any) => d.kind === "invoice").flags.length).toBeGreaterThan(0);
+    expect(view.resolution.totals.accepted_cents).toBe(20400 - view.resolution.totals.replacement_cents);
   });
 
   it("a demo reset gets a new invoice-id tag, so PayPal never sees a repeated invoice id", async () => {
@@ -176,7 +177,7 @@ describe("StockSure flows", () => {
     ok(await part("8"));
     expect((await po()).status).toBe("dispatched");
     expect(await packs()).toBe(stock0 - 8);
-    expect((await sam.get(`/po/${ids.demoPo}/receive`)).text).toMatch(/part 1/);
+    expect((await sam.get(`/api/ui/po/${ids.demoPo}/receive`)).json.mode).toBe("part");
     // Part 1 arrives complete: counted against what was shipped in the part, so it agrees itself.
     ok(await receive(ids.demoPo, "8 cs", "0", null));
     expect((await po()).status).toBe("part_settling");
@@ -200,7 +201,7 @@ describe("StockSure flows", () => {
     expect((await po()).status).toBe("in_review");
     ok(await ana.post(`/po/${ids.demoPo}/lines/${l}/review`, { action: "agree", seen: await seenOf() }));
     expect((await po()).status).toBe("resolving");
-    expect((await jordan.get(`/po/${ids.demoPo}`)).text).toMatch(/Part 1 already charged \$80\.00/);
+    expect((await jordan.get(`/api/ui/po/${ids.demoPo}`)).json.resolution.part_charged_cents).toBe(8000);
     const r = await approveBoth();
     expect(r.body.totals.accepted_cents).toBe(18000);
     await run();
@@ -349,7 +350,8 @@ describe("StockSure flows", () => {
     await run();
     expect((await po()).status).toBe("exception");
     expect((await po()).exception).toMatch(/replacement no longer works/);
-    expect((await jordan.get(`/po/${ids.demoPo}`)).text).toMatch(/Agree a new replacement/);
+    expect((await jordan.get(`/api/ui/po/${ids.demoPo}`)).json.can_replan).toBe(true);
+    expect((await ana.get(`/api/ui/po/${ids.demoPo}`)).json.can_replan).toBe(false);
     ok(await jordan.post(`/po/${ids.demoPo}/resolution/revise`, {}));
     expect((await po()).status).toBe("resolving");
     const v2 = await approveBoth();
@@ -406,10 +408,10 @@ describe("StockSure flows", () => {
     expect(await risk()).toBeUndefined();
     ok(await eta({ eta: t(due + 6 * 36e5), observed_at: ago(30), source: "carrier", ref: "trk-2" }));
     expect(await risk()).toMatchObject({ status: "open", slack_minutes: -360 });
-    expect((await jordan.get("/home")).text).toMatch(/late ETA/);
-    const page = (await jordan.get(`/po/${ids.demoPo}`)).text;
-    expect(page).toMatch(/Early warning/);
-    expect(page).toMatch(/usage rate isn&#39;t recorded|usage rate isn't recorded/);
+    expect((await jordan.get("/api/ui/home")).json.orders.find((o: any) => o.id === ids.demoPo)).toMatchObject({ late: true, needs_you: true });
+    const risky = (await jordan.get(`/api/ui/po/${ids.demoPo}`)).json;
+    expect(risky.supply.risk).toMatchObject({ status: "open", can_decide: true });
+    expect(risky.supply.risk.unknowns.join(" ")).toMatch(/usage rate isn't recorded/);
     expect((await db.query<any>("SELECT body FROM messages WHERE po_id = $1 AND body LIKE 'Early warning%'", [ids.demoPo])).rows).toHaveLength(1);
 
     // The same carrier event again is one update; an older observation is kept but not applied.
@@ -440,7 +442,7 @@ describe("StockSure flows", () => {
     await dispatch(ids.demoPo, "clean");
     ok(await receive(ids.demoPo, "20 cs", "0", "clean"));
     expect(await risk()).toMatchObject({ status: "closed", closed_reason: "Delivered" });
-    expect((await jordan.get("/home")).text).not.toMatch(/late ETA/);
+    expect((await jordan.get("/api/ui/home")).json.orders.find((o: any) => o.id === ids.demoPo).late).toBe(false);
     // After delivery no more estimates are taken.
     expect(err(await eta({ eta: t(due), observed_at: ago(1), source: "supplier", ref: "s9" }))).toMatch(/only between funding and delivery/);
   });
@@ -469,7 +471,7 @@ describe("StockSure flows", () => {
     expect([...fake.refunds.values()].filter((r) => r.captureId === cap).map((r) => r.amount?.value)).toEqual([(claim.amount_cents / 100).toFixed(2)]);
     expect((await db.query<any>("SELECT status FROM defect_claims WHERE id = $1", [claim.id])).rows[0].status).toBe("refunded");
     expect(JSON.stringify((await latestReceipt(db, ids.demoPo))!.lines)).toBe(receiptBefore);
-    expect((await jordan.get(`/po/${ids.demoPo}`)).text).toMatch(/After delivery/);
+    expect((await jordan.get(`/api/ui/po/${ids.demoPo}`)).json.defects.claims.map((c: any) => c.status)).toContain("refunded");
   });
 
   it("dispute, revise, agree: only the changed line is re-reviewed and stock follows the revision", async () => {
@@ -666,7 +668,8 @@ describe("StockSure flows", () => {
   });
 
   it("access control: other buyers see nothing; roles are enforced server-side", async () => {
-    expect((await marco.get(`/po/${ids.demoPo}`)).status).toBe(404);
+    expect((await marco.get(`/api/ui/po/${ids.demoPo}`)).status).toBe(404);
+    expect((await marco.get(`/api/ui/po/${ids.demoPo}/receive`)).status).toBe(404);
     expect((await marco.get(`/po/${ids.demoPo}/record.json`)).status).toBe(404);
     ok(await jordan.post(`/po/${ids.demoPo}/submit`));
     expect(err(await sam.post(`/po/${ids.demoPo}/quote`, {}))).toMatch(/Only supplier/);
@@ -686,6 +689,8 @@ describe("StockSure flows", () => {
     const doc = (await db.query<{ id: string }>("SELECT id FROM documents LIMIT 1")).rows[0];
     expect((await marco.get(`/doc/${doc.id}`)).status).toBe(404);
     expect((await jordan.get(`/doc/${doc.id}`)).headers.get("content-security-policy")).toMatch(/sandbox/);
+    // Messages reach the front end as JSON data (React renders text, never HTML); the page shell never contains them.
     expect((await jordan.get(`/po/${ids.demoPo}`)).text).not.toMatch(/<script>alert/);
+    expect((await jordan.get(`/api/ui/po/${ids.demoPo}`)).headers.get("content-type")).toMatch(/application\/json/);
   });
 });

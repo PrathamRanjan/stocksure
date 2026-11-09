@@ -167,9 +167,10 @@ export async function walkFoundation(c: FoundationCtx) {
   const bigId = (big as any).approvalId as string;
   expect((await jordan.get("/guard")).text).toMatch(/Waiting for you \(2\)/);
   // Both holds show on the order itself, as guard cards.
-  const poPage = (await jordan.get(`/po/${ids.demoPo}`)).text;
-  expect(poPage).toContain(`ap-${heldId}`);
-  expect(poPage).toContain(`/guard/approvals/${heldId}/approve`);
+  const poView = (await jordan.get(`/api/ui/po/${ids.demoPo}`)).json;
+  expect(poView.approvals.map((a: any) => a.id)).toEqual(expect.arrayContaining([heldId, bigId]));
+  expect(poView.approvals.find((a: any) => a.id === bigId).needs_passkey).toBe(true);
+  expect((await jordan.get("/api/ui/approvals")).json.approvals.map((a: any) => a.id)).toEqual(expect.arrayContaining([heldId, bigId]));
   expect(decodeURIComponent((await jordan.post(`/guard/approvals/${bigId}/click`, { approve: "1" })).location ?? "")).toMatch(/passkey/);
   expect(decodeURIComponent((await jordan.post(`/guard/approvals/${bigId}/approve`, { next: `/po/${ids.demoPo}` })).location ?? "")).toMatch(/passkey/);
   okRedirect(await jordan.post(`/guard/approvals/${bigId}/decline`, { next: `/po/${ids.demoPo}` }));
@@ -213,11 +214,8 @@ export async function walkFoundation(c: FoundationCtx) {
   expect((await anon.get("/evidence/eval.csv?suite=receiving")).text).toMatch(/^id,arm/);
   expect((await anon.get("/llms.txt")).text).toMatch(/\/mcp/);
   expect((await anon.get("/skill.md")).text).toMatch(/StockSure skill/);
-  const judge = await anon.get("/judge");
-  expect(judge.text).toMatch(/six beats/);
-  const sid = judge.text.match(/\/judge\?s=([^&"]+)&b=1/)?.[1];
-  expect(sid).toBeTruthy();
-  expect((await anon.get(`/judge?s=${sid}&b=3`)).text).toMatch(/4\. /);
+  // Judge mode is a page of the front end (a guided tour); the server only has to serve it.
+  expect((await anon.get("/judge")).status).toBe(200);
 
   // ---- Channels: simulator shows what live channels would send; replies work; webhooks accept bodies ----
   const channels = await jordan.get("/channels");

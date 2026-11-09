@@ -41,32 +41,39 @@ export const AGGRID = raw(`<script src="https://cdn.jsdelivr.net/npm/ag-grid-com
 
 export const BRAND: Brand = {
   name: "StockSure",
-  mark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 4l9 5.5V20H3z"/><path d="M7 20v-6h10v6"/><path d="M9.5 17h5"/></svg>`,
-  description: "StockSure: when a delivery arrives short, damaged or mis-billed, it agrees what arrived, charges only that on PayPal and gets replacements moving.",
-  themeColor: "#1f2328",
-  fonts: "family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600",
+  // The tally mark: three strokes and a slash, one mark per pack.
+  mark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 5v14M9.5 5v14M14 5v14M18.5 19 21 5"/></svg>`,
+  description: "StockSure: when a delivery arrives short, damaged or mis-billed, both sides agree what arrived and PayPal charges exactly that.",
+  themeColor: "#1B1A16",
+  fonts: "family=Archivo:wdth,wght@62..125,400..900&family=Source+Sans+3:wght@400;600;700",
   appFoot: "PayPal sandbox: no real money moves. StockSure pays for agreed quantities at quoted prices, never for what a document claims.",
-  siteLinks: [["/#how", "How it works"], ["/#safety", "Safety"], ["/#try", "Try it"], ["/demo", "Demo setup"]],
-  cta: ["/#try", "Try the demo"],
-  siteFoot: "StockSure · built for the PayPal AI Hackathon · PayPal sandbox only, no real money moves.",
+  siteLinks: [["/#how", "How it works"], ["/#pricing", "Pricing"], ["/demo", "Demo"], ["/evidence", "Evidence"]],
+  cta: ["/login", "Sign in"],
+  siteFoot: "StockSure · built for the PayPal hackathon · PayPal sandbox only, no real money moves.",
   siteFootLinks: [["/login", "Sign in"], ["/evidence", "Evidence"], ["/llms.txt", "llms.txt"]],
   staticBase: "/static",
   legacyCss: ["app.css"],
 };
 
+/** Same pages, labels and order as the app's sidebar (web/src/components/shell.tsx navFor). */
 function navFor(w: NonNullable<LayoutOpts["who"]>): NavGroup[] {
   const owner = w.role === "owner";
   if (w.kind === "supplier")
     return [
-      { label: "Orders", items: [["/home", "Orders", "home"], ["/catalog", "Catalog", "package"], ["/deliveries", "Deliveries", "truck"], ["/disputes", "Disputes", "alert"]] },
-      { label: "Money", items: [["/ledger", "Ledger", "receipt"], ["/performance", "Performance", "chart"]] },
-      { label: "How it works", items: [["/negotiations", "Agent deals", "bot"], ["/channels", "Messages", "message"], ["/evidence", "Evidence", "file"], ["/demo", "Demo setup", "gauge"]] },
+      { label: "Main", items: [["/home", "Orders", "home"], ["/catalog", "Catalog", "package"], ["/performance", "Performance", "chart"], ["/deliveries", "Deliveries", "calendar"]] },
+      { label: "Controls and records", items: [["/disputes", "PayPal disputes", "alert"], ["/negotiations", "Negotiations", "bot"], ["/ledger", "Ledger", "receipt"], ["/channels", "Phone alerts", "message"], ["/evidence", "Evidence", "file"]] },
+    ];
+  if (!owner)
+    return [
+      { label: "Main", items: [["/home", "Deliveries", "home"], ["/dock", "Dock (camera)", "truck"], ["/stock", "Stock", "box"], ["/catalog", "Catalog", "package"]] },
+      { label: "Controls and records", items: [["/channels", "Phone alerts", "message"], ["/evidence", "Evidence", "file"]] },
     ];
   return [
-    { label: "Orders", items: [["/home", "Orders", "home"], ...(owner ? ([["/po/new", "New order", "cart"]] as [string, string, string][]) : []), ["/dock", "Receiving dock", "truck"], ["/stock", "Stock", "box"], ["/deliveries", "Deliveries", "package"]] },
-    { label: "Money", items: [["/ledger", "Ledger", "receipt"], ...(owner ? ([["/guard", "Approvals", "shieldCheck"]] as [string, string, string][]) : [])] },
-    { label: "Settings", items: [...(owner ? ([["/safety", "Scam protection", "shield"]] as [string, string, string][]) : []), ["/channels", "Messages", "message"]] },
-    { label: "How it works", items: [["/negotiations", "Agent deals", "bot"], ["/evidence", "Evidence", "file"], ["/demo", "Demo setup", "gauge"]] },
+    { label: "Main", items: [["/home", "Orders", "home"], ["/approvals", "Approvals", "checkCircle"], ["/stock", "Stock", "box"], ["/performance", "Supplier record", "chart"]] },
+    {
+      label: "Controls and records",
+      items: [["/guard", "Spending rules", "gauge"], ["/safety", "Scam check", "shieldCheck"], ["/catalog", "Catalog", "package"], ["/ledger", "Ledger", "receipt"], ["/deliveries", "Deliveries board", "calendar"], ["/disputes", "PayPal disputes", "alert"], ["/negotiations", "Agent negotiations", "bot"], ["/channels", "Phone alerts", "message"], ["/evidence", "Evidence", "file"]],
+    },
   ];
 }
 

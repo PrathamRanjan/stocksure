@@ -276,37 +276,6 @@ Guarantees: a capture never exceeds what was received against the signed agreeme
     { title: "Resolve and pay correctly", body: "A clean receipt settles by code: capture what was accepted, release the rest, re-plan any replacement under the same spending limit. A disputed line needs both sides to agree. Charges above the threshold wait for the owner's passkey.", href: "/ledger" },
     { title: "Try to break it", body: "The arena table on the evidence page shows hostile agents, models and documents failing to move money. Flip the kill switch and watch a request get denied before PayPal; open a dispute and send the evidence pack.", href: "/evidence" },
   ];
-  r.get(
-    "/judge",
-    page(async (req, res) => {
-      const db = await getDb();
-      const p = await me(req);
-      let id = typeof req.query.s === "string" ? req.query.s : null;
-      let beat = 0;
-      if (id) {
-        const row = (await db.query<any>("SELECT * FROM judge_sessions WHERE id = $1", [id])).rows[0];
-        if (row) {
-          beat = Math.min(BEATS.length - 1, Math.max(0, Number(req.query.b ?? row.beat)));
-          await db.query("UPDATE judge_sessions SET beat = $2, last_seen = now() WHERE id = $1", [id, beat]);
-        } else id = null;
-      }
-      if (!id) {
-        id = newId("jdg");
-        await db.query("INSERT INTO judge_sessions (id, persona) VALUES ($1, $2)", [id, String(req.query.persona ?? "judge")]);
-      }
-      const b = BEATS[beat];
-      res.send(
-        layout(
-          { title: "Judge mode", who: whoOf(p) },
-          html`<h1>Three minutes, six beats</h1><p class="sub">A guided walk through the whole loop. Each beat opens the right page; the trace and evidence are live, not screenshots. Sign in as the demo buyer owner from <a href="/demo">/demo</a> first.</p>
-<ol class="beats">${raw(BEATS.map((x, i) => `<li class="${i === beat ? "now" : i < beat ? "done" : ""}"><a href="/judge?s=${id}&b=${i}">${x.title}</a></li>`).join(""))}</ol>
-<div class="card"><h2>${beat + 1}. ${b.title}</h2><p>${b.body}</p><div class="row"><a class="btn primary" href="${b.href}" target="_blank" rel="noopener">Open</a>${beat + 1 < BEATS.length ? html`<a class="btn" href="/judge?s=${id}&b=${beat + 1}">Next beat</a>` : html`<a class="btn" href="/evidence">Evidence page</a>`}</div></div>
-<p class="small muted">Sandbox only. The demo buyer, supplier and receiver are seeded.</p>`,
-        ),
-      );
-    }, () => "/"),
-  );
-
   // ---- Channels (roadmap B.8) ----
   r.get(
     "/channels",
@@ -396,8 +365,8 @@ ${addr ? html`<form method="post" action="/channels/reply" class="row"><input ty
       short_name: "StockSure",
       start_url: "/dock",
       display: "standalone",
-      background_color: "#0f172a",
-      theme_color: "#234e8a",
+      background_color: "#F4EFE4",
+      theme_color: "#1B1A16",
       icons: [{ src: "/static/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
     });
   });

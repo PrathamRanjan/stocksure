@@ -77,6 +77,7 @@ function head(b: Brand, title: string, extra = ""): string {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?${b.fonts}&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 ${css}
 <meta name="theme-color" content="${e(b.themeColor)}">
+<script>try{var c=localStorage.getItem("ss-theme")||"system";if(c==="dark"||(c==="system"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 ${extra}
 </head>`;
 }

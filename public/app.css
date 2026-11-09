@@ -236,15 +236,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 .btn.danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
 .banner.warn{background:rgba(245,158,11,.15);border:1px solid #f59e0b}
 .chat{display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:60vh;overflow:auto}.msg{max-width:78%;padding:8px 12px;border-radius:12px;background:var(--card-2,rgba(255,255,255,.05))}.msg.out{align-self:flex-start;border-top-left-radius:2px}.msg.in{align-self:flex-end;background:rgba(35,78,138,.35);border-top-right-radius:2px}.msg .body{white-space:pre-wrap}
-.beats{counter-reset:b;list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px}.beats li{padding:6px 12px;border-radius:999px;border:1px solid var(--line,#334155)}.beats li.now{background:#234e8a;color:#fff}.beats li.done{opacity:.6}.beats li a{color:inherit;text-decoration:none}
+.beats{counter-reset:b;list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px}.beats li{padding:6px 12px;border-radius:999px;border:1px solid var(--line,#334155)}.beats li.now{background:var(--carbon);color:var(--card-c)}.beats li.done{opacity:.6}.beats li a{color:inherit;text-decoration:none}
 td.good{color:#34d399}td.bad{color:#f87171;font-weight:600}
 .grid-sm{height:220px}.grid-md{height:300px}.grid-lg{height:380px}
-.mini-bars .bar{display:grid;grid-template-columns:130px 1fr 40px;gap:8px;align-items:center;margin:4px 0;font-size:.85rem;height:auto;background:none}.mini-bars .val{display:block;height:10px;border-radius:5px;background:#234e8a}.mini-bars .num{text-align:right;color:var(--muted)}
+.mini-bars .bar{display:grid;grid-template-columns:130px 1fr 40px;gap:8px;align-items:center;margin:4px 0;font-size:.85rem;height:auto;background:none}.mini-bars .val{display:block;height:10px;border-radius:5px;background:var(--carbon)}.mini-bars .num{text-align:right;color:var(--muted)}
 .widget h3{margin-top:0}
 .sub{color:var(--muted);margin-top:-6px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
 .pill.good{background:rgba(52,211,153,.2);color:#34d399}.pill.bad{background:rgba(248,113,113,.2);color:#f87171}.pill.warn{background:rgba(245,158,11,.2);color:#f59e0b}
-.rounds{list-style:none;padding:0}.rounds li{padding:8px 10px;border-left:3px solid var(--line,#334155);margin:6px 0}.rounds li.buyer{border-color:#234e8a}.rounds li.supplier{border-color:#0d9488}
+.rounds{list-style:none;padding:0}.rounds li{padding:8px 10px;border-left:3px solid var(--line,#334155);margin:6px 0}.rounds li.buyer{border-color:var(--carbon)}.rounds li.supplier{border-color:var(--paid)}
 .dock-card{display:block;padding:14px;border-radius:12px;border:1px solid var(--line,#334155);margin:8px 0;text-decoration:none;color:inherit}.dock-card b{font-size:1.1rem}
 #bryntum-deliveries{min-height:480px;border:1px solid var(--line,#334155);border-radius:10px;overflow:hidden}
 

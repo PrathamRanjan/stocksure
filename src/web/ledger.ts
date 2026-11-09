@@ -120,7 +120,7 @@ export function ledgerRouter() {
   <div class="card widget"><h3>Billed versus paid</h3>
     <div class="stats"><div><b>${fmt(w.billed_vs_paid.billed_cents)}</b><span>suppliers' invoices say</span></div><div><b>${fmt(w.billed_vs_paid.paid_cents)}</b><span>StockSure paid (captured minus refunded)</span></div><div><b>${fmt(w.billed_vs_paid.quote_cents)}</b><span>quoted</span></div></div>
     <p class="small muted">Payment follows confirmed counts and quote prices. The gap is what document text asked for and did not get.</p></div>
-  <div class="card widget"><h3>Supplier reliability</h3><div id="grid-reliability" class="grid-sm ag-theme-quartz-dark"></div></div>
+  <div class="card widget"><h3>Supplier reliability</h3><div id="grid-reliability" class="grid-sm ag-theme-quartz"></div></div>
   <div class="card widget"><h3>Hold coverage</h3>
     <div class="stats"><div><b>${w.coverage.held_orders}</b><span>orders with a live hold</span></div><div><b>${fmt(w.coverage.held_quote_cents)}</b><span>quoted on them</span></div><div><b>${fmt(w.coverage.held_limit_cents)}</b><span>limits</span></div><div><b>${w.coverage.reauthorized}</b><span>reauthorized past day 3</span></div></div>
     <div class="mini-bars" id="status-bars"></div></div>
@@ -130,12 +130,12 @@ export function ledgerRouter() {
 <form method="get" action="/ledger" class="row"><input type="text" name="q" value="${typeof req.query.q === "string" ? req.query.q : ""}" placeholder="Which orders cost more than they were quoted? What did we pay Harbour in October?" maxlength="500" style="flex:1"><button class="btn primary small">Ask</button></form>
 ${asked ? html`<div class="answer"><p>${asked.answer}</p><p class="small muted">Answered by ${asked.by}.${asked.quarantined.length ? ` Removed ${asked.quarantined.length} instruction-like fragment(s) from the question.` : ""} The model sees rows as data and cannot change anything.</p>${asked.rows.length ? html`<div class="table-wrap"><table class="small"><thead><tr><th>Order</th><th>Status</th><th>Supplier</th><th>Quoted</th><th>Paid</th><th>Billed</th></tr></thead><tbody>${raw(asked.rows.map((x: any) => `<tr><td>${x.number}</td><td>${x.status}</td><td>${String(x.supplier).replace(/</g, "&lt;")}</td><td>$${x.quote.toFixed(2)}</td><td>$${(x.captured - x.refunded).toFixed(2)}</td><td>$${x.billed.toFixed(2)}</td></tr>`).join(""))}</tbody></table></div>` : ""}${asked.chart ? html`<div class="mini-bars">${raw(asked.chart.series.slice(0, 10).map((s) => `<div class="bar"><span class="lbl">${String(s.label).replace(/</g, "&lt;")}</span><span class="val" style="width:${Math.min(100, (100 * s.value) / Math.max(1, ...asked.chart!.series.map((x) => x.value)))}%"></span><span class="num">${s.value}</span></div>`).join(""))}</div>` : ""}</div>` : ""}</div>
 
-<div class="card"><h2>Orders</h2><div id="grid-orders" class="grid-lg ag-theme-quartz-dark"></div></div>
+<div class="card"><h2>Orders</h2><div id="grid-orders" class="grid-lg ag-theme-quartz"></div></div>
 <div class="grid g2">
-  <div class="card"><h2>PayPal operations</h2><div id="grid-ops" class="grid-md ag-theme-quartz-dark"></div></div>
-  <div class="card"><h2>Receipts</h2><div id="grid-receipts" class="grid-md ag-theme-quartz-dark"></div></div>
+  <div class="card"><h2>PayPal operations</h2><div id="grid-ops" class="grid-md ag-theme-quartz"></div></div>
+  <div class="card"><h2>Receipts</h2><div id="grid-receipts" class="grid-md ag-theme-quartz"></div></div>
 </div>
-<div class="card"><h2>Negotiations</h2><div id="grid-negotiations" class="grid-sm ag-theme-quartz-dark"></div></div>
+<div class="card"><h2>Negotiations</h2><div id="grid-negotiations" class="grid-sm ag-theme-quartz"></div></div>
 ${studio ? html`<div class="card"><h2>AG Studio</h2><div id="ag-studio" data-license="present" data-src="/ledger/data.json"></div><p class="small muted">Studio mounts here with the licence from the environment; the three widgets above are registered as custom widgets.</p></div>` : ""}
 <p class="small"><a href="/ledger/data.json">Data as JSON</a> · <a href="/ledger/export.csv">Orders CSV</a> · <a href="/deliveries">Deliveries over time</a></p>
 ${jsonBlock("ledger-data", d)}`,

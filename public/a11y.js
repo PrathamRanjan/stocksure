@@ -130,6 +130,8 @@
   }
 
   apply();
+  // Single-page app hook: re-apply after a client-side route change (voice buttons, read-aloud slot).
+  window.a11yKit = { apply, firstVisit };
   const boot = () => {
     if (!document.querySelector("[data-a11y-open]")) document.body.appendChild(fab);
     for (const b of document.querySelectorAll("[data-q]")) { const [k, v] = b.dataset.q.split(":"); const val = v === "true" ? true : isNaN(Number(v)) ? v : Number(v); b.setAttribute("aria-pressed", String(p[k] === val)); }

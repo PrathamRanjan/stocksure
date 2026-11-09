@@ -64,7 +64,17 @@ describe("StockSure acceptance journey", () => {
     expect((await anon.get("/healthz")).status).toBe(200);
     expect((await anon.get("/")).status).toBeLessThan(400);
     expect((await anon.get("/login")).status).toBe(200);
-    expect((await anon.get("/demo")).text).toMatch(/Demo setup/);
+    // Front-end pages are served by the app shell; their data comes from /api/ui/* (JSON, read-only).
+    for (const u of ["/demo", "/about", "/favicon.svg"]) expect((await anon.get(u)).status, u).toBe(200);
+    expect((await anon.get("/no-such-page", { accept: "text/html" })).status).toBe(404);
+    expect((await anon.get("/api/ui/no-such-view")).status).toBe(404);
+    expect((await anon.get("/api/ui/home")).status).toBe(401);
+    const demoView = (await anon.get("/api/ui/demo")).json;
+    expect(demoView.po.id).toBe(ids.demoPo);
+    expect(demoView.quote_total_cents).toBeGreaterThan(0);
+    expect((await anon.get("/api/ui/session")).json.who).toBeNull();
+    expect((await anon.get("/api/ui/people")).json.people.map((x: any) => x.first).slice(0, 3)).toEqual(["Jordan", "Sam", "Ana"]);
+    expect((await anon.get("/api/ui/preview")).json.po.number).toBeTruthy();
     const jordan = await login("jordan");
     const sam = await login("sam");
     const ana = await login("ana");
@@ -83,7 +93,9 @@ describe("StockSure acceptance journey", () => {
     };
 
     // Buyer owner connects PayPal through the vault approval.
-    expect((await jordan.get("/home")).text).toMatch(/Connect PayPal/);
+    expect((await jordan.get("/home")).status).toBe(200);
+    expect((await jordan.get("/api/ui/home")).json).toMatchObject({ can_connect: true, org: { paypal_connected: false } });
+    expect((await jordan.get("/api/ui/session")).json.who).toMatchObject({ first: "Jordan", owner: true });
     const connect = await jordan.post("/connect-paypal");
     const setup = new URL(connect.location!).searchParams.get("token")!;
     expect(err(await jordan.get(`/connect-paypal/return?approval_token_id=wrong`))).toMatch(/does not match/);
@@ -92,13 +104,19 @@ describe("StockSure acceptance journey", () => {
     expect((await one("SELECT vault_token_id FROM orgs WHERE id = $1", [ids.laneway])).vault_token_id).toBeTruthy();
 
     // Catalog, stock and performance pages for each side; the supplier edits a catalog row.
-    for (const c of [jordan, ana]) for (const u of ["/catalog", "/stock", "/performance", "/home"]) expect((await c.get(u)).status, u).toBeLessThan(400);
+    for (const c of [jordan, ana]) for (const u of ["/catalog", "/stock", "/performance", "/home", "/approvals", "/api/ui/catalog", "/api/ui/performance", "/api/ui/home", "/api/ui/approvals"]) expect((await c.get(u)).status, u).toBeLessThan(400);
+    expect((await jordan.get("/api/ui/stock")).status).toBe(200);
+    expect((await ana.get("/api/ui/stock")).status).toBe(403);
+    expect((await ana.get("/api/ui/catalog")).json.can_edit).toBe(true);
+    expect((await jordan.get("/api/ui/catalog")).json.can_edit).toBe(false);
     const sku = await one("SELECT id, stock_packs, price_cents FROM products WHERE sku = 'OAT-6'");
     expect(err(await jordan.post(`/catalog/${sku.id}`, { stock: "5", price: "1.00" }))).toMatch(/Only the supplier/);
     ok(await ana.post(`/catalog/${sku.id}`, { stock: String(sku.stock_packs + 1), price: (sku.price_cents / 100).toFixed(2) }));
 
     // A second order from the form, to use for the pending-hold and refused-capture paths.
-    expect((await jordan.get("/po/new")).text).toMatch(/Save draft/);
+    expect((await jordan.get("/po/new")).status).toBe(200);
+    expect((await jordan.get("/api/ui/po-new")).json.suppliers[0].catalog.length).toBeGreaterThan(0);
+    expect((await sam.get("/api/ui/po-new")).status).toBe(403);
     const deliverBy = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 16);
     const r2 = ok(await jordan.post("/po/new", { supplier_id: ids.supplier, product_0: ids.products["OAT-12"], qty_0: "2", limit: "40.00", deliver_by: deliverBy, note: "Weekend top-up" }));
     const po2 = r2.location!.split("/po/")[1].split("?")[0];
@@ -121,7 +139,9 @@ describe("StockSure acceptance journey", () => {
     // Two-part delivery: 8 cases now (charged on agreement, not final), the rest later.
     const l = await line();
     ok(await ana.post(`/po/${id}/dispatch-part`, { [`part_${l}`]: "8" }));
-    expect((await sam.get(`/po/${id}/receive`)).text).toMatch(/part 1/);
+    expect((await sam.get(`/po/${id}/receive`)).status).toBe(200);
+    expect((await sam.get(`/api/ui/po/${id}/receive`)).json).toMatchObject({ mode: "part", open: true });
+    expect((await ana.get(`/api/ui/po/${id}/receive`)).status).toBe(403);
     ok(await receive(id, "8 cs", "0", null));
     await run();
     expect((await po()).status).toBe("part_delivered");
@@ -171,7 +191,11 @@ describe("StockSure acceptance journey", () => {
     // Records, and a repeat order from the closed one.
     expect((await jordan.get(`/po/${id}/record.csv`)).text).toContain("OAT-12");
     expect((await jordan.get(`/po/${id}/record.json`)).json.purchase_orders.length).toBe(2);
-    expect((await jordan.get(`/po/${id}`)).text).toMatch(/Ignored text in invoice/);
+    expect((await jordan.get(`/po/${id}`)).status).toBe(200);
+    const view = (await jordan.get(`/api/ui/po/${id}`)).json;
+    expect(view.docs.find((d: any) => d.kind === "invoice").flags.length).toBeGreaterThan(0);
+    expect(view.po.status).toBe("closed");
+    expect(view.ops.some((o: any) => o.kind === "capture" && o.paypal_id)).toBe(true);
     const rep = ok(await jordan.post(`/po/${id}/reorder`));
     expect((await getPo(db, rep.location!.split("/po/")[1].split("?")[0])).status).toBe("draft");
 

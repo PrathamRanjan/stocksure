@@ -15,7 +15,7 @@ import { me, whoOf } from "./auth.js";
 import { back, flashOf, page } from "./common.js";
 import { fmtDate, html, layout, pill, raw } from "./html.js";
 
-const PWA_HEAD = raw(`<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#234e8a"><link rel="apple-touch-icon" href="/static/icon.svg">`);
+const PWA_HEAD = raw(`<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#1B1A16"><link rel="apple-touch-icon" href="/static/icon.svg">`);
 
 async function needBuyer(req: Request, res: Response): Promise<Person | null> {
   const p = await me(req);
