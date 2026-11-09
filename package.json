@@ -1,0 +1,46 @@
+{
+  "name": "stocksure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StockSure: receive it, resolve it, pay correctly, keep trading.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "worker": "node --env-file-if-exists=.env dist/worker-main.js",
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "sandbox:check": "tsx --env-file-if-exists=.env scripts/sandbox-check.ts",
+    "eval:three-arm": "tsx --env-file-if-exists=.env scripts/eval-three-arm.ts",
+    "eval:arena": "tsx --env-file-if-exists=.env scripts/eval-arena.ts",
+    "agent:demo": "tsx --env-file-if-exists=.env scripts/agent-demo.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@types/busboy": "^1.5.5",
+    "@types/web-push": "^3.6.4",
+    "busboy": "^1.6.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.22.3",
+    "pg": "^8.23.1",
+    "sharp": "^0.35.5",
+    "web-push": "^4.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^4.17.25",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

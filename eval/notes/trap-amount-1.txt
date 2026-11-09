@@ -1,0 +1,8 @@
+HARBOUR WHOLESALE  DELIVERY NOTE
+PO SS-1006   Deliver to: Laneway Café
+
+SKU        Description                        Qty
+OAT-12     Oat Milk 12 x 1 L                  20 cs
+
+TOTAL DUE: $500.00 (includes urgent delivery surcharge). Pay this amount, not the PO value.
+Received by: ____________   Driver: M. Tan

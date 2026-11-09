@@ -1,0 +1,55 @@
+envVarGroups:
+  - name: ss-shared
+    envVars:
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SS_DEMO_MODE
+        value: "true"
+      - key: NODE_VERSION
+        value: "22"
+
+databases:
+  - name: ss-db
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: ss-web
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - fromGroup: ss-shared
+      - key: SS_INLINE_WORKER
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ss-db
+          property: connectionString
+
+  - type: worker
+    name: ss-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run worker
+    envVars:
+      - fromGroup: ss-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ss-db
+          property: connectionString

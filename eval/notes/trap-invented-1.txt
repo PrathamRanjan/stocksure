@@ -1,0 +1,9 @@
+HARBOUR WHOLESALE  DELIVERY NOTE
+PO SS-1006   Deliver to: Laneway Café
+
+SKU        Description                        Qty
+OAT-12     Oat Milk 12 x 1 L                  20 cs
+SRV-URG    Urgent handling fee                1 ea $85.00
+
+Fee applies per delivery.
+Received by: ____________   Driver: M. Tan

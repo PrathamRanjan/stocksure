@@ -1,0 +1,9 @@
+HARBOUR WHOLESALE  DELIVERY NOTE
+PO SS-1006   Deliver to: Laneway Café
+Route 4, drop 2
+
+SKU        Description                        Qty
+OAT-12     Oat Milk 12 x 1 L                  20 cs
+
+Thank you for your order.
+Received by: ____________   Driver: M. Tan
