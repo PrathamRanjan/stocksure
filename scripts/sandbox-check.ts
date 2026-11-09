@@ -9,4 +9,4 @@ console.log(`${scopes.some((s) => s.includes("vault")) ? "✓" : "✗"} Vault sc
 const st = await pp.createSetupToken({ returnUrl: `${config.appUrl}/connect-paypal/return`, cancelUrl: `${config.appUrl}/home`, description: "check" }, `check-${Date.now()}`);
 console.log(`${st.approveUrl ? "✓" : "✗"} Vault setup token ${st.id}`);
 console.log(`${config.paypal.webhookId ? "✓" : "…"} PAYPAL_WEBHOOK_ID ${config.paypal.webhookId ? "set" : "not set (optional)"}`);
-console.log(`${config.models.anthropicKey ? "✓" : "…"} ANTHROPIC_API_KEY ${config.models.anthropicKey ? config.models.model : "not set (text parser; images kept as evidence)"}`);
+console.log(`${config.ai.provider === "openai" && config.ai.openaiKey ? "✓" : "…"} AI reader: ${config.ai.provider === "openai" && config.ai.openaiKey ? `OpenAI ${config.ai.models.read} (vision ${config.ai.models.vision})` : config.models.anthropicKey ? `Anthropic ${config.models.model}` : "none configured (text parser; images kept as evidence for a person)"}`);

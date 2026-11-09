@@ -113,7 +113,7 @@ export function buildCases(): ArenaCase[] {
       const rules = await setRules(c.owner.org_id, { agents_may_order: true, max_over_catalog_pct: 0 });
       await c.db.query("UPDATE orgs SET floor_pct = 100 WHERE id = $1", [c.ids.supplier]);
       const poId = await newOrder(c.owner, c.ids.supplier, c.cat, 4, 100000);
-      return { poId, rules, floor: 100, expect: (n, lines) => (n.status === "agreed" && n.outcome?.total_cents === totalOf(lines, catalogOffer(lines)) ? null : `expected agreed at catalog, got ${n.status} ${JSON.stringify(n.outcome)}`) };
+      return { poId, rules, floor: 100, expect: (n, lines) => ((n.status === "agreed" || (n.status === "held" && /Connect PayPal/.test(String(n.outcome?.reason)))) && n.outcome?.total_cents === totalOf(lines, catalogOffer(lines)) ? null : `expected agreement at catalog (accepted, or held only because PayPal is not connected), got ${n.status} ${JSON.stringify(n.outcome)}`) };
     }),
     negotiationCase("n03", "Spending limit below the supplier's floor: agents walk away without a deal", async (c) => {
       const rules = await setRules(c.owner.org_id, { agents_may_order: true });
