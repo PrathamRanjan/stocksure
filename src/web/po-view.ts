@@ -9,6 +9,7 @@ import { etaUpdates, riskView } from "../services/supply-watch.js";
 import { deliveryContext, partCharged, shipmentsOf } from "../services/parts.js";
 import { docsOf, fundingOf, latestReceipt, latestResolution, linesOf, opsOfRoot, orgById, treeOf, type Person, type PO, type PoLine } from "../store.js";
 import { fmtDate, html, pill, raw, type Raw } from "./html.js";
+import { scanText } from "../safety/rules.js";
 import { agreementFor, verifyAgreement } from "../services/agreements.js";
 import { negotiationsFor } from "../agents/runtime.js";
 import { runsFor } from "../trace.js";
@@ -33,7 +34,7 @@ export async function messagesFor(q: Queryable, poId: string) {
 export function thread(msgs: any[], lineId: string | null, poId: string, canPost: boolean): Raw {
   const mine = msgs.filter((m) => (m.po_line_id ?? null) === lineId);
   return html`<div class="thread" aria-label="${lineId ? "Line thread" : "Order thread"}">
-${mine.length ? mine.map((m) => html`<p class="msg ${m.kind}"><b>${m.author}</b> <span class="muted small">${fmtDate(m.created_at)}</span><br>${m.body}${m.document_id ? html` <a href="/doc/${m.document_id}">evidence</a>` : ""}</p>`) : html`<p class="msg system">No messages yet.</p>`}
+${mine.length ? mine.map((m) => { const scan = scanText(m.body); return html`<p class="msg ${m.kind}">${scan.level !== "clear" ? html`<span class="banner ${scan.level === "hold" ? "bad" : "warn"}" role="alert" style="display:block;margin-bottom:6px"><b>Scam check:</b> this message ${scan.words.join(", and ")}. StockSure pays suppliers only through PayPal under the agreed order; nothing written in a message changes where or how much is paid.</span>` : ""}<b>${m.author}</b> <span class="muted small">${fmtDate(m.created_at)}</span><br>${m.body}${m.document_id ? html` <a href="/doc/${m.document_id}">evidence</a>` : ""}</p>`; }) : html`<p class="msg system">No messages yet.</p>`}
 ${canPost ? html`<form method="post" action="/po/${poId}/message" class="row"><input type="hidden" name="line_id" value="${lineId ?? ""}"><label class="sr" for="m-${lineId ?? "po"}">Message</label><input id="m-${lineId ?? "po"}" type="text" name="body" placeholder="${lineId ? "Reply about this line" : "Message the other side"}" required maxlength="2000"><button class="btn small" type="submit">Send</button></form>` : ""}
 </div>`;
 }

@@ -477,7 +477,6 @@ ${cat.map((c) => html`<tr><td><b>${c.sku}</b></td><td>${c.name}<br><span class="
     const ids = await demoIds(db);
     const demoPo = ids ? await getPo(db, ids.demoPo).catch(() => null) : null;
     const f = demoPo && demoPo.auth_id ? await fundingOf(db, demoPo.root_id) : null;
-    const demoKeys: Record<string, string> = JSON.parse((await setting(db, "demo_keys")) ?? "{}");
     const driver = ids ? (await db.query<{ driver_token: string | null }>("SELECT driver_token FROM people WHERE id = $1", [ids.people.ana])).rows[0] : null;
     res.send(page(req, p, "Demo", html`<h1>Demo setup</h1>
 ${!config.demoMode ? html`<p class="banner warn">Demo mode is off.</p>` : html`
@@ -489,7 +488,7 @@ ${!config.demoMode ? html`<p class="banner warn">Demo mode is off.</p>` : html`
 <li>Ana agrees the line. The resolution pays $180, credits $20 and picks 2 × Barista Oat at $24: $204 of $210. Both approve.</li>
 <li>StockSure captures $180 (final capture), confirms PayPal released the other $20, then holds $24 for the replacement. Ana dispatches it; Sam receives it; $24 is captured. The order closes at $204.</li></ol>
 ${f ? html`<p>Current funding for ${demoPo!.number}: captured ${fmt(f.captured_cents)}, held ${fmt(f.held_cents)}, spendable ${fmt(f.spendable_cents)} of ${fmt(f.limit_cents)}.</p>` : ""}</section>
-<section class="card"><h2>Agents and phones</h2><p class="small">MCP endpoint <span class="mono">${config.appUrl}/mcp</span> (Streamable HTTP, <span class="mono">Authorization: Bearer &lt;key&gt;</span>, optional <span class="mono">X-Agent-Id</span>). Merchant cart API under <span class="mono">/api/merchant</span> with the same key. Demo keys: ${raw(Object.entries(demoKeys).map(([k, v]) => `<span class="mono small">${k}: ${v}</span>`).join(" · "))}.</p>
+<section class="card"><h2>Agents and phones</h2><p class="small">MCP endpoint <span class="mono">${config.appUrl}/mcp</span> (Streamable HTTP, <span class="mono">Authorization: Bearer &lt;key&gt;</span>, optional <span class="mono">X-Agent-Id</span>). Merchant cart API under <span class="mono">/api/merchant</span> with the same key. Keys are printed by <span class="mono">npm run seed</span> and never shown on a page.</p>${config.demoMode && ids ? html`<p class="small">Sign in without a key (demo mode): ${Object.entries(ids.people).map(([name, id]) => html`<form method="post" action="/login" class="inline"><input type="hidden" name="person_id" value="${id}"><button class="btn small" type="submit">${name}</button></form> `)}</p>` : ""}
 ${driver?.driver_token ? html`<p class="small">Driver page (no sign-in): <a href="/driver/${driver.driver_token}">${config.appUrl}/driver/${driver.driver_token}</a></p>` : ""}
 <p class="small">Judge mode: <a href="/judge">/judge</a>. Evidence: <a href="/evidence">/evidence</a>. Agent demo script: <span class="mono">npm run agent:demo</span>.</p></section>
 <section class="card"><h2>Reset</h2><form method="post" action="/demo/reset" class="row"><label class="check"><input type="checkbox" name="keep" value="1" checked> Keep saved PayPal connections</label><button class="btn danger" type="submit">Reset and load demo data</button></form></section>
