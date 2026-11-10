@@ -59,7 +59,7 @@ function RouteEffects() {
 function Authed({ children }: { children: ReactNode }) {
   const { session, loading } = useSession();
   const loc = useLocation();
-  if (loading && !session)
+  if (loading && !session?.who)
     return (
       <AppShell>
         <LoadingBlock />

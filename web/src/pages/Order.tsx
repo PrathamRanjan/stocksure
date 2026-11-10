@@ -244,8 +244,8 @@ export default function Order() {
         sub={<>{m.me.side === "buyer" ? m.po.supplier_name : m.po.buyer_name} · deliver by {day(m.po.deliver_by)} · limit <span className="num">{money(m.po.limit_cents)}</span></>}
       />
       <div className="mb-4"><Related m={m} /></div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="grid min-w-0 gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5">
           <NextStep m={m} reload={reload} />
           {m.approvals.map((a) => <ApprovalCard key={a.id} a={a} onDone={reload} showOrder={false} />)}
           <Lines m={m} reload={reload} />
@@ -254,7 +254,7 @@ export default function Order() {
           <DefectsPanel m={m} reload={reload} />
           <Messages m={m} reload={reload} />
         </div>
-        <aside className="grid content-start gap-5" aria-label="Money and records">
+        <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5" aria-label="Money and records">
           <MoneyPanel m={m} />
           <PayPalPanel m={m} reload={reload} />
           <DocsPanel m={m} />

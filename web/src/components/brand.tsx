@@ -124,14 +124,14 @@ export function SettlementBar({ f, className, compact = false }: { f: FundingNum
   const pct = (c: number) => `${Math.min(100, (c / lim) * 100)}%`;
   const label = `Limit ${money(f.limit_cents)}: ${money(captured)} charged, ${money(heldOnly)} held, ${money(exp)} being released, ${money(f.spendable_cents)} spendable now.`;
   return (
-    <div className={className}>
+    <div className={cn("@container", className)}>
       <div className="sbar" role="img" aria-label={label}>
         <span data-k="captured" style={{ width: pct(captured) }} />
         <span data-k="held" style={{ width: pct(heldOnly) }} />
         <span data-k="expected" style={{ width: pct(exp) }} />
       </div>
       {!compact && (
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm @lg:grid-cols-4">
           <Fig k="Charged" v={captured} dot="var(--paid)" hint={f.refunded_cents ? `${money(f.refunded_cents)} refunded` : undefined} />
           <Fig k="Held on PayPal" v={heldOnly} dot="var(--held)" />
           <Fig k="Being released" v={exp} dot="var(--released)" hint="not spendable until PayPal confirms" />

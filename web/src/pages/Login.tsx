@@ -38,7 +38,7 @@ export default function Login() {
     const r = await act("/login", { ...data, next });
     setBusy(null);
     if (!r.ok) return toast.error(r.message || "That didn't work.");
-    refresh();
+    await refresh();
     nav(r.to ?? next);
   }
 

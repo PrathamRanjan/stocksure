@@ -3,3 +3,5 @@ dist
 data
 .env
 eval/cache/*.live.json
+test-results
+playwright-report

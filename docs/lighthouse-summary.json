@@ -1,0 +1,97 @@
+{
+ "tool": "Lighthouse 12.8.2, Chromium 141 headless",
+ "server": "scripts/e2e-server.ts (local, gzip on)",
+ "date": "2026-11-10",
+ "pages": {
+  "demo-desktop": {
+   "performance": 99,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "0.5 s",
+   "lcp": "0.7 s",
+   "cls": "0.052",
+   "tbt": "0 ms"
+  },
+  "home-desktop": {
+   "performance": 100,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "0.4 s",
+   "lcp": "0.7 s",
+   "cls": "0.022",
+   "tbt": "0 ms"
+  },
+  "home-mobile": {
+   "performance": 92,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "2.1 s",
+   "lcp": "3.0 s",
+   "cls": "0.037",
+   "tbt": "0 ms"
+  },
+  "landing-desktop": {
+   "performance": 100,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "0.4 s",
+   "lcp": "0.7 s",
+   "cls": "0.004",
+   "tbt": "0 ms"
+  },
+  "landing-mobile": {
+   "performance": 92,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "2.1 s",
+   "lcp": "3.0 s",
+   "cls": "0",
+   "tbt": "0 ms"
+  },
+  "login-desktop": {
+   "performance": 100,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "0.4 s",
+   "lcp": "0.6 s",
+   "cls": "0.022",
+   "tbt": "0 ms"
+  },
+  "login-mobile": {
+   "performance": 91,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "2.1 s",
+   "lcp": "3.1 s",
+   "cls": "0",
+   "tbt": "0 ms"
+  },
+  "order-desktop": {
+   "performance": 100,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "0.4 s",
+   "lcp": "0.7 s",
+   "cls": "0.022",
+   "tbt": "0 ms"
+  },
+  "order-mobile": {
+   "performance": 92,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100,
+   "fcp": "2.1 s",
+   "lcp": "3.0 s",
+   "cls": "0.037",
+   "tbt": "0 ms"
+  }
+ }
+}

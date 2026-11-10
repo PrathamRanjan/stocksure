@@ -16,10 +16,11 @@ export function TourRunner() {
   }, []);
   useEffect(() => {
     const q = new URLSearchParams(loc.search);
-    if (q.get("tour") === "judge" || q.get("tour") === "product") {
+    const kind = q.get("tour");
+    if (kind === "judge" || kind === "product") {
       q.delete("tour");
       nav({ pathname: loc.pathname, search: q.toString() }, { replace: true });
-      void startTour(q.get("tour") === "product" ? "product" : "judge");
+      void startTour(kind);
     }
   }, [loc.search]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

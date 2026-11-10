@@ -151,7 +151,7 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
         {r.auto && <Stamp tone="carbon">Clean delivery: agreed automatically</Stamp>}
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} role="region" aria-label="Line by line, scrolls sideways">
         <table className="w-full min-w-[30rem] text-sm">
           <caption className="sr-only">Payment per line</caption>
           <thead className="text-left text-muted-foreground">
@@ -214,8 +214,8 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
       </div>
 
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-        <div className="flex items-center gap-2"><dt className="text-muted-foreground">{m.po.buyer_name}</dt><dd>{r.buyer_approved_by ? <Stamp tone="paid">Approved · {r.buyer_approved_by}</Stamp> : <Stamp tone="quiet">Not yet</Stamp>}</dd></div>
-        <div className="flex items-center gap-2"><dt className="text-muted-foreground">{m.po.supplier_name}</dt><dd>{r.supplier_approved_by ? <Stamp tone="paid">Approved · {r.supplier_approved_by}</Stamp> : <Stamp tone="quiet">Not yet</Stamp>}</dd></div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><dt className="text-muted-foreground">{m.po.buyer_name}</dt><dd className="flex min-w-0 flex-wrap items-center gap-x-2">{r.buyer_approved_by ? <><Stamp tone="paid">Approved</Stamp><span className="min-w-0 break-words">{r.buyer_approved_by}</span></> : <Stamp tone="quiet">Not yet</Stamp>}</dd></div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><dt className="text-muted-foreground">{m.po.supplier_name}</dt><dd className="flex min-w-0 flex-wrap items-center gap-x-2">{r.supplier_approved_by ? <><Stamp tone="paid">Approved</Stamp><span className="min-w-0 break-words">{r.supplier_approved_by}</span></> : <Stamp tone="quiet">Not yet</Stamp>}</dd></div>
       </dl>
 
       {r.open && (

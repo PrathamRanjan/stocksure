@@ -21,14 +21,17 @@
     "eval:arena": "tsx --env-file-if-exists=.env scripts/eval-arena.ts",
     "agent:demo": "tsx --env-file-if-exists=.env scripts/agent-demo.ts",
     "build:web": "npm --prefix web ci --include=dev --no-audit --no-fund && npm --prefix web run build",
-    "dev:web": "npm --prefix web run dev"
+    "dev:web": "npm --prefix web run dev",
+    "e2e": "npm --prefix web run e2e"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/busboy": "^1.5.5",
+    "@types/compression": "^1.8.1",
     "@types/web-push": "^3.6.4",
     "busboy": "^1.6.0",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "express": "^4.22.3",
     "pg": "^8.23.1",

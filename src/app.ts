@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -56,6 +57,8 @@ export function createApp() {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
+  // Gzip text responses (HTML, JSON, JS, CSS). Nothing here streams, so buffering per response is fine.
+  app.use(compression());
   app.use(express.json({ limit: "200kb" }));
   app.use(express.urlencoded({ extended: false, limit: "200kb" }));
   app.use(cookieParser());

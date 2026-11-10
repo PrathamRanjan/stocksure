@@ -32,7 +32,7 @@ export default function Stock() {
       )}
       <SectionTitle>Recent moves</SectionTitle>
       {d.moves.length ? (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} role="region" aria-label="Recent stock moves, scrolls sideways">
           <table className="w-full min-w-[32rem] text-sm">
             <caption className="sr-only">Recent stock moves</caption>
             <thead className="text-left text-muted-foreground">

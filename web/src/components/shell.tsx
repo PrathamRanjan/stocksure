@@ -107,7 +107,8 @@ function NavEntry({ n, onClick, compact = false }: { n: NavItem; onClick?: () =>
 
 export function DemoRibbon() {
   const { session } = useSession();
-  if (!session?.demo) return null;
+  // Render the frame before the session arrives so the page doesn't jump when it does.
+  if (session && !session.demo) return null;
   const bit = (on: boolean, l: string) => (
     <span className="inline-flex items-center gap-1">
       <span className={cn("inline-block size-1.5 rounded-full", on ? "bg-paid" : "bg-muted-foreground")} aria-hidden="true" />
@@ -119,11 +120,15 @@ export function DemoRibbon() {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5">
         <span className="font-heading font-extrabold uppercase tracking-wider" style={{ fontVariationSettings: '"wdth" 125' }}>Hackathon demo</span>
         <span className="hidden flex-wrap gap-x-3 text-muted-foreground sm:flex">
-          {bit(session.paypal_ready, `PayPal ${session.paypal_env}`)}
-          {bit(!/parser/.test(session.reader), "AI reader")}
-          {bit(session.channels.telegram, "Telegram")}
+          {session && (
+            <>
+              {bit(session.paypal_ready, `PayPal ${session.paypal_env}`)}
+              {bit(!/parser/.test(session.reader), "AI reader")}
+              {bit(session.channels.telegram, "Telegram")}
+            </>
+          )}
         </span>
-        <span className="text-muted-foreground sm:hidden">PayPal sandbox · no real money</span>
+        <span className="text-muted-foreground sm:hidden">Sandbox · no real money</span>
         <span className="ml-auto flex items-center gap-3">
           <button type="button" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8" onClick={() => startTour("judge")} data-tour="take-tour">
             Take the tour
