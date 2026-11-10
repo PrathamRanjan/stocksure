@@ -38,6 +38,8 @@ export type PoStatus = "draft" | "submitted" | "quoted" | "funding" | "funded" |
 export interface PO {
   id: string;
   number: string;
+  /** Sample history from the seed: shown as Sample, never paid through PayPal. */
+  is_sample?: boolean;
   buyer_id: string;
   supplier_id: string;
   root_id: string;

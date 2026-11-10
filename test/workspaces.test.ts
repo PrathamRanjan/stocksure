@@ -117,8 +117,10 @@ describe("private demo workspaces", () => {
     // A's person id means nothing in B.
     expect((await b.post("/login", { person_id: jordanA.id, next: "/home" })).location).toMatch(/err=/);
     // A's home only lists A's orders.
-    const homeA = (await a.get("/api/ui/home")).json;
-    expect(homeA).toBeTruthy();
+    const sessA = (await a.get("/api/ui/session")).json;
+    expect(sessA.workspace.id).toBe(wa.workspace.id);
+    expect(sessA.paypal).toMatchObject({ connected: true, demo_wallet: true });
+    expect((await a.get("/api/ui/demo")).json.scope).toBe("yours");
 
     // Webhooks find their workspace from custom_id, else from the PayPal ids the workspace recorded.
     const hold = fake.bodies.find((x) => x.method === "createVaultedAuthorizeOrder" && String((x.body as any).customId).startsWith(`${wa.workspace.id}:`))!;
@@ -181,9 +183,11 @@ describe("private demo workspaces", () => {
     const viewer = new Client(base);
     viewer.cookies.set("ss_ws", encodeURIComponent(sign(show.id)));
     expect((await viewer.get("/api/ui/workspace")).json.workspace.kind).toBe("showcase");
-    const people = (await viewer.get("/api/ui/people")).json.people;
-    expect(people.length).toBeGreaterThan(0);
-    const w403 = await viewer.post("/login", { person_id: people[0].id, next: "/home" });
+    // Nobody signs in to the showcase: it lists no people, and a write is refused even with a real person id.
+    expect((await viewer.get("/api/ui/people")).json).toEqual({ people: [], needs_workspace: true });
+    expect((await viewer.get("/api/ui/preview")).json.from).toBe("showcase");
+    const showPerson = (await inWs<{ id: string }>(show.id, "SELECT id FROM people LIMIT 1"))[0];
+    const w403 = await viewer.post("/login", { person_id: showPerson.id, next: "/home" });
     expect(w403.status).toBe(403);
     expect((await viewer.post("/demo/fault", { method: "captureAuthorization", kind: "fail_503" })).status).toBe(403);
 
@@ -200,6 +204,23 @@ describe("private demo workspaces", () => {
     expect(srv.failures).toEqual([]);
     // Every demo and admin route is exercised here (the main journey runs on the base data and skips them).
     expect(srv.missed().filter((r) => WORKSPACE_ROUTES.includes(r))).toEqual([]);
+  });
+
+  it("production with no workspace: nobody to sign in as, base data never shown, previews come from the showcase", { timeout: 60000 }, async () => {
+    config.demo.baseSignIn = false;
+    const anon = new Client(base);
+    expect((await anon.get("/api/ui/people")).json).toEqual({ people: [], needs_workspace: true });
+    expect((await anon.get("/api/ui/preview")).json.po).toBeNull();
+    expect((await anon.get("/api/ui/demo")).json).toMatchObject({ po: null, scope: "none" });
+    const basePerson = (await inWs<{ id: string }>(null, "SELECT id FROM people LIMIT 1"))[0];
+    expect((await anon.post("/login", { person_id: basePerson.id, next: "/home" })).location).toMatch(/err=/);
+    expect((await anon.post("/demo/fault", { method: "captureAuthorization", kind: "fail_503" })).location).toMatch(/err=/);
+    const { rebuildShowcase } = await import("../src/demo/workspaces.js");
+    await rebuildShowcase();
+    const pv = (await anon.get("/api/ui/preview")).json;
+    expect(pv.from).toBe("showcase");
+    expect(pv.po.number).toBeTruthy();
+    expect((await anon.get("/api/ui/demo")).json.scope).toBe("showcase");
   });
 
   it("closing a workspace voids its open holds and drops its data", { timeout: 60000 }, async () => {

@@ -9,11 +9,12 @@ import { setProviderFetch } from "../src/ai/provider.js";
 import { FakePayPal } from "../src/paypal/fake.js";
 import { PayPalError, setPayPal } from "../src/paypal/index.js";
 import { seedDemo, type DemoIds } from "../src/services/seed.js";
-import { fundingOf, getPo, latestReceipt, latestResolution, linesOf } from "../src/store.js";
+import { fundingOf, getPo, postMessage, latestReceipt, latestResolution, linesOf } from "../src/store.js";
 import { lineFingerprint } from "../src/services/receiving.js";
 import { instanceTag } from "../src/services/orders.js";
 import { handlers } from "../src/worker.js";
 import { Client } from "./client.js";
+import { DEMO_SUPPLIER_CHANGE } from "../src/web/safety.js";
 
 let db: Db;
 const savedAi = { key: config.ai.openaiKey, provider: config.ai.provider };
@@ -527,6 +528,34 @@ describe("StockSure flows", () => {
     expect(calls("captureAuthorization")).toBe(1);
     expect((await db.query("SELECT 1 FROM purchase_orders WHERE parent_id = $1", [ids.demoPo])).rows).toHaveLength(1);
     expect(calls("createVaultedAuthorizeOrder")).toBe(2);
+  });
+
+  it("a capture held by the scam check, once approved, settles once (no approval loop, one held message)", async () => {
+    await toResolution();
+    await postMessage(db, ids.demoPo, null, "Ana Ruiz", "supplier", DEMO_SUPPLIER_CHANGE);
+    const r = await approveBoth();
+    await run();
+    expect(calls("captureAuthorization")).toBe(0);
+    const { handlers: h } = await import("../src/worker.js");
+    await h.settle({ poId: ids.demoPo, version: r.version });
+    await h.settle({ poId: ids.demoPo, version: r.version });
+    const pending = (await db.query<any>("SELECT id, payload FROM approvals WHERE status = 'pending'")).rows;
+    expect(pending).toHaveLength(1);
+    expect((typeof pending[0].payload === "string" ? JSON.parse(pending[0].payload) : pending[0].payload).safety_rule).toBe("supplier_details_changed_in_message");
+    const held = (await db.query<any>("SELECT body FROM messages WHERE po_id = $1 AND body LIKE '%waits for the buyer''s approval%'", [ids.demoPo])).rows;
+    expect(held).toHaveLength(1);
+    expect((await db.query("SELECT 1 FROM events WHERE po_id = $1 AND type = 'settle.held'", [ids.demoPo])).rows).toHaveLength(1);
+    // The owner approves (by click; the amount is under the passkey threshold).
+    ok(await jordan.post(`/guard/approvals/${pending[0].id}/click`, { approve: "1" }));
+    await run();
+    await run();
+    expect(calls("captureAuthorization")).toBe(1);
+    expect((await po()).status).toBe("awaiting_replacement");
+    expect((await db.query("SELECT 1 FROM approvals WHERE status = 'pending'")).rows).toHaveLength(0);
+    // S3: every amount in the activity reads as currency.
+    const texts = (await db.query<{ summary: string }>("SELECT summary FROM events WHERE po_id = $1", [ids.demoPo])).rows.map((e) => e.summary).join("\n");
+    expect(texts).toMatch(/Owner approved the \$\d+\.\d\d charge/);
+    expect(texts).not.toMatch(/\d+ cents/);
   });
 
   it("a 503 on capture retries with the same request id: one capture", async () => {

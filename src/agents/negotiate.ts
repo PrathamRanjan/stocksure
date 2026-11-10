@@ -3,6 +3,7 @@
  * mandate (max over catalog, concession per round, walk-away, max rounds) and the supplier's floor. A model may
  * phrase a proposal; it never chooses a price. Anything the model writes is shown as wording only.
  */
+import { fmt } from "../core/money.js";
 import { offlineRules, structured } from "../ai/provider.js";
 import type { Rules } from "../guard/policy.js";
 import type { PoLine } from "../store.js";
@@ -47,7 +48,7 @@ export function guardBuyerOffer(offer: Offer, lines: PoLine[], rules: Rules, spe
   }
   const total = totalOf(lines, out);
   if (total > spendLimitCents) reasons.push(`total ${total} exceeds the order's spend limit ${spendLimitCents}`);
-  if (total > rules.max_order_cents) reasons.push(`total ${total} exceeds the mandate's max_order_cents ${rules.max_order_cents}`);
+  if (total > rules.max_order_cents) reasons.push(`total ${fmt(total)} is above the owner's per-order limit of ${fmt(rules.max_order_cents)}`);
   return { ok: total <= spendLimitCents && total <= rules.max_order_cents, reasons, offer: out };
 }
 
@@ -85,7 +86,7 @@ export function hopeless(lines: PoLine[], rules: Rules, floorPct: number, spendL
   if (bad) return `${bad.product.sku}: supplier floor ${floor[bad.id]} is above the mandate ceiling ${ceiling[bad.id]}`;
   const minTotal = totalOf(lines, floor);
   if (minTotal > spendLimitCents) return `even at the supplier's floor the order costs ${minTotal}, above the spend limit ${spendLimitCents}`;
-  if (minTotal > rules.max_order_cents) return `even at the supplier's floor the order costs ${minTotal}, above max_order_cents ${rules.max_order_cents}`;
+  if (minTotal > rules.max_order_cents) return `even at the supplier's floor the order costs ${fmt(minTotal)}, above the owner's per-order limit of ${fmt(rules.max_order_cents)}`;
   return null;
 }
 

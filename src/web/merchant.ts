@@ -4,6 +4,7 @@
  * order. Keyed by the buyer's StockSure key (ssk_). Nothing here touches PayPal: checkout drafts and submits
  * the order; the hold is placed when a quote is accepted, through the same gate as every other order.
  */
+import { fmt } from "../core/money.js";
 import { Router, type Request } from "express";
 import { getDb } from "../db.js";
 import { newId } from "../lib/ids.js";
@@ -44,7 +45,7 @@ async function quoteCart(c: any) {
   });
   const total = lines.reduce((a, l: any) => a + (l.line_cents ?? 0), 0);
   const rules = await rulesFor(c.buyer_id);
-  const mandate = !rules.agents_may_order ? { outcome: "deny", reason: "the owner's mandate does not let agents order" } : total > rules.max_order_cents ? { outcome: "deny", reason: `total ${total} cents is above the per-order limit of ${rules.max_order_cents}` } : rules.allowed_suppliers.length && !rules.allowed_suppliers.includes(c.supplier_id) ? { outcome: "deny", reason: "supplier is not on the allowed list" } : total > rules.approve_above_cents ? { outcome: "wait", reason: `charges above ${rules.approve_above_cents} cents wait for the owner before capture` } : { outcome: "run", reason: "inside the mandate" };
+  const mandate = !rules.agents_may_order ? { outcome: "deny", reason: "the owner's mandate does not let agents order" } : total > rules.max_order_cents ? { outcome: "deny", reason: `total ${fmt(total)} is above the per-order limit of ${fmt(rules.max_order_cents)}` } : rules.allowed_suppliers.length && !rules.allowed_suppliers.includes(c.supplier_id) ? { outcome: "deny", reason: "supplier is not on the allowed list" } : total > rules.approve_above_cents ? { outcome: "wait", reason: `charges above ${fmt(rules.approve_above_cents)} wait for the owner before capture` } : { outcome: "run", reason: "inside the mandate" };
   return { lines, total_cents: total, currency: "USD", mandate, catalog_prices: true, note: "Prices are catalog prices. The supplier quotes after submit; the buyer's agent or owner accepts, and only then is a hold placed." };
 }
 
@@ -136,7 +137,7 @@ export function merchantRouter() {
       const deliverBy = new Date(String(req.body?.deliver_by ?? new Date(Date.now() + 2 * 864e5).toISOString()));
       const limit = Number.isInteger(req.body?.spend_limit_cents) ? Number(req.body.spend_limit_cents) : Math.ceil(quote.total_cents * 1.1);
       const rules = await rulesFor(p.org_id);
-      if (limit > rules.max_order_cents) throw new GtError(`spend_limit_cents ${limit} is above the mandate's per-order limit ${rules.max_order_cents}`, "policy_denied", 403);
+      if (limit > rules.max_order_cents) throw new GtError(`spend limit ${fmt(limit)} is above the owner's per-order limit of ${fmt(rules.max_order_cents)}`, "policy_denied", 403);
       const owner: Person = p.role === "owner" ? p : { ...p, role: "owner" };
       const poId = await createPo(owner, { supplier_id: c.supplier_id, lines: quote.lines.map((l: any) => ({ product_id: l.product_id, qty_packs: l.qty_packs, substitutes: [], replace_shortfall: true })), deliver_by: deliverBy, spend_limit_cents: limit, note: `From cart ${c.id} by ${c.agent_id}`.slice(0, 200) });
       const db = await getDb();

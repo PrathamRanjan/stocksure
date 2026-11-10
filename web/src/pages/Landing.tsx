@@ -13,7 +13,7 @@ interface Preview {
   lines?: { sku: string; name: string; pack_label: string; unit_price_cents: number; tally: TallyNums }[];
   totals?: { accepted_cents: number; replacement_cents: number; final_cents: number; limit_cents: number } | null;
   quote_total_cents?: number;
-  funding?: { captured_cents: number; held_cents: number; expected_cents: number; spendable_cents: number; limit_cents: number } | null;
+  funding?: { captured_cents: number; held_cents: number; expected_cents: number; spendable_cents: number; limit_cents: number; held_now_cents?: number; releasing_cents?: number; released_cents?: number; refunding_cents?: number } | null;
 }
 
 /** The live demo order as it stands now. Nothing is invented: while loading it shows a placeholder frame, and
@@ -67,7 +67,7 @@ function Docket() {
       <TallyLegend className="border-t border-dashed border-input pt-3 text-xs" />
       {f ? (
         <div className="mt-4">
-          <SettlementBar f={{ limit_cents: f.limit_cents, captured_cents: f.captured_cents, held_cents: f.held_cents, expected: f.expected_cents ? [{ label: "release", cents: f.expected_cents }] : [], spendable_cents: f.spendable_cents }} compact />
+          <SettlementBar f={{ limit_cents: f.limit_cents, captured_cents: f.captured_cents, held_cents: f.held_cents, held_now_cents: f.held_now_cents, releasing_cents: f.releasing_cents, released_cents: f.released_cents, refunding_cents: f.refunding_cents, spendable_cents: f.spendable_cents }} compact />
           <p className="mt-2 text-sm text-muted-foreground">
             <span className="num font-semibold text-foreground">{money(f.captured_cents)}</span> charged · <span className="num">{money(f.held_cents)}</span> held · limit <span className="num">{money(f.limit_cents)}</span>
           </p>

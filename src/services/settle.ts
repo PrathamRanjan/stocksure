@@ -79,8 +79,8 @@ export async function settle(poId: string, version: number, attempt = 0) {
       await logEvent(db, po, "settle.waiting", e.message);
       return;
     }
-    if (e instanceof GtError && e.code === "held") {
-      await logEvent(db, po, "settle.held", e.message);
+    if (e instanceof GtError && (e.code === "held" || e.code === "held_again")) {
+      if (e.code === "held") await logEvent(db, po, "settle.held", e.message);
       return; // the owner's approval re-queues this job (guard/release.ts)
     }
     if (e instanceof GtError && e.code === "exception") return exception(po, e.message);
@@ -138,8 +138,9 @@ async function captureOriginal(po: PO, v: number, accepted: number, already = 0)
     const verdict = await dryRun({ action: "capture", ownerId: po.buyer_id, agentScope: `org:${po.buyer_id}`, entity: "po", entityId: po.id, cents: accepted, trustedCents: [accepted], authorizationId: po.auth_id }, run, db);
     if (verdict.gate === "held") {
       await run.end("held");
-      await postMessage(db, po.id, null, "StockSure", "system", `Capture of ${fmt(accepted)} waits for the buyer's approval: ${verdict.reason}`, "system");
-      throw new GtError(`Capture of ${fmt(accepted)} is held for approval ${verdict.approvalId}: ${verdict.reason}`, "held");
+      // Said once, when the approval is first created; a re-run that finds it still waiting stays quiet.
+      if (verdict.fresh) await postMessage(db, po.id, null, "StockSure", "system", `Capture of ${fmt(accepted)} waits for the buyer's approval: ${verdict.reason}`, "system");
+      throw new GtError(`Capture of ${fmt(accepted)} is held for approval ${verdict.approvalId}: ${verdict.reason}`, verdict.fresh ? "held" : "held_again");
     }
     if (verdict.gate !== "allowed") {
       await run.end("failed");
@@ -348,8 +349,10 @@ export async function settlePart(poId: string, attempt = 0) {
     const verdict = await dryRun({ action: "capture", ownerId: po.buyer_id, agentScope: `org:${po.buyer_id}`, entity: "po", entityId: po.id, cents: amount, trustedCents: [amount], authorizationId: po.auth_id }, run, db);
     if (verdict.gate === "held") {
       await run.end("held");
-      await logEvent(db, po, "settle.held", `Part 1 capture of ${fmt(amount)} waits for the buyer's approval ${verdict.approvalId}: ${verdict.reason}`);
-      await postMessage(db, po.id, null, "StockSure", "system", `Part 1 charge of ${fmt(amount)} waits for the buyer's approval: ${verdict.reason}`, "system");
+      if (verdict.fresh) {
+        await logEvent(db, po, "settle.held", `Part 1 capture of ${fmt(amount)} waits for the buyer's approval ${verdict.approvalId}: ${verdict.reason}`);
+        await postMessage(db, po.id, null, "StockSure", "system", `Part 1 charge of ${fmt(amount)} waits for the buyer's approval: ${verdict.reason}`, "system");
+      }
       return; // the owner's approval re-queues this job (guard/release.ts)
     }
     if (verdict.gate !== "allowed") {

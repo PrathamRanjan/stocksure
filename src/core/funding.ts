@@ -23,6 +23,15 @@ export interface Funding {
   inflight_cents: number;
   expected: { label: string; cents: number }[];
   spendable_cents: number;
+  /** Spec S2, the money panel, all from PayPal state: */
+  /** Live authorizations that can still be captured (plus holds being placed). */
+  held_now_cents: number;
+  /** The rest of a hold after a final capture or a void, until PayPal's read-back shows it released. */
+  releasing_cents: number;
+  /** The rest of holds PayPal has confirmed released (final capture or void read back). */
+  released_cents: number;
+  /** Refunds sent or about to be sent, not yet confirmed by PayPal. */
+  refunding_cents: number;
   holds: { id: string; po_number?: string; amount_cents: number; captured_cents: number; live_cents: number; status: string }[];
 }
 
@@ -33,6 +42,8 @@ export function funding(limitCents: number, ops: FundOp[]): Funding {
   const expected: Funding["expected"] = [];
   const holds: Funding["holds"] = [];
   let held = 0;
+  let releasing = 0;
+  let released = 0;
   for (const a of ops.filter((o) => o.kind === "authorize" && ok(o) && o.paypal_id)) {
     const caps = ops.filter((o) => o.kind === "capture" && o.parent_paypal_id === a.paypal_id);
     const capturedOn = caps.filter(ok).reduce((s, o) => s + o.amount_cents, 0);
@@ -41,10 +52,18 @@ export function funding(limitCents: number, ops: FundOp[]): Funding {
     held += live;
     holds.push({ id: a.paypal_id!, po_number: a.po_number, amount_cents: a.amount_cents, captured_cents: capturedOn, live_cents: live, status });
     const finalOrVoid = caps.some((c) => c.final_capture && c.status !== "failed") || ops.some((o) => o.kind === "void" && o.parent_paypal_id === a.paypal_id && o.status !== "failed");
-    if (live > 0 && finalOrVoid) expected.push({ label: `Release of the rest of hold ${a.paypal_id}${a.po_number ? ` (${a.po_number})` : ""}`, cents: live });
+    if (live > 0 && finalOrVoid) {
+      expected.push({ label: `Release of the rest of hold ${a.paypal_id}${a.po_number ? ` (${a.po_number})` : ""}`, cents: live });
+      releasing += live;
+    }
+    if (!ACTIVE_AUTH.has(status) && finalOrVoid) released += Math.max(0, a.amount_cents - capturedOn);
   }
+  let refunding = 0;
   const inflight = ops.filter((o) => o.kind === "authorize" && (o.status === "planned" || o.status === "pending")).reduce((a, o) => a + o.amount_cents, 0);
-  for (const r of ops.filter((o) => o.kind === "refund" && (o.status === "planned" || o.status === "pending"))) expected.push({ label: `Refund ${r.paypal_id ?? "(not sent yet)"}`, cents: r.amount_cents });
+  for (const r of ops.filter((o) => o.kind === "refund" && (o.status === "planned" || o.status === "pending"))) {
+    expected.push({ label: `Refund ${r.paypal_id ?? "(not sent yet)"}`, cents: r.amount_cents });
+    refunding += r.amount_cents;
+  }
   return {
     limit_cents: limitCents,
     captured_cents: captured,
@@ -53,6 +72,10 @@ export function funding(limitCents: number, ops: FundOp[]): Funding {
     inflight_cents: inflight,
     expected,
     spendable_cents: limitCents - captured + refunded - held - inflight,
+    held_now_cents: held - releasing + inflight,
+    releasing_cents: releasing,
+    released_cents: released,
+    refunding_cents: refunding,
     holds,
   };
 }

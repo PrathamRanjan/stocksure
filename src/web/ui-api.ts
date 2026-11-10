@@ -5,9 +5,11 @@
  */
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { config } from "../config.js";
-import { getDb, type Queryable } from "../db.js";
+import { currentWs, getDb, withWorkspace, type Queryable } from "../db.js";
+import { inShowcase, showcase } from "../demo/workspaces.js";
 import { hasOpenAI, offlineRules } from "../ai/provider.js";
 import { formatUnits } from "../core/units.js";
+import { fmt } from "../core/money.js";
 import { GtError } from "../lib/util.js";
 import { FAULTABLE } from "../paypal/index.js";
 import { countersignThreshold } from "../guard/dryrun.js";
@@ -242,7 +244,8 @@ async function poModel(q: Queryable, po: PO, p: Person) {
     can_post: po.status !== "closed",
     // A replacement that stopped fitting (stock or price moved) is re-planned by the owner; the accepted goods stay charged.
     can_replan: owner && po.status === "exception" && /replacement no longer works/.test(po.exception ?? ""),
-    events,
+    // S3: rows written before every amount was formatted said "2400 cents"; show those as currency too.
+    events: events.map((e: any) => ({ ...e, summary: String(e.summary ?? "").replace(/\b(\d+) cents\b/g, (_m: string, n: string) => fmt(Number(n))) })),
     demo: { samples: config.demoMode },
     copy: { next: (supplier ? NEXT_SUPPLIER : NEXT_BUYER)[po.status] ?? null },
   };
@@ -307,6 +310,36 @@ async function receiveModel(q: Queryable, po: PO) {
   };
 }
 
+/**
+ * Where an anonymous read comes from. Inside a workspace: that workspace. Outside one, in production: the read-only
+ * showcase (or nothing, if it is not built yet). Outside one locally: the base data, as before.
+ */
+async function anonScope<T>(fn: () => Promise<T>, none: T): Promise<T> {
+  if (currentWs() || config.demo.baseSignIn) return fn();
+  const s = await showcase();
+  return s ? withWorkspace(s.id, fn) : none;
+}
+
+/**
+ * Spec S1: the one definition of "needs you", used by the home page, its empty state and the nav badge alike.
+ * An order needs you when its state waits on your side, it is late, or (for the owner) a payment on it waits for
+ * your approval. Approvals not tied to an order are counted on their own.
+ */
+async function needsYou(db: Queryable, p: Person): Promise<{ poIds: Set<string>; approvals: Awaited<ReturnType<typeof approvalsFor>>; count: number }> {
+  const col = p.org_kind === "buyer" ? "buyer_id" : "supplier_id";
+  const states = p.org_kind === "supplier" ? NEED_SUPPLIER : NEED_BUYER;
+  const rows = (await db.query<{ id: string }>(`SELECT id FROM purchase_orders WHERE ${col} = $1 AND status = ANY($2) AND NOT is_sample`, [p.org_id, states])).rows;
+  const poIds = new Set(rows.map((r) => r.id));
+  for (const id of await riskyPos(db, p.org_id)) poIds.add(id);
+  const approvals = await approvalsFor(db, p, null);
+  let loose = 0;
+  for (const a of approvals) {
+    if (a.po_id) poIds.add(a.po_id);
+    else loose++;
+  }
+  return { poIds, approvals, count: poIds.size + loose };
+}
+
 export function uiRouter() {
   const r = Router();
 
@@ -314,20 +347,20 @@ export function uiRouter() {
     "/api/ui/session",
     J(async (_req, _res, p) => {
       const db = await getDb();
-      let paypal: { connected: boolean; payer: string | null } | null = null;
+      let paypal: { connected: boolean; payer: string | null; demo_wallet: boolean } | null = null;
       let needs = 0;
       let approvals = 0;
       if (p) {
         const org = await orgById(db, p.org_id);
-        if (p.org_kind === "buyer") paypal = { connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null };
-        const col = p.org_kind === "buyer" ? "buyer_id" : "supplier_id";
-        const states = p.org_kind === "supplier" ? NEED_SUPPLIER : NEED_BUYER;
-        needs = Number((await db.query<any>(`SELECT count(*)::int AS n FROM purchase_orders WHERE ${col} = $1 AND status = ANY($2)`, [p.org_id, states])).rows[0].n);
-        if (p.org_kind === "buyer" && p.role === "owner") approvals = Number((await db.query<any>("SELECT count(*)::int AS n FROM approvals WHERE owner_id = $1 AND status = 'pending'", [p.org_id])).rows[0].n);
+        if (p.org_kind === "buyer") paypal = { connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null, demo_wallet: (org as any)?.vault_source === "demo_wallet" };
+        const n = await needsYou(db, p);
+        needs = n.count;
+        approvals = n.approvals.length;
       }
       return {
         who: whoJson(p),
         demo: config.demoMode,
+        workspace: currentWs() ? { id: currentWs(), showcase: await inShowcase() } : null,
         paypal_env: config.paypal.env,
         paypal_ready: !!(config.paypal.clientId && config.paypal.clientSecret),
         reader: hasOpenAI() ? `OpenAI ${config.ai.models.read}` : offlineRules() ? "text parser (offline test mode)" : "no model configured",
@@ -342,6 +375,9 @@ export function uiRouter() {
     "/api/ui/people",
     J(async () => {
       if (!config.demoMode) return { people: [] };
+      // In production the people to sign in as exist only inside a visitor's own workspace.
+      if (!currentWs() && !config.demo.baseSignIn) return { people: [], needs_workspace: true };
+      if (await inShowcase()) return { people: [], needs_workspace: true };
       const db = await getDb();
       const rows = (await db.query<any>("SELECT p.id, p.name, p.role, o.name AS org, o.kind FROM people p JOIN orgs o ON o.id = p.org_id ORDER BY o.kind DESC, o.name, p.role")).rows;
       const order = ["Jordan", "Sam", "Ana", "Priya", "Lee", "Marco", "Tess"];
@@ -352,7 +388,7 @@ export function uiRouter() {
   /** The landing preview: the real demo order as it stands right now (lines, counts, money), no secrets. */
   r.get(
     "/api/ui/preview",
-    J(async () => {
+    J(async () => anonScope(async () => {
       const db = await getDb();
       const ids = await demoIds(db);
       const po = ids ? await getPo(db, ids.demoPo).catch(() => null) : null;
@@ -367,9 +403,10 @@ export function uiRouter() {
         lines: lines.map((l) => ({ sku: l.product.sku, name: l.product.name, pack_label: l.product.pack_label, unit_price_cents: l.unit_price_cents ?? l.product.price_cents, tally: tally(l, byLine.get(l.id) ?? null) })),
         totals: res ? { accepted_cents: res.body.totals.accepted_cents, replacement_cents: res.body.totals.replacement_cents, final_cents: res.body.totals.final_cents, limit_cents: res.body.totals.limit_cents } : null,
         quote_total_cents: quoteTotal(lines),
-        funding: f ? { captured_cents: f.captured_cents - f.refunded_cents, held_cents: f.held_cents + f.inflight_cents, expected_cents: f.expected.reduce((a, x) => a + x.cents, 0), spendable_cents: f.spendable_cents, limit_cents: f.limit_cents } : null,
+        funding: f ? { captured_cents: f.captured_cents - f.refunded_cents, held_cents: f.held_cents + f.inflight_cents, expected_cents: f.expected.reduce((a, x) => a + x.cents, 0), spendable_cents: f.spendable_cents, limit_cents: f.limit_cents, held_now_cents: f.held_now_cents, releasing_cents: f.releasing_cents, released_cents: f.released_cents, refunding_cents: f.refunding_cents } : null,
+        from: currentWs() ? ((await inShowcase()) ? "showcase" : "your demo") : "local data",
       };
-    }, false),
+    }, { po: null } as any), false),
   );
 
   r.get(
@@ -380,7 +417,8 @@ export function uiRouter() {
       const pos = (await db.query<PO & { buyer_name: string }>(`SELECT po.*, b.name AS buyer_name FROM purchase_orders po JOIN orgs b ON b.id = po.buyer_id WHERE po.${col} = $1 ORDER BY (po.status = 'closed'), po.created_at DESC LIMIT 100`, [p!.org_id])).rows;
       const org = await orgById(db, p!.org_id);
       const risky = await riskyPos(db, p!.org_id);
-      const states = p!.org_kind === "supplier" ? NEED_SUPPLIER : NEED_BUYER;
+      const need = await needsYou(db, p!);
+      const waiting = new Set(need.approvals.map((a) => a.po_id).filter(Boolean));
       const next = p!.org_kind === "supplier" ? NEXT_SUPPLIER : NEXT_BUYER;
       const orders = [];
       for (const po of pos) {
@@ -393,10 +431,12 @@ export function uiRouter() {
           kind: po.kind,
           status: po.status,
           buyer: po.buyer_name,
-          history: po.note.startsWith("Imported"),
+          history: po.is_sample || po.note.startsWith("Imported"),
+          sample: !!po.is_sample,
           late: risky.has(po.id),
-          needs_you: risky.has(po.id) || states.includes(po.status),
-          next: next[po.status] ?? null,
+          needs_you: need.poIds.has(po.id),
+          approval_waiting: waiting.has(po.id),
+          next: waiting.has(po.id) ? "Approve the payment" : (next[po.status] ?? null),
           total_cents: quoteTotal(lines) || null,
           limit_cents: po.kind === "original" ? po.spend_limit_cents : null,
           deliver_by: po.deliver_by,
@@ -409,7 +449,8 @@ export function uiRouter() {
         org: { name: org?.name, side: p!.org_kind, paypal_connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null },
         can_create: p!.org_kind === "buyer" && p!.role === "owner",
         can_connect: p!.org_kind === "buyer" && p!.role === "owner",
-        approvals: await approvalsFor(db, p!, null),
+        approvals: need.approvals,
+        needs_count: need.count,
         orders,
       };
     }),
@@ -494,7 +535,7 @@ export function uiRouter() {
   /** The scripted scenario with every figure computed from the live demo order, never typed in. */
   r.get(
     "/api/ui/demo",
-    J(async () => {
+    J(async () => anonScope(async () => {
       const db = await getDb();
       const ids = await demoIds(db);
       const po = ids ? await getPo(db, ids.demoPo).catch(() => null) : null;
@@ -510,12 +551,14 @@ export function uiRouter() {
         line: l0 ? { sku: l0.product.sku, name: l0.product.name, qty_packs: l0.qty_packs, pack_label: l0.product.pack_label, price_cents: l0.unit_price_cents ?? l0.product.price_cents, substitutes: l0.substitutes.length } : null,
         quote_total_cents: quoteTotal(lines) || (l0 ? l0.qty_packs * l0.product.price_cents : null),
         totals: res?.body?.totals ?? null,
-        funding: f ? { captured_cents: f.captured_cents - f.refunded_cents, held_cents: f.held_cents + f.inflight_cents, spendable_cents: f.spendable_cents, limit_cents: f.limit_cents } : null,
+        funding: f ? { captured_cents: f.captured_cents - f.refunded_cents, held_cents: f.held_now_cents, releasing_cents: f.releasing_cents, spendable_cents: f.spendable_cents, limit_cents: f.limit_cents } : null,
         driver_path: driver?.driver_token ? `/driver/${driver.driver_token}` : null,
         faults: FAULTABLE,
         live: { paypal: !!(config.paypal.clientId && config.paypal.clientSecret), ai: hasOpenAI(), telegram: !!config.channels.telegramToken, push: !!(config.channels.vapidPublic && config.channels.vapidPrivate) },
+        // "yours": figures from your own workspace; "showcase": the read-only sample, until you start your own.
+        scope: currentWs() ? ((await inShowcase()) ? "showcase" : "yours") : config.demo.baseSignIn ? "local" : "none",
       };
-    }, false),
+    }, { demo: config.demoMode, app_url: config.appUrl, po: null, line: null, quote_total_cents: null, totals: null, funding: null, driver_path: null, faults: FAULTABLE, live: { paypal: !!(config.paypal.clientId && config.paypal.clientSecret), ai: hasOpenAI(), telegram: !!config.channels.telegramToken, push: !!(config.channels.vapidPublic && config.channels.vapidPrivate) }, scope: "none" } as any), false),
   );
 
   r.get("/api/ui/*", (_req, res) => res.status(404).json({ error: "not_found", message: "No such view." }));

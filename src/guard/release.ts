@@ -5,6 +5,7 @@
 import { getDb } from "../db.js";
 import { enqueue } from "../jobs.js";
 import { logEvent } from "../store.js";
+import { fmt } from "../core/money.js";
 
 export async function releaseApproved(approvalId: string) {
   const db = await getDb();
@@ -17,7 +18,7 @@ export async function releaseApproved(approvalId: string) {
     if (po && v) {
       if (po.status === "settling") await enqueue(db, "settle", { poId: po.id, version: v.version }, new Date(), `settle:${po.id}:${v.version}`);
       if (po.status === "part_settling") await enqueue(db, "settle_part", { poId: po.id }, new Date(), `settle_part:${po.id}`);
-      await logEvent(db, po, "approval.released", `Owner approved capture of ${p.cents} cents; settlement resumes`);
+      await logEvent(db, po, "approval.released", `Owner approved the ${fmt(p.cents)} charge; settlement resumes`);
     }
   }
   if (p.entity === "claim" && p.action === "refund") {

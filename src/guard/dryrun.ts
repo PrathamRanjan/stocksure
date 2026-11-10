@@ -4,6 +4,7 @@
  * moves at or above the owner's threshold are held for approval (a click, or a passkey countersign over the exact
  * payload hash above SS_COUNTERSIGN_ABOVE_CENTS).
  */
+import { fmt } from "../core/money.js";
 import { createHash } from "node:crypto";
 import { assessSettlement } from "../safety/index.js";
 import { config } from "../config.js";
@@ -36,7 +37,7 @@ export interface MoneyMove {
   orderId?: string | null;
 }
 
-export type GateVerdict = { gate: "allowed"; checks: string[] } | { gate: "dry_run_refused" | "denied"; reason: string; checks: string[] } | { gate: "held"; approvalId: string; reason: string; checks: string[] };
+export type GateVerdict = { gate: "allowed"; checks: string[] } | { gate: "dry_run_refused" | "denied"; reason: string; checks: string[] } | { gate: "held"; approvalId: string; reason: string; checks: string[]; /** False when this repeats an approval already waiting: say nothing new. */ fresh: boolean };
 
 export class HeldForApproval extends Error {
   constructor(readonly approvalId: string, msg: string) {
@@ -74,10 +75,10 @@ export async function dryRun(m: MoneyMove, run?: Run | null, q?: Queryable): Pro
   }
 
   const rules = await rulesFor(m.ownerId, db);
-  if ((m.action === "authorize" || m.action === "reauthorize") && m.cents > rules.max_order_cents) return refuse(`order ${m.cents} cents exceeds the mandate's max_order_cents ${rules.max_order_cents}`, "denied");
+  if ((m.action === "authorize" || m.action === "reauthorize") && m.cents > rules.max_order_cents) return refuse(`order of ${fmt(m.cents)} is above the owner's per-order limit of ${fmt(rules.max_order_cents)}`, "denied");
   if (m.action === "authorize") {
     const today = (await db.query<{ s: string }>("SELECT coalesce(sum(amount_cents),0) AS s FROM payment_ops o JOIN purchase_orders p ON p.id = o.po_id WHERE p.buyer_id = $1 AND o.kind = 'authorize' AND o.status IN ('pending','succeeded') AND o.created_at > now() - interval '1 day'", [m.ownerId])).rows[0];
-    if (Number(today?.s ?? 0) + m.cents > rules.max_daily_cents) return refuse(`today's holds ${Number(today?.s ?? 0)} + ${m.cents} exceed max_daily_cents ${rules.max_daily_cents}`, "denied");
+    if (Number(today?.s ?? 0) + m.cents > rules.max_daily_cents) return refuse(`today's holds ${fmt(Number(today?.s ?? 0))} plus ${fmt(m.cents)} would pass the owner's daily limit of ${fmt(rules.max_daily_cents)}`, "denied");
   }
   checks.push("within the mandate");
 
@@ -88,15 +89,15 @@ export async function dryRun(m: MoneyMove, run?: Run | null, q?: Queryable): Pro
       const ok = m.action === "reauthorize" ? ["CREATED", "EXPIRED", "PENDING"].includes(a.status) : a.status === "CREATED" || a.status === "PENDING" || a.status === "PARTIALLY_CAPTURED";
       if (!ok) return refuse(`authorization ${m.authorizationId} is ${a.status}; cannot ${m.action}`);
       const authCents = Math.round(Number(a.amount?.value ?? 0) * 100);
-      if (m.action === "capture" && m.cents > authCents) return refuse(`capture ${m.cents} exceeds authorization ${authCents}`);
-      checks.push(`authorization ${a.status}, ${authCents} cents`);
+      if (m.action === "capture" && m.cents > authCents) return refuse(`capture of ${fmt(m.cents)} is more than the ${fmt(authCents)} hold`);
+      checks.push(`authorization ${a.status}, ${fmt(authCents)}`);
     }
     if (m.captureId && m.action === "refund") {
       const c = await paypal().getCapture(m.captureId);
       if (!["COMPLETED", "PARTIALLY_REFUNDED"].includes(c.status)) return refuse(`capture ${m.captureId} is ${c.status}; cannot refund`);
       const capCents = Math.round(Number(c.amount?.value ?? 0) * 100);
-      if (m.cents > capCents) return refuse(`refund ${m.cents} exceeds capture ${capCents}`);
-      checks.push(`capture ${c.status}, ${capCents} cents`);
+      if (m.cents > capCents) return refuse(`refund of ${fmt(m.cents)} is more than the ${fmt(capCents)} charged`);
+      checks.push(`capture ${c.status}, ${fmt(capCents)}`);
     }
   } catch (e) {
     return refuse(`PayPal state could not be read: ${(e as Error).message.slice(0, 160)}`);
@@ -110,17 +111,22 @@ export async function dryRun(m: MoneyMove, run?: Run | null, q?: Queryable): Pro
   }
   const safetyHold = safety?.level === "hold";
   if ((m.action === "capture" || m.action === "refund") && (safetyHold || m.cents >= rules.approve_above_cents) && !(await approvedFor(m.entity, m.entityId, m.action, m.cents, db))) {
-    const payload = { action: m.action, entity: m.entity, entity_id: m.entityId, cents: m.cents, ...(safetyHold ? { safety_rule: safety!.rule ?? "rule", safety_reasons: safety!.reasons, safety_risk: safety!.risk } : {}) };
-    const existing = (await db.query<{ id: string }>("SELECT id FROM approvals WHERE owner_id = $1 AND payload_hash = $2 AND status = 'pending'", [m.ownerId, payloadHash(payload)])).rows[0];
+    // The hash covers the move itself only (action, entity, id, amount): the same move held again finds the same
+    // approval, and approvedFor() finds it once granted. Safety details are stored beside it, never hashed: hashing
+    // them made an approved scam hold unfindable, so settlement held it again forever.
+    const move = { action: m.action, entity: m.entity, entity_id: m.entityId, cents: m.cents };
+    const payload = { ...move, ...(safetyHold ? { safety_rule: safety!.rule ?? "rule", safety_reasons: safety!.reasons, safety_risk: safety!.risk } : {}) };
+    const hash = payloadHash(move);
+    const existing = (await db.query<{ id: string }>("SELECT id FROM approvals WHERE owner_id = $1 AND payload_hash = $2 AND status = 'pending'", [m.ownerId, hash])).rows[0];
     const approvalId = existing?.id ?? newId("apr");
-    if (!existing) await db.query("INSERT INTO approvals (id, owner_id, action, payload_hash, payload) VALUES ($1,$2,$3,$4,$5)", [approvalId, m.ownerId, m.action, payloadHash(payload), JSON.stringify(payload)]);
+    if (!existing) await db.query("INSERT INTO approvals (id, owner_id, action, payload_hash, payload) VALUES ($1,$2,$3,$4,$5)", [approvalId, m.ownerId, m.action, hash, JSON.stringify(payload)]);
     await run?.step({ actor: "guard", tool: `dry_run:${m.action}`, args: payload, gate: "held", result: { approval_id: approvalId, checks } });
     if (!existing) {
       await appendAudit("money.held", m.entity, m.entityId, { ...payload, approval_id: approvalId }, db);
       const big = m.cents > config.guard.countersignAboveCents;
-      await notifyParty("buyer", m.ownerId, `StockSure wants to ${m.action} ${(m.cents / 100).toFixed(2)} on ${m.entity} ${m.entityId}. It is at or above your approval threshold.${big ? ` Above ${(config.guard.countersignAboveCents / 100).toFixed(2)} it needs your passkey in the guard console.` : ""}`, big ? [{ id: `decline:${approvalId}`, label: "Decline" }] : [{ id: `approve:${approvalId}`, label: "Approve" }, { id: `decline:${approvalId}`, label: "Decline" }], "approval", approvalId, db).catch(() => undefined);
+      await notifyParty("buyer", m.ownerId, `StockSure wants to ${m.action} ${fmt(m.cents)} on ${m.entity} ${m.entityId}. ${safetyHold ? `The scam check paused it: ${safety!.reasons[0]}` : "It is at or above your approval threshold."}${big ? ` Above ${fmt(config.guard.countersignAboveCents)} it needs your passkey in the guard console.` : ""}`, big ? [{ id: `decline:${approvalId}`, label: "Decline" }] : [{ id: `approve:${approvalId}`, label: "Approve" }, { id: `decline:${approvalId}`, label: "Decline" }], "approval", approvalId, db).catch(() => undefined);
     }
-    return { gate: "held", approvalId, reason: safetyHold ? `paused by the scam check: ${safety!.reasons[0]}` : `${m.action} ${m.cents} cents is at or above the mandate's approval threshold ${rules.approve_above_cents}`, checks };
+    return { gate: "held", approvalId, fresh: !existing, reason: safetyHold ? `paused by the scam check: ${safety!.reasons[0]}` : `${m.action} of ${fmt(m.cents)} is at or above the owner's approval threshold of ${fmt(rules.approve_above_cents)}`, checks };
   }
 
   await run?.step({ actor: "guard", tool: `dry_run:${m.action}`, args: { cents: m.cents, entity: m.entity, entity_id: m.entityId }, gate: "allowed", result: { checks } });
@@ -139,7 +145,12 @@ export async function gate(m: MoneyMove, run?: Run | null, q?: Queryable): Promi
 export async function approvedFor(entity: string, entityId: string, action: MoneyAction, cents: number, q?: Queryable): Promise<boolean> {
   const db = q ?? (await getDb());
   const h = payloadHash({ action, entity, entity_id: entityId, cents });
-  const r = await db.query("SELECT 1 FROM approvals WHERE payload_hash = $1 AND status = 'approved' LIMIT 1", [h]);
+  // The payload match also finds approvals stored before the hash covered the move only (scam holds hashed their
+  // safety details too, so the hash alone never matched them).
+  const r = await db.query(
+    "SELECT 1 FROM approvals WHERE status = 'approved' AND (payload_hash = $1 OR (payload->>'action' = $2 AND payload->>'entity' = $3 AND payload->>'entity_id' = $4 AND (payload->>'cents')::bigint = $5)) LIMIT 1",
+    [h, action, entity, entityId, cents],
+  );
   return r.rows.length > 0;
 }
 

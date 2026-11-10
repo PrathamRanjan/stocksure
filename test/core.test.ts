@@ -174,6 +174,22 @@ describe("planner: review SS-7", () => {
 });
 
 describe("funding", () => {
+  it("S2 money panel, oat-milk scenario: $180 charged, $24 held, $20 released, $6 spendable", () => {
+    const op = (o: Partial<FundOp>): FundOp => ({ kind: "authorize", status: "succeeded", amount_cents: 0, paypal_id: null, parent_paypal_id: null, paypal_status: null, final_capture: false, ...o });
+    const hold = op({ amount_cents: 20000, paypal_id: "A1", paypal_status: "CREATED" });
+    const cap = op({ kind: "capture", amount_cents: 18000, paypal_id: "C1", parent_paypal_id: "A1", final_capture: true });
+    // Right after the final capture, before PayPal's read-back: the $20 is being released, not held, not spendable.
+    const mid = funding(21000, [hold, cap]);
+    expect([mid.captured_cents, mid.held_now_cents, mid.releasing_cents, mid.released_cents, mid.spendable_cents]).toEqual([18000, 0, 2000, 0, 1000]);
+    // PayPal confirms; the $24 replacement hold is live.
+    const repl = op({ amount_cents: 2400, paypal_id: "A2", paypal_status: "CREATED" });
+    const end = funding(21000, [{ ...hold, paypal_status: "CAPTURED" }, cap, repl]);
+    expect([end.captured_cents, end.held_now_cents, end.releasing_cents, end.released_cents, end.spendable_cents]).toEqual([18000, 2400, 0, 2000, 600]);
+    // A pending refund never reduces what is held (the old panel subtracted it and showed Held $0).
+    const ref = op({ kind: "refund", status: "pending", amount_cents: 2400, parent_paypal_id: "C1" });
+    const r = funding(21000, [{ ...hold, paypal_status: "CAPTURED" }, cap, repl, ref]);
+    expect([r.held_now_cents, r.releasing_cents, r.refunding_cents]).toEqual([2400, 0, 2400]);
+  });
   it("an expected release is not spendable until PayPal confirms it", () => {
     const hold = op({ amount_cents: 20000, paypal_id: "AU1", paypal_status: "CREATED" });
     expect(funding(21000, [hold]).spendable_cents).toBe(1000);
