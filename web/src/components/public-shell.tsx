@@ -24,7 +24,6 @@ export function PublicShell({ children, wide = false }: { children: ReactNode; w
           </Link>
           <nav aria-label="Site" className="ml-6 hidden items-center gap-5 text-[0.95rem] font-semibold md:flex">
             <a href="/#how" className="hover:underline">How it works</a>
-            <a href="/#pricing" className="hover:underline">Pricing</a>
             <Link to="/demo" className="hover:underline">Demo</Link>
             <a href="/evidence" className="hover:underline">Evidence</a>
           </nav>

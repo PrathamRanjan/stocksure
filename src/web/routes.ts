@@ -1,7 +1,6 @@
 import { countersignThreshold } from "../guard/dryrun.js";
 import { guardCard } from "./safetyui.js";
 import { icon } from "./icons.js";
-import { landing } from "./landing.js";
 import { Router, type Request, type Response } from "express";
 import { config } from "../config.js";
 import { getDb } from "../db.js";

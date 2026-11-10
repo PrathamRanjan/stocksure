@@ -72,8 +72,7 @@ ${rows.length
 <form method="post" action="/disputes/floor" class="row"><label for="floor" class="small">Floor, % of catalog</label><input id="floor" type="number" name="floor_pct" min="50" max="100" value="${org?.floor_pct ?? 90}" style="width:6rem"><button class="btn small">Save</button></form></div>
 <div class="card"><h2>Driver link</h2><p class="small muted">A phone page for your driver: today's dispatched orders, arrival notice, tracking number. No sign-in; the link is the key.</p>
 ${driver?.driver_token ? html`<p class="mono small">${config.appUrl}/driver/${driver.driver_token}</p>` : ""}<form method="post" action="/disputes/driver-link" class="row"><button class="btn small">${driver?.driver_token ? "Rotate link" : "Create link"}</button></form></div>
-</div>
-<p class="small muted">Amounts above are PayPal's. ${fmt(0)} shown anywhere else on this page is a placeholder, never a balance.</p>`,
+</div>`,
         ),
       );
     }, () => "/home"),

@@ -5,7 +5,7 @@ import { money } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { PublicShell } from "@/components/public-shell";
-import { SettlementBar, Stamp, StatusStamp, Tally, TallyLegend, TrustRow, type TallyNums } from "@/components/brand";
+import { SettlementBar, StatusStamp, Tally, TallyLegend, TrustRow, type TallyNums } from "@/components/brand";
 import { startTour } from "@/tour/tours";
 
 interface Preview {
@@ -16,28 +16,42 @@ interface Preview {
   funding?: { captured_cents: number; held_cents: number; expected_cents: number; spendable_cents: number; limit_cents: number } | null;
 }
 
-/** A docket that shows what the product does, using the live demo order (or a labelled example before the demo loads). */
+/** The live demo order as it stands now. Nothing is invented: while loading it shows a placeholder frame, and
+ *  with no demo order it says so. */
 function Docket() {
-  const { data } = useView<Preview>("/api/ui/preview");
-  const live = !!data?.po && !!data.lines?.length;
-  const lines = live
-    ? data!.lines!
-    : [
-        { sku: "MILK-2L", name: "Full cream milk 2 L", pack_label: "case of 6", unit_price_cents: 1140, tally: { ordered: 7, accepted: 6, damaged: 1, wrong: 0, short: 0 } },
-        { sku: "BEAN-1K", name: "House espresso beans 1 kg", pack_label: "bag", unit_price_cents: 3200, tally: { ordered: 3, accepted: 2, damaged: 0, wrong: 0, short: 1 } },
-      ];
+  const { data, error } = useView<Preview>("/api/ui/preview");
+  const frame = "relative rounded-lg border border-border bg-card p-4 shadow-[0_1px_0_var(--border),0_12px_30px_-18px_rgb(0_0_0/0.35)] sm:p-5";
+  if (!data && !error)
+    return (
+      <figure className={`${frame} min-h-72`} aria-label="Loading the live demo order" aria-busy="true">
+        <div className="h-4 w-32 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+        <div className="mt-2 h-6 w-56 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+        <div className="mt-6 grid gap-3">
+          {[0, 1].map((i) => <div key={i} className="h-12 animate-pulse rounded bg-muted motion-reduce:animate-none" />)}
+        </div>
+      </figure>
+    );
+  if (!data?.po || !data.lines?.length)
+    return (
+      <figure className={`${frame} grid min-h-72 place-content-center gap-3 text-center`} aria-label="No live demo order">
+        <p className="font-heading text-lg font-bold">No demo order on this server right now</p>
+        <p className="text-sm text-muted-foreground">Load the demo to see a real order, its counts and its PayPal state here.</p>
+        <Button asChild variant="outline" className="justify-self-center"><Link to="/demo">Open the demo controls</Link></Button>
+      </figure>
+    );
+  const lines = data.lines;
   const f = data?.funding;
   const est = lines.reduce((a, l) => a + l.unit_price_cents * l.tally.ordered, 0);
-  const quoted = live && data!.quote_total_cents ? data!.quote_total_cents : null;
+  const quoted = data.quote_total_cents || null;
   return (
-    <figure className="relative rounded-lg border border-border bg-card p-4 shadow-[0_1px_0_var(--border),0_12px_30px_-18px_rgb(0_0_0/0.35)] sm:p-5" aria-label={live ? `Live demo order ${data!.po!.number}` : "Example delivery"}>
+    <figure className="relative rounded-lg border border-border bg-card p-4 shadow-[0_1px_0_var(--border),0_12px_30px_-18px_rgb(0_0_0/0.35)] sm:p-5" aria-label={`Live demo order ${data.po.number}`}>
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-dashed border-input pb-3">
         <div>
-          <p className="mono text-xs uppercase tracking-wider text-muted-foreground">{live ? "Live demo order" : "Example"}</p>
-          <p className="font-heading text-lg font-bold">{live ? data!.po!.number : "SS-1042"} · {live ? data!.po!.supplier : "Harbour Wholesale"}</p>
-          <p className="text-sm text-muted-foreground">to {live ? data!.po!.buyer : "Laneway Café"}</p>
+          <p className="mono text-xs uppercase tracking-wider text-muted-foreground">Live demo order</p>
+          <p className="font-heading text-lg font-bold">{data.po.number} · {data.po.supplier}</p>
+          <p className="text-sm text-muted-foreground">to {data.po.buyer}</p>
         </div>
-        {live ? <StatusStamp status={data!.po!.status} /> : <Stamp tone="paid">Paid as counted</Stamp>}
+        <StatusStamp status={data.po.status} />
       </div>
       <ul className="divide-y divide-dashed divide-input">
         {lines.slice(0, 3).map((l) => (
@@ -160,35 +174,6 @@ export default function Landing() {
         </ul>
       </section>
 
-      <section id="pricing" className="mt-14 scroll-mt-20 sm:mt-20" aria-labelledby="pricing-title">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="pricing-title" className="text-2xl sm:text-3xl">Pricing</h2>
-          <Stamp tone="quiet">Illustrative, not on sale</Stamp>
-        </div>
-        <p className="mb-5 mt-1 max-w-2xl text-muted-foreground">A sketch of how this could be priced. For comparison, inventory suites for restaurants are commonly listed at about $127–$339 per location per month.</p>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            { k: "Counter", p: "$0", u: "one location", v: ["Up to 20 orders a month", "PayPal holds and captures", "AI docket reading"] },
-            { k: "Kitchen", p: "$29", u: "per location / month", v: ["Unlimited orders", "Spending rules and passkey approvals", "Replacement planning and phone alerts"], hi: true },
-            { k: "Supplier", p: "$0", u: "always", v: ["Confirm quotes and agree counts", "Get paid the agreed amount", "Delivery board and disputes view"] },
-          ].map((t) => (
-            <div key={t.k} className={`rounded-lg border bg-card p-5 ${t.hi ? "border-foreground border-2" : "border-border"}`}>
-              <h3 className="text-lg">{t.k}</h3>
-              <p className="mt-2">
-                <span className="num font-heading text-4xl font-extrabold">{t.p}</span> <span className="text-muted-foreground">{t.u}</span>
-              </p>
-              <ul className="mt-3 space-y-1.5">
-                {t.v.map((x) => (
-                  <li key={x} className="flex gap-2">
-                    <span className="tally sm mt-1.5" aria-hidden="true"><i data-k="accepted" /></span>
-                    {x}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="mt-14 sm:mt-20" aria-labelledby="faq-title">
         <h2 id="faq-title" className="mb-4 text-2xl sm:text-3xl">Questions</h2>

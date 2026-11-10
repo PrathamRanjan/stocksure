@@ -1,6 +1,6 @@
 /**
  * AI provider layer (roadmap B.1). OpenAI Responses API with strict JSON-schema outputs and image input,
- * a model chain (primary -> fallback -> replayed answer to the identical input -> none), a per-call audit
+ * a model chain (primary -> fallback -> none; replaying an earlier answer is opt-in per call), a per-call audit
  * record, and the two guard helpers every caller must use: forbidden-field schema checks and grounding.
  *
  * Money and PayPal ids never come out of a model. `assertSafeSchema` enforces that at call time and the
@@ -32,7 +32,8 @@ export interface StructuredCall<T> {
   schemaName: string;
   schema: Record<string, unknown>;
   maxOutputTokens?: number;
-  /** Allow replaying the last real answer to the identical input when every model fails. Default true. */
+  /** Opt in to replaying the last real answer to the identical input when every model fails. Off by default:
+   *  a failed call then falls back to rules or to a person, never to an old answer presented as a new one. */
   allowReplay?: boolean;
   /** Attach to an agent run for the trace. */
   runId?: string | null;
@@ -239,7 +240,7 @@ export async function structured<T>(call: StructuredCall<T>): Promise<CallResult
   const parse = call.parse ?? ((x: unknown) => x as T);
   const started = Date.now();
   if (!hasOpenAI()) {
-    if (call.allowReplay !== false) {
+    if (call.allowReplay === true) {
       const r = await replay(inputHash);
       if (r) return { output: parse(r.output), model: r.model, via: "replay", inputHash, tokensIn: 0, tokensOut: 0, costUsd: 0, latencyMs: Date.now() - started, auditId: null };
     }
@@ -264,7 +265,7 @@ export async function structured<T>(call: StructuredCall<T>): Promise<CallResult
       await audit({ purpose: call.purpose, model, via: i === 0 ? "primary" : "fallback", inputHash, outputHash: "", tokensIn: 0, tokensOut: 0, costUsd: 0, latencyMs: Date.now() - t0, ok: false, error: msg, output: null, runId: call.runId ?? null });
     }
   }
-  if (call.allowReplay !== false) {
+  if (call.allowReplay === true) {
     const r = await replay(inputHash);
     if (r) {
       await audit({ purpose: call.purpose, model: r.model, via: "replay", inputHash, outputHash: "", tokensIn: 0, tokensOut: 0, costUsd: 0, latencyMs: Date.now() - started, ok: true, error: null, output: r.output, runId: call.runId ?? null });

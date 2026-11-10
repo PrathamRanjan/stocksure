@@ -47,7 +47,7 @@ export const BRAND: Brand = {
   themeColor: "#1B1A16",
   fonts: "family=Archivo:wdth,wght@62..125,400..900&family=Source+Sans+3:wght@400;600;700",
   appFoot: "PayPal sandbox: no real money moves. StockSure pays for agreed quantities at quoted prices, never for what a document claims.",
-  siteLinks: [["/#how", "How it works"], ["/#pricing", "Pricing"], ["/demo", "Demo"], ["/evidence", "Evidence"]],
+  siteLinks: [["/#how", "How it works"], ["/demo", "Demo"], ["/evidence", "Evidence"]],
   cta: ["/login", "Sign in"],
   siteFoot: "StockSure · built for the PayPal hackathon · PayPal sandbox only, no real money moves.",
   siteFootLinks: [["/login", "Sign in"], ["/evidence", "Evidence"], ["/llms.txt", "llms.txt"]],

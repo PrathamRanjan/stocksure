@@ -43,6 +43,12 @@ The full table is in [AUDIT.md §3](AUDIT.md). In short:
 - **Found and fixed during this pass:**
   - The owner's sidebar linked to `/disputes`, a supplier-only page, which answered 403. Removed.
   - On phones the ribbon said "PayPal sandbox" even when PayPal was simulated. It now says "Sandbox · no real money", which is true in both modes; the wide ribbon still names each live or simulated service.
+- **Second sweep, after the redesign (10 Nov, evening):**
+  - The landing page's pricing section (invented $0 / $29 / $0 tiers, marked "illustrative") is removed, along with its nav links.
+  - The landing preview no longer falls back to an invented "Example SS-1042" order. It shows a loading frame, the live demo order, or "No demo order on this server right now".
+  - The old server landing page (`src/web/landing.ts`, with the fake "PO-1042 · $214.60" card) is deleted. It was no longer routed.
+  - A placeholder sentence on `/disputes` is removed.
+  - The AI no longer replays an earlier answer when every model call fails. Replay is now opt-in per call and no production path opts in. A failed read falls back to the labelled text parser or to typing the counts by hand.
 - No literal amount, id or frozen clock changes a business result. Money is always quote price × confirmed units, in integer cents, computed on the server. The front end never computes money: it renders the server's `funding` and `resolution.totals`.
 
 ## 3. Design direction
