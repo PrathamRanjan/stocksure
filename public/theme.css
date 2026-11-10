@@ -84,3 +84,10 @@ html .ag-theme-quartz, html .ag-theme-quartz-dark { --ag-font-family: var(--font
 .b-theme-stockium, .b-gridbase { font-family: var(--font-sans); }
 .app-back { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* Key/value tables (spending rules) wrap on small screens instead of pushing the page sideways. */
+table.kv th, table.kv td { white-space: normal; overflow-wrap: anywhere; }
+table.kv th { width: 55%; }
+.table-wrap:focus-visible { outline: 2px solid var(--carbon); outline-offset: 2px; }
+/* Long ids and links (driver links, PayPal ids) break instead of widening the page. */
+p.mono, .mono a, td.mono { overflow-wrap: anywhere; }

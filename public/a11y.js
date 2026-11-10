@@ -10,7 +10,17 @@
   let live;
   const announce = (t) => { if (!live) { live = document.createElement("div"); live.className = "a11y-live"; live.setAttribute("aria-live", "polite"); document.body.appendChild(live); } live.textContent = ""; setTimeout(() => (live.textContent = t), 30); };
 
+  // Tables that scroll sideways must be reachable by keyboard (WCAG 2.1.1): make each a labelled, focusable region.
+  function scrollRegions() {
+    document.querySelectorAll(".table-wrap:not([tabindex])").forEach((w) => {
+      w.tabIndex = 0;
+      w.setAttribute("role", "region");
+      const h = w.querySelector("caption") || (w.closest("section, .card, details") || document).querySelector("h1, h2, h3, summary");
+      w.setAttribute("aria-label", `${h ? h.textContent.trim().slice(0, 60) + ": " : ""}table, scrolls sideways`);
+    });
+  }
   function apply() {
+    scrollRegions();
     root.dataset.a11yText = String(p.textScale);
     root.dataset.a11yContrast = p.contrast;
     root.dataset.a11yFont = p.font;

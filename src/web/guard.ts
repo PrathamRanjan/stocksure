@@ -58,7 +58,7 @@ const RULE_LABELS: Record<keyof Rules, string> = {
 const fmtRule = (k: keyof Rules, v: unknown) => (typeof v === "boolean" ? (v ? "yes" : "no") : String(k).endsWith("_cents") ? fmt(Number(v)) : String(k).endsWith("_pct") ? `${v}%` : Array.isArray(v) ? (v.length ? v.join(", ") : "any") : String(v));
 
 function rulesTable(rules: Rules, compare?: Rules) {
-  return html`<table class="small"><tbody>${raw(
+  return html`<table class="small kv"><tbody>${raw(
     (Object.keys(RULE_LABELS) as (keyof Rules)[])
       .map((k) => {
         const changed = compare && JSON.stringify(compare[k]) !== JSON.stringify(rules[k]);
@@ -123,7 +123,7 @@ export function guardRouter() {
   <div class="stats"><div><b>${bt.orders}</b><span>orders</span></div><div><b>${bt.run}</b><span>would run</span></div><div><b>${bt.wait}</b><span>would wait for you</span></div><div><b>${bt.deny}</b><span>would be denied</span></div></div>
   <div class="stats"><div><b>${fmt(bt.auto_cents)}</b><span>moves without you</span></div><div><b>${fmt(bt.held_cents)}</b><span>waits for you</span></div></div>
   <form method="post" action="/guard/backtest" class="row" id="bt-form">
-    <label class="small">Try an approval threshold: <output id="bt-out">${fmt(rules.approve_above_cents)}</output></label>
+    <label class="small" for="bt-slider">Try an approval threshold: <output id="bt-out">${fmt(rules.approve_above_cents)}</output></label>
     <input type="range" name="approve_above_cents" min="5000" max="500000" step="5000" value="${rules.approve_above_cents}" id="bt-slider">
     <input type="hidden" name="base" value="${policy?.id ?? ""}">
     <button class="btn small">Re-run backtest</button>

@@ -57,7 +57,7 @@ function NextStep({ m, reload }: { m: PoModel; reload: () => void }) {
     return box(
       `Accept the quote: ${money(m.quote_total_cents)}`,
       <>
-        <p>PayPal places a <strong>hold</strong> for <span className="num font-semibold">{money(m.quote_total_cents)}</span> on {m.paypal?.payer ?? "your PayPal"}. It isn't a charge: only what's accepted at delivery is captured, and the rest is released.</p>
+        <p>PayPal places a <strong>hold</strong> for <span className="num font-semibold">{money(m.quote_total_cents)}</span> on <span className="break-all">{m.paypal?.payer ?? "your PayPal"}</span>. It isn't a charge: only what's accepted at delivery is captured, and the rest is released.</p>
         {m.over_limit && <p className="mt-2 font-semibold text-stop">The quote is above your {money(m.po.limit_cents)} limit, so it can't be accepted. Ask the supplier to re-quote or start a new order.</p>}
       </>,
       <Button size="lg" variant="carbon" disabled={!!busy || m.over_limit} onClick={() => run("accept", `/po/${id}/accept`, { version: String(m.po.quote_version) })}>

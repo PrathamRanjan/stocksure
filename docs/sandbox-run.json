@@ -1,0 +1,55 @@
+{
+ "base": "https://pph-stocksure.onrender.com",
+ "ran_at": "2026-11-10T01:38:56.453Z",
+ "po": "SS-1006",
+ "accepted_cents": 18000,
+ "quote_cents": 20000,
+ "funding": {
+  "limit_cents": 21000,
+  "captured_cents": 18000,
+  "refunded_cents": 0,
+  "held_cents": 2000,
+  "inflight_cents": 0,
+  "expected": [
+   {
+    "label": "Release of the rest of hold 002890902Y4715613 (SS-1006)",
+    "cents": 2000
+   }
+  ],
+  "spendable_cents": 1000,
+  "holds": [
+   {
+    "id": "002890902Y4715613",
+    "po_number": "SS-1006",
+    "amount_cents": 20000,
+    "captured_cents": 18000,
+    "live_cents": 2000,
+    "status": "CREATED"
+   }
+  ]
+ },
+ "ops": [
+  {
+   "po": "SS-1006",
+   "kind": "authorize",
+   "status": "succeeded",
+   "paypal_status": "CREATED",
+   "amount": "200.00",
+   "final_capture": false,
+   "paypal_id": "002890902Y4715613",
+   "request_id": "hold:po_vh6yq6ryquaewgjp:1",
+   "at": "2026-11-10T01:38:37.369Z"
+  },
+  {
+   "po": "SS-1006",
+   "kind": "capture",
+   "status": "succeeded",
+   "paypal_status": "COMPLETED",
+   "amount": "180.00",
+   "final_capture": true,
+   "paypal_id": "4Y124646ET315235G",
+   "request_id": "cap:po_vh6yq6ryquaewgjp:1",
+   "at": "2026-11-10T01:38:55.521Z"
+  }
+ ]
+}

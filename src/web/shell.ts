@@ -60,7 +60,7 @@ export interface ShellPage {
 }
 
 const tools = () =>
-  `<div class="tools"><button class="iconbtn" type="button" data-a11y-read aria-pressed="false" title="Read this page aloud" aria-label="Read this page aloud">${icon("volume")}</button><button class="btn small" type="button" data-a11y-open aria-haspopup="dialog">${icon("type")}<span>Display</span></button></div>`;
+  `<div class="tools"><button class="iconbtn" type="button" data-a11y-read aria-pressed="false" title="Read this page aloud" aria-label="Read this page aloud">${icon("volume")}</button><button class="btn small" type="button" data-a11y-open aria-haspopup="dialog" aria-label="Display and help">${icon("type")}<span>Display</span></button></div>`;
 
 function head(b: Brand, title: string, extra = ""): string {
   const s = b.staticBase;

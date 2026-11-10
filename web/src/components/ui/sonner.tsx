@@ -32,6 +32,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          // Rich colours from the Docket stamps; sonner's defaults fall below 4.5:1 (red on pink was 4.34:1).
+          "--success-bg": "var(--paid-soft)",
+          "--success-text": "var(--paid)",
+          "--success-border": "var(--paid)",
+          "--error-bg": "var(--stop-soft)",
+          "--error-text": "var(--stop)",
+          "--error-border": "var(--stop)",
+          "--warning-bg": "var(--held-soft)",
+          "--warning-text": "var(--held)",
+          "--warning-border": "var(--held)",
+          "--info-bg": "var(--popover)",
+          "--info-text": "var(--popover-foreground)",
+          "--info-border": "var(--border)",
         } as React.CSSProperties
       }
       toastOptions={{

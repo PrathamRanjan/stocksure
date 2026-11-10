@@ -88,3 +88,39 @@ test("dark theme passes axe on the busiest pages", async ({ browser }) => {
   }
   await ctx.close();
 });
+
+test("server-rendered control pages fit 360 px and pass axe", async ({ browser }) => {
+  const pages: Record<"Jordan" | "Sam" | "Ana", string[]> = {
+    Jordan: ["/guard", "/safety", "/ledger", "/deliveries", "/negotiations", "/channels", "/evidence"],
+    Sam: ["/dock"],
+    Ana: ["/deliveries", "/disputes", "/negotiations", "/ledger"],
+  };
+  const failures: string[] = [];
+  for (const who of ["Jordan", "Sam", "Ana"] as const) {
+    // Every link in this persona's sidebar opens without an error page or a bounce.
+    const desk = await as(browser, who);
+    const links = await desk.page.locator("aside nav a[href^='/']").evaluateAll((as) => [...new Set(as.map((a) => a.getAttribute("href")!))]);
+    expect(links.length, `${who} sidebar`).toBeGreaterThan(3);
+    for (const l of links) {
+      const r = await desk.page.goto(l);
+      if ((r?.status() ?? 500) >= 400 || /[?&]err=/.test(desk.page.url())) failures.push(`${who} sidebar ${l} -> ${r?.status()} ${desk.page.url()}`);
+    }
+    await desk.ctx.close();
+    const { ctx, page } = await as(browser, who, { viewport: { width: 360, height: 780 } });
+    for (const path of pages[who]) {
+      const r = await page.goto(path);
+      expect(r?.status(), `${who} ${path}`).toBeLessThan(400);
+      await page.waitForLoadState("networkidle");
+      try {
+        await noHorizontalScroll(page, `${who} ${path}`);
+      } catch (e) {
+        failures.push(String((e as Error).message).split("\n")[0]);
+      }
+      // Third-party widgets (AG Grid, Bryntum) are excluded; their own markup is outside this app's control.
+      const ax = await new AxeBuilder({ page }).exclude(".ag-root-wrapper").exclude(".b-widget").withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+      for (const v of ax.violations) failures.push(`${who} ${path} ${v.id}: ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
+    }
+    await ctx.close();
+  }
+  expect(failures).toEqual([]);
+});

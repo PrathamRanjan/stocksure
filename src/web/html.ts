@@ -69,10 +69,10 @@ function navFor(w: NonNullable<LayoutOpts["who"]>): NavGroup[] {
       { label: "Controls and records", items: [["/channels", "Phone alerts", "message"], ["/evidence", "Evidence", "file"]] },
     ];
   return [
-    { label: "Main", items: [["/home", "Orders", "home"], ["/approvals", "Approvals", "checkCircle"], ["/stock", "Stock", "box"], ["/performance", "Supplier record", "chart"]] },
+    { label: "Main", items: [["/home", "Orders", "home"], ["/approvals", "Approvals", "checkCircle"], ["/stock", "Stock", "box"], ["/performance", "Record", "chart"]] },
     {
       label: "Controls and records",
-      items: [["/guard", "Spending rules", "gauge"], ["/safety", "Scam check", "shieldCheck"], ["/catalog", "Catalog", "package"], ["/ledger", "Ledger", "receipt"], ["/deliveries", "Deliveries board", "calendar"], ["/disputes", "PayPal disputes", "alert"], ["/negotiations", "Agent negotiations", "bot"], ["/channels", "Phone alerts", "message"], ["/evidence", "Evidence", "file"]],
+      items: [["/guard", "Spending rules", "gauge"], ["/safety", "Scam check", "shieldCheck"], ["/catalog", "Catalog", "package"], ["/ledger", "Ledger", "receipt"], ["/deliveries", "Deliveries board", "calendar"], ["/negotiations", "Agent negotiations", "bot"], ["/channels", "Phone alerts", "message"], ["/evidence", "Evidence", "file"]],
     },
   ];
 }

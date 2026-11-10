@@ -124,8 +124,9 @@ export default function Home() {
         </div>
       )}
       {d.can_connect && d.org.paypal_connected && (
-        <p className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
-          <Stamp tone="paid">PayPal connected</Stamp> {d.org.payer ? `as ${d.org.payer}` : ""} · sandbox
+        <p className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <Stamp tone="paid">PayPal connected</Stamp>
+          <span className="min-w-0 break-all">{d.org.payer ? `as ${d.org.payer} · ` : ""}sandbox</span>
         </p>
       )}
 

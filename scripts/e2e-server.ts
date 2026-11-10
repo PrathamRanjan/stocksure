@@ -1,4 +1,5 @@
 // Hermetic server for the Playwright suite: in-memory database, the fake PayPal, the demo seed, no .env.
+// The payer email is as long as a real sandbox one, so layouts are tested with it.
 // Nothing here talks to PayPal, OpenAI or any channel. Laneway starts connected to a fake vault so the money flow runs.
 import { createApp } from "../src/app.js";
 import { openDb, setDb } from "../src/db.js";
@@ -18,7 +19,7 @@ async function connect() {
   const st = await fake.createSetupToken({ returnUrl: "x" }, `st-${Date.now()}`);
   fake.approveSetup(st.id);
   const t = await fake.createPaymentToken(st.id, `pt-${Date.now()}`);
-  await db.query("UPDATE orgs SET vault_token_id = $2, vault_payer = 'buyer@example.com' WHERE id = $1", [ids.laneway, t.id]);
+  await db.query("UPDATE orgs SET vault_token_id = $2, vault_payer = 'sb-a1b2c3d4e5f6g7@personal.example.com' WHERE id = $1", [ids.laneway, t.id]);
 }
 await connect();
 const app = createApp();
