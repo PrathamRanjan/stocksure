@@ -80,7 +80,8 @@ export function createApp() {
       res.setHeader("Cache-Control", "no-store");
       res.json({ ok: true, db: "ok", db_ms: Date.now() - t0, commit: config.commit || null, uptime_s: Math.round(process.uptime()) });
     } catch (e) {
-      res.status(500).json({ ok: false, db: "error", error: (e as Error).message, commit: config.commit || null });
+      console.error("[stocksure healthz]", (e as Error).message);
+      res.status(500).json({ ok: false, db: "error", error: "The database did not answer.", commit: config.commit || null });
     }
   });
   app.post("/webhooks/paypal", (req, res, next) => receiveWebhook(req, res).catch(next));

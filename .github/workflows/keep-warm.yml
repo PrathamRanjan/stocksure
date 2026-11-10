@@ -1,0 +1,30 @@
+# Spec A4 hosting, step 2: request /healthz every 10 minutes so the site is awake when a judge arrives, and fail
+# loudly (a red run in Actions) when the site or its database is down.
+#
+# Cost note: on Render's free plan an always-awake service uses about 730 of the workspace's 750 free instance hours
+# a month, which are shared with every other free service in the same Render workspace. Once StockSure is on an
+# always-on instance this is only an uptime check. To stop the pings, set the repository variable KEEP_WARM to "off".
+name: keep-warm
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+permissions: {}
+jobs:
+  ping:
+    if: ${{ vars.KEEP_WARM != 'off' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: GET /healthz
+        run: |
+          set -eu
+          url="${{ vars.HEALTH_URL || 'https://pph-stocksure.onrender.com/healthz' }}"
+          for i in 1 2 3; do
+            code=$(curl -s -o body.json -w '%{http_code}' --max-time 60 "$url" || echo 000)
+            echo "attempt $i: HTTP $code $(head -c 300 body.json 2>/dev/null || true)"
+            if [ "$code" = "200" ] && grep -q '"ok":true' body.json; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::$url did not answer ok after 3 attempts"
+          exit 1

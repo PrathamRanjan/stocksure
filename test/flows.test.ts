@@ -558,6 +558,40 @@ describe("StockSure flows", () => {
     expect(texts).not.toMatch(/\d+ cents/);
   });
 
+  it("stuck settlement clears itself: a job orphaned by a restart is reclaimed; no job means re-queue, then 'needs you'", async () => {
+    const { sweepStuck } = await import("../src/services/sweeper.js");
+    await toResolution();
+    await approveBoth();
+    // The process "dies" mid-settle: the job is left running and the order sits in settling.
+    await db.query("UPDATE jobs SET status = 'running', updated_at = now() - interval '30 minutes' WHERE type = 'settle'");
+    await db.query("UPDATE purchase_orders SET updated_at = now() - interval '30 minutes' WHERE id = $1", [ids.demoPo]);
+    expect((await sweepStuck()).reclaimed).toBe(1);
+    await run();
+    expect((await po()).status).toBe("awaiting_replacement");
+    expect(calls("captureAuthorization")).toBe(1);
+
+    // A second order stuck in settling with no job at all (e.g. it failed five times).
+    await db.query("UPDATE purchase_orders SET status = 'settling', updated_at = now() - interval '30 minutes' WHERE id = $1", [ids.demoPo]);
+    await db.query("UPDATE jobs SET status = 'failed', last_error = 'boom' WHERE type = 'settle'");
+    const first = await sweepStuck();
+    expect(first.requeued).toEqual([`base:${(await po()).number}`]);
+    expect((await db.query("SELECT 1 FROM jobs WHERE type = 'settle' AND status = 'pending'")).rows).toHaveLength(1);
+    // Still stuck after the retry: it surfaces as an exception the owner sees.
+    await db.query("UPDATE jobs SET status = 'failed', last_error = 'boom again' WHERE type = 'settle'");
+    await db.query("UPDATE purchase_orders SET updated_at = now() - interval '30 minutes' WHERE id = $1", [ids.demoPo]);
+    const second = await sweepStuck();
+    expect(second.surfaced).toHaveLength(1);
+    const p = await po();
+    expect(p.status).toBe("exception");
+    expect(p.exception).toMatch(/boom again/);
+    const home = (await jordan.get("/api/ui/home")).json;
+    expect(home.orders.find((o: any) => o.id === ids.demoPo).needs_you).toBe(true);
+    // Retrying from the page never charges twice: the capture step is already recorded.
+    ok(await jordan.post(`/po/${ids.demoPo}/retry-settle`));
+    await run();
+    expect(calls("captureAuthorization")).toBe(1);
+  });
+
   it("a 503 on capture retries with the same request id: one capture", async () => {
     await toResolution();
     await approveBoth();

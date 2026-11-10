@@ -328,7 +328,7 @@ async function anonScope<T>(fn: () => Promise<T>, none: T): Promise<T> {
 async function needsYou(db: Queryable, p: Person): Promise<{ poIds: Set<string>; approvals: Awaited<ReturnType<typeof approvalsFor>>; count: number }> {
   const col = p.org_kind === "buyer" ? "buyer_id" : "supplier_id";
   const states = p.org_kind === "supplier" ? NEED_SUPPLIER : NEED_BUYER;
-  const rows = (await db.query<{ id: string }>(`SELECT id FROM purchase_orders WHERE ${col} = $1 AND status = ANY($2) AND NOT is_sample`, [p.org_id, states])).rows;
+  const rows = (await db.query<{ id: string }>(`SELECT id FROM purchase_orders WHERE ${col} = $1 AND (status = ANY($2) OR (status = 'funding' AND exception IS NOT NULL)) AND NOT is_sample`, [p.org_id, states])).rows;
   const poIds = new Set(rows.map((r) => r.id));
   for (const id of await riskyPos(db, p.org_id)) poIds.add(id);
   const approvals = await approvalsFor(db, p, null);
