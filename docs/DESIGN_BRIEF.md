@@ -47,8 +47,9 @@ An owner reading on a phone between jobs, and a receiver at the back door with w
 | `--paid` | `#1D6B3B` | `#7FCF98` | 5.9:1 / 9.6:1 |
 | `--stop` | `#B0261C` | `#FF8A7A` | 5.8:1 / 7.4:1 |
 | `--released` | `#5A5F6B` | `#A9AFBC` | 5.6:1 / 7.7:1 |
+| `--input` (field borders) | `#8F8672` | `#77715E` | at least 3:1 on card (non-text) |
 
-All text pairs meet WCAG 2.2 AA (4.5:1). Large display text is above 7:1. Ratios were checked with the script in `web/scripts/contrast.mjs`.
+All text pairs meet WCAG 2.2 AA (4.5:1). Field borders and the focus ring meet the 3:1 non-text rule (1.4.11). Large display text is above 7:1. Run `node web/scripts/contrast.mjs` to recheck every pair from the live CSS tokens.
 
 - Radius: 4 px controls, 6 px cards (paper is square-ish). Pills are 999 px.
 - Spacing: 4 px base; card padding 16 (mobile) / 24 (desktop).

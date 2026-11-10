@@ -2,7 +2,7 @@
    negotiations, channels, traces, evidence). Same tokens as web/src/index.css so every page reads as one product:
    receipt paper, ink, a carbon-copy blue for links and focus, and stamp colours for money states. */
 :root {
-  --paper: #f4efe4; --paper-2: #ebe4d4; --ink: #1b1a16; --card-c: #fffcf5; --muted-c: #5a564c; --rule: #d9d1bf; --rule-2: #bdb39d;
+  --paper: #f4efe4; --paper-2: #ebe4d4; --ink: #1b1a16; --card-c: #fffcf5; --muted-c: #5a564c; --rule: #d9d1bf; --rule-2: #8f8672;
   --carbon: #2a3f8f; --carbon-soft: #e3e7f5; --held: #8a5300; --held-soft: #f8ead0; --paid: #1d6b3b; --paid-soft: #dcefe1;
   --stop: #b0261c; --stop-soft: #f8e0dc; --released: #5a5f6b; --released-soft: #e6e7ea;
   --ui-bg: var(--paper); --ui-fg: var(--ink); --ui-card: var(--card-c); --ui-card-fg: var(--ink);
@@ -24,7 +24,7 @@
   color-scheme: light;
 }
 html.dark {
-  --paper: #14130f; --paper-2: #1a1914; --ink: #f2ede1; --card-c: #1d1c17; --muted-c: #b3ad9f; --rule: #34322a; --rule-2: #4a473c;
+  --paper: #14130f; --paper-2: #1a1914; --ink: #f2ede1; --card-c: #1d1c17; --muted-c: #b3ad9f; --rule: #34322a; --rule-2: #77715e;
   --carbon: #9db0f2; --carbon-soft: #1e2440; --held: #f0b45a; --held-soft: #33270f; --paid: #7fcf98; --paid-soft: #12301c;
   --stop: #ff8a7a; --stop-soft: #3a1915; --released: #a9afbc; --released-soft: #24262b;
   --ui-accent-bg: #2c2b23; --shadow-lg: 0 1px 0 var(--rule), 0 8px 24px rgb(0 0 0 / 0.45);
