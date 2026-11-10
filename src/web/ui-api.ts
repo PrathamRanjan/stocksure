@@ -213,7 +213,7 @@ async function poModel(q: Queryable, po: PO, p: Person) {
   const hasMoney = lines.some((l) => l.unit_price_cents !== null) || !!po.auth_id;
 
   return {
-    po: { id: po.id, number: po.number, status: po.status, kind: po.kind, root_id: po.root_id, buyer_name: po.buyer_name, supplier_name: po.supplier_name, deliver_by: po.deliver_by, limit_cents: po.spend_limit_cents, note: po.note, exception: po.exception, quote_version: po.quote_version, dispatched_at: po.dispatched_at, closed_at: po.closed_at, created_at: po.created_at, history: po.note.startsWith("Imported") },
+    po: { id: po.id, number: po.number, status: po.status, kind: po.kind, root_id: po.root_id, buyer_name: po.buyer_name, supplier_name: po.supplier_name, deliver_by: po.deliver_by, limit_cents: po.spend_limit_cents, note: po.note, exception: po.exception, quote_version: po.quote_version, dispatched_at: po.dispatched_at, closed_at: po.closed_at, created_at: po.created_at, history: !!po.is_sample || po.note.startsWith("Imported"), sample: !!po.is_sample },
     me: { side: buyer ? "buyer" : "supplier", role: p.role, owner },
     tree,
     children,
@@ -222,7 +222,7 @@ async function poModel(q: Queryable, po: PO, p: Person) {
     disputed: !!rec?.lines.some((l) => l.supplier_status === "disputed"),
     quote_total_cents: total,
     over_limit: total > po.spend_limit_cents,
-    paypal: buyer ? { connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null } : null,
+    paypal: buyer ? { connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null, demo_wallet: (org as any)?.vault_source === "demo_wallet" } : null,
     delivery: { mode: ctx.mode, part: part ? { accepted_cents: part.accepted_cents, status: part.status, packs: part.packs } : null },
     funding: hasMoney ? await fundingOf(q, po.root_id) : null,
     approvals: await approvalsFor(q, p, po.id),
@@ -306,7 +306,7 @@ async function receiveModel(q: Queryable, po: PO) {
         damage_flag: p.flags.includes("possible_damage"),
       };
     }),
-    extractions: exs.map((e) => ({ id: e.id, filename: e.filename, kind: e.kind, source: e.source, created_at: e.created_at, flags: e.flags, lines: e.lines?.lines ?? [], damage: e.lines?.damage ?? [], notes: e.lines?.notes ?? [] })),
+    extractions: exs.map((e) => ({ id: e.id, document_id: e.document_id, filename: e.filename, kind: e.kind, source: e.source, created_at: e.created_at, flags: e.flags, lines: e.lines?.lines ?? [], damage: e.lines?.damage ?? [], notes: e.lines?.notes ?? [], failed: !!e.lines?.failed })),
   };
 }
 
@@ -446,7 +446,7 @@ export function uiRouter() {
         });
       }
       return {
-        org: { name: org?.name, side: p!.org_kind, paypal_connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null },
+        org: { name: org?.name, side: p!.org_kind, paypal_connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null, demo_wallet: (org as any)?.vault_source === "demo_wallet" },
         can_create: p!.org_kind === "buyer" && p!.role === "owner",
         can_connect: p!.org_kind === "buyer" && p!.role === "owner",
         approvals: need.approvals,

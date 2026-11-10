@@ -22,6 +22,7 @@ const Stock = lazy(() => import("@/pages/Stock"));
 const Catalog = lazy(() => import("@/pages/Catalog"));
 const Performance = lazy(() => import("@/pages/Performance"));
 const Demo = lazy(() => import("@/pages/Demo"));
+const Start = lazy(() => import("@/pages/Start"));
 const Judge = lazy(() => import("@/pages/Judge"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -83,6 +84,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/about" element={<Landing />} />
+        <Route path="/start" element={<Lazy><Start /></Lazy>} />
         <Route path="/login" element={<Login />} />
         <Route path="/home" element={<Authed><Home /></Authed>} />
         <Route path="/po/new" element={<Authed><NewOrder /></Authed>} />

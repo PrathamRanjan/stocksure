@@ -16,7 +16,7 @@ import { GtError } from "../lib/util.js";
 import { armFault, FAULTABLE, type FaultKind } from "../paypal/index.js";
 import { recordCsv, recordJson, supplierPerformance } from "../services/records.js";
 import { acceptQuote, completeConnect, createPo, dispatchPo, quotePo, quoteTotal, retryHold, startConnect, submitPo, type UploadFile } from "../services/orders.js";
-import { confirmReceipt, postLineMessage, supplierReview, uploadReceivingDoc, type CountInput } from "../services/receiving.js";
+import { confirmReceipt, postLineMessage, supplierReview, uploadReceivingDoc, type CountInput, rereadReceivingDoc } from "../services/receiving.js";
 import { approveResolution, reviseResolution } from "../services/resolution.js";
 import { demoIds, keyWorkspace, sampleDeliveryNote, sampleInvoice } from "../services/seed.js";
 import { retrySettle } from "../services/settle.js";
@@ -167,6 +167,12 @@ export function routes() {
     for (const f of files.photo ?? []) (await uploadReceivingDoc(p, po.id, "photo", f), n++);
     if (!n) throw new GtError("Choose a file, paste the note or use a sample.", "invalid");
     back(res, `/po/${po.id}/receive`, `${n} document${n > 1 ? "s" : ""} stored and read. Check the proposal, then confirm.`);
+  }));
+
+  r.post("/po/:id/receive/reread/:doc", act(async (req, res, p) => {
+    const r1 = await rereadReceivingDoc(p, req.params.id, req.params.doc);
+    if (r1.failed) back(res, `/po/${req.params.id}/receive`, "I still couldn't read that. Fill the counts in below; the document is kept as evidence.", true);
+    else back(res, `/po/${req.params.id}/receive`, "Read again. Check the proposal, then confirm.");
   }));
 
   r.post("/po/:id/receive/confirm", act(async (req, res, p) => {

@@ -1,5 +1,6 @@
 import { getDb, type Queryable } from "../db.js";
-import { extractDelivery, observePhoto, type DamageHint, type DeliveryExtraction } from "../ai/extract.js";
+import { extractDelivery, observePhoto, PHOTO_FAILED, type DamageHint, type DeliveryExtraction } from "../ai/extract.js";
+import { AI_FAILED_MESSAGE } from "../ai/provider.js";
 import { formatUnits, parseQuantity, type UnitSpec } from "../core/units.js";
 import { newId } from "../lib/ids.js";
 import { GtError } from "../lib/util.js";
@@ -17,21 +18,50 @@ export async function uploadReceivingDoc(person: Person, poId: string, kind: "de
   const po = await poFor(db, person, poId);
   if (!["dispatched", "in_review"].includes(po.status)) throw new GtError(`${po.number} is ${po.status.replace(/_/g, " ")}; nothing to receive.`, "bad_state", 409);
   const cands = await candidates(db, po);
+  const read = await readDoc(kind, f, cands);
+  return db.tx(async (q) => {
+    const d = await storeDoc(q, po.id, kind, f, who(person), read.ex?.instructions ?? []);
+    await q.query("INSERT INTO extractions (id, document_id, source, lines, flags) VALUES ($1,$2,$3,$4,$5)", [newId("ex"), d.id, read.source, JSON.stringify(read.body), JSON.stringify(read.ex?.instructions ?? [])]);
+    if (read.ex?.instructions.length) await postMessage(q, po.id, null, "StockSure", "system", `${f.filename}: ${read.ex.instructions.length} instruction-like line(s) removed before reading. Documents cannot change counts, payee or amounts.`, "system", d.id);
+    if (read.hint) await postMessage(q, po.id, read.hint.line_id, "StockSure", "system", `AI photo note (unverified): ${read.hint.text}`, "system", d.id);
+    await logEvent(q, po, "doc.uploaded", `${who(person)} uploaded ${kind.replace("_", " ")} ${f.filename}${read.body.failed ? " (the model couldn't read it)" : ""}`, { document_id: d.id, lines: read.body.lines.length, flags: read.ex?.instructions.length ?? 0, failed: read.body.failed }, who(person));
+    return d.id;
+  });
+}
+
+/** Runs the reader on one document. A failure is recorded as failed with the plain message, never as an empty read. */
+async function readDoc(kind: "delivery_note" | "photo", f: { mime: string; body: Buffer; filename: string }, cands: Awaited<ReturnType<typeof candidates>>) {
   const text = isText(f.mime, f.filename) ? f.body.toString("utf8") : null;
   let ex: DeliveryExtraction | null = null;
   let hint: DamageHint | null = null;
+  let photoFailed = false;
   if (kind === "delivery_note") ex = await extractDelivery({ mime: f.mime, body: f.body, text }, cands);
-  else hint = await observePhoto({ mime: f.mime, body: f.body, text: null }, cands);
-  return db.tx(async (q) => {
-    const d = await storeDoc(q, po.id, kind, f, who(person), ex?.instructions ?? []);
-    const lines = ex?.lines ?? [];
-    const damage = ex?.damage ?? (hint ? [hint] : []);
-    await q.query("INSERT INTO extractions (id, document_id, source, lines, flags) VALUES ($1,$2,$3,$4,$5)", [newId("ex"), d.id, ex?.source ?? (hint ? "model-photo" : "none"), JSON.stringify({ lines, damage, notes: ex?.notes ?? [] }), JSON.stringify(ex?.instructions ?? [])]);
-    if (ex?.instructions.length) await postMessage(q, po.id, null, "StockSure", "system", `${f.filename}: ${ex.instructions.length} instruction-like line(s) removed before reading. Documents cannot change counts, payee or amounts.`, "system", d.id);
-    if (hint) await postMessage(q, po.id, hint.line_id, "StockSure", "system", `AI photo note (unverified): ${hint.text}`, "system", d.id);
-    await logEvent(q, po, "doc.uploaded", `${who(person)} uploaded ${kind.replace("_", " ")} ${f.filename}`, { document_id: d.id, lines: lines.length, flags: ex?.instructions.length ?? 0 }, who(person));
-    return d.id;
+  else {
+    const h = await observePhoto({ mime: f.mime, body: f.body, text: null }, cands);
+    if (h === PHOTO_FAILED) photoFailed = true;
+    else hint = h;
+  }
+  const failed = !!ex?.failed || photoFailed;
+  const body = { lines: ex?.lines ?? [], damage: ex?.damage ?? (hint ? [hint] : []), notes: ex?.notes ?? (photoFailed ? [AI_FAILED_MESSAGE] : []), failed };
+  return { ex, hint, body, source: ex?.source ?? (hint ? "model-photo" : photoFailed ? "none" : "none"), failed };
+}
+
+/** "Read it again" after a failed read (spec A5.5): re-runs the reader on the stored document and replaces its reading. */
+export async function rereadReceivingDoc(person: Person, poId: string, documentId: string) {
+  if (person.org_kind !== "buyer") throw new GtError("Only the buyer's team reads receiving documents.", "forbidden", 403);
+  const db = await getDb();
+  const po = await poFor(db, person, poId);
+  if (!["dispatched", "in_review"].includes(po.status)) throw new GtError(`${po.number} is ${po.status.replace(/_/g, " ")}; nothing to receive.`, "bad_state", 409);
+  const doc = (await db.query<{ id: string; kind: "delivery_note" | "photo"; filename: string; mime: string; body: Buffer | null; text_content: string | null }>("SELECT id, kind, filename, mime, body, text_content FROM documents WHERE id = $1 AND po_id = $2 AND kind IN ('delivery_note','photo')", [documentId, po.id])).rows[0];
+  if (!doc) throw new GtError("Document not found", "not_found", 404);
+  const body = doc.body ? Buffer.from(doc.body) : Buffer.from(doc.text_content ?? "", "utf8");
+  const read = await readDoc(doc.kind, { mime: doc.mime, body, filename: doc.filename }, await candidates(db, po));
+  await db.tx(async (q) => {
+    await q.query("UPDATE extractions SET source = $2, lines = $3, flags = $4 WHERE document_id = $1", [doc.id, read.source, JSON.stringify(read.body), JSON.stringify(read.ex?.instructions ?? [])]);
+    if (read.hint) await postMessage(q, po.id, read.hint.line_id, "StockSure", "system", `AI photo note (unverified): ${read.hint.text}`, "system", doc.id);
+    await logEvent(q, po, "doc.reread", `${who(person)} asked to read ${doc.filename} again: ${read.failed ? "the model still couldn't read it" : `${read.body.lines.length} line(s) read`}`, { document_id: doc.id, failed: read.failed }, who(person));
   });
+  return { failed: read.failed };
 }
 
 export interface LineProposal {

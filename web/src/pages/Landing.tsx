@@ -121,7 +121,7 @@ export default function Landing() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link to={who ? "/home" : "/login"}>
+              <Link to={who ? "/home" : "/start"}>
                 {who ? "Open your orders" : "Try the live demo"} <ArrowRight aria-hidden="true" />
               </Link>
             </Button>
@@ -195,7 +195,7 @@ export default function Landing() {
         <p className="mt-2 max-w-xl opacity-85">Sign in as the café owner, the person who receives deliveries, or the wholesaler. The demo resets any time.</p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button asChild size="lg" variant="secondary">
-            <Link to="/login">Choose a person <ArrowRight aria-hidden="true" /></Link>
+            <Link to="/start">Start your own demo <ArrowRight aria-hidden="true" /></Link>
           </Button>
           <Button size="lg" variant="outline" className="border-background/40 bg-transparent text-background hover:bg-background/10 hover:text-background" onClick={() => startTour("judge")}>
             Take the tour

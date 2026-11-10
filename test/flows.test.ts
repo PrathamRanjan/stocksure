@@ -699,6 +699,35 @@ describe("StockSure flows", () => {
     expect(fake.bodies.filter((b) => b.method === "captureAuthorization").map((b) => (b.body as any).amountCents)).toEqual([18000]);
   });
 
+  it("when every model fails the reading says so (no rules stand-in), and Read it again works once a model answers", async () => {
+    config.ai.openaiKey = "test-key";
+    config.ai.provider = "openai";
+    let up = false;
+    const models: string[] = [];
+    setProviderFetch(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      models.push(body.model);
+      if (!up) return new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 500 });
+      const out = { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", confidence: 0.95 }], damage: [] };
+      return new Response(JSON.stringify({ model: body.model, status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(out) }] }], usage: { input_tokens: 10, output_tokens: 10 } }), { status: 200 });
+    });
+    await orderAndHold();
+    await dispatch(ids.demoPo, "");
+    ok(await sam.post(`/po/${ids.demoPo}/receive/upload`, { note_text: "Delivery docket: 20 cs Oat Milk 12 x 1 L" }));
+    // The primary and the backup model were both tried; nothing else read the docket.
+    expect(new Set(models)).toEqual(new Set([config.ai.models.read, config.ai.models.readBackup]));
+    const view = (await sam.get(`/api/ui/po/${ids.demoPo}/receive`)).json;
+    expect(view.extractions[0]).toMatchObject({ failed: true, source: "none", lines: [] });
+    expect(view.extractions[0].notes.join(" ")).toMatch(/couldn't read that/);
+    expect(JSON.stringify(view)).not.toMatch(/overloaded|OpenAI 500/);
+    up = true;
+    ok(await sam.post(`/po/${ids.demoPo}/receive/reread/${view.extractions[0].document_id}`));
+    const after = (await sam.get(`/api/ui/po/${ids.demoPo}/receive`)).json;
+    expect(after.extractions).toHaveLength(1);
+    expect(after.extractions[0].failed).toBe(false);
+    expect(after.extractions[0].lines).toHaveLength(1);
+  });
+
   it("access control: other buyers see nothing; roles are enforced server-side", async () => {
     expect((await marco.get(`/api/ui/po/${ids.demoPo}`)).status).toBe(404);
     expect((await marco.get(`/api/ui/po/${ids.demoPo}/receive`)).status).toBe(404);

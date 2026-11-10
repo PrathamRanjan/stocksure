@@ -40,7 +40,7 @@ export interface ApprovalRow {
   created_at: string;
 }
 interface HomeData {
-  org: { name: string; side: "buyer" | "supplier"; paypal_connected: boolean; payer: string | null };
+  org: { name: string; side: "buyer" | "supplier"; paypal_connected: boolean; payer: string | null; demo_wallet?: boolean };
   can_create: boolean;
   can_connect: boolean;
   approvals: ApprovalRow[];
@@ -132,7 +132,7 @@ export default function Home() {
       {d.can_connect && d.org.paypal_connected && (
         <p className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <Stamp tone="paid">PayPal connected</Stamp>
-          <span className="min-w-0 break-all">{d.org.payer ? `as ${d.org.payer} · ` : ""}sandbox</span>
+          <span className="min-w-0 break-all">{d.org.demo_wallet ? `Paid from the demo's saved sandbox wallet${d.org.payer ? ` (${d.org.payer})` : ""} · no PayPal login needed` : `${d.org.payer ? `as ${d.org.payer} · ` : ""}sandbox`}</span>
         </p>
       )}
 

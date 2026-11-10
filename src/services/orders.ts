@@ -353,6 +353,8 @@ export async function dispatchPo(person: Person, poId: string, invoice: UploadFi
       for (const l of ex.lines) await q.query("INSERT INTO invoice_lines (document_id, idx, po_line_id, description, billed_units, unit_price_cents, line_cents) VALUES ($1,$2,$3,$4,$5,$6,$7)", [d.id, i++, l.line_id, l.description, l.units, l.unit_price_cents, l.line_cents]);
       if (ex.instructions.length)
         await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename} contains ${ex.instructions.length} instruction-like line(s) (${[...new Set(ex.instructions.map((f) => f.kind.replace(/_/g, " ")))].join(", ")}). They were removed before reading and cannot change who is paid or how much.`, "system", d.id);
+      // Spec A5.5: an unread invoice is said out loud, not shown as an invoice with no lines.
+      if (ex.failed) await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename}: ${ex.notes[0] ?? "I couldn't read this invoice."} The settlement doesn't depend on it: code pays the agreed counts at the quoted price.`, "system", d.id);
     }
     await setPo(q, po.id, { status: "dispatched", dispatched_at: new Date() });
     await notifyOrder("buyer", po.buyer_id, `${po.number} is on its way from ${po.supplier_name}. Open the dock when it arrives.`, po.id, q).catch(() => undefined);

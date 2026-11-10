@@ -1,6 +1,8 @@
 import { driver, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { act, getJSON } from "@/lib/api";
+import { startDemo } from "@/lib/demo";
+import { toast } from "sonner";
 
 /**
  * Tours span pages: the state lives in sessionStorage ({ kind, i }) and TourRunner (tour/runner.tsx) re-applies the
@@ -93,11 +95,22 @@ const write = (s: State | null) => {
 export const stepsOf = (s: State) => (s.kind === "judge" ? JUDGE : PRODUCT[s.ctx.role ?? "owner"]);
 
 export async function startTour(kind: TourKind) {
-  const [demo, people, sess] = await Promise.all([
-    getJSON<{ po: { id: string } | null }>("/api/ui/demo").catch(() => ({ po: null })),
-    getJSON<{ people: { first: string; id: string }[] }>("/api/ui/people").catch(() => ({ people: [] })),
-    getJSON<{ who: { role: "owner" | "receiving" | "supplier" } | null }>("/api/ui/session").catch(() => ({ who: null })),
-  ]);
+  const load = () =>
+    Promise.all([
+      getJSON<{ po: { id: string } | null }>("/api/ui/demo").catch(() => ({ po: null })),
+      getJSON<{ people: { first: string; id: string }[]; needs_workspace?: boolean }>("/api/ui/people").catch(() => ({ people: [] as { first: string; id: string }[], needs_workspace: false })),
+      getJSON<{ who: { role: "owner" | "receiving" | "supplier" } | null }>("/api/ui/session").catch(() => ({ who: null })),
+    ]);
+  let [demo, people, sess] = await load();
+  // The tour signs in as each person, and people exist only inside a private demo: open one first (spec A1.2).
+  if (people.needs_workspace) {
+    const r = await startDemo();
+    if (!r.ok) {
+      toast.error(`Couldn't open a demo for the tour: ${r.message}`);
+      return;
+    }
+    [demo, people, sess] = await load();
+  }
   const ctx: Ctx = { demoPo: demo.po?.id ?? null, people: Object.fromEntries(people.people.map((p) => [p.first, p.id])), role: sess.who?.role ?? null };
   if (kind === "product" && !ctx.role) kind = "judge";
   write({ kind, i: 0, ctx });

@@ -358,8 +358,10 @@ export async function extractInvoice(u: Upload, cands: Candidate[]): Promise<Inv
   }
 }
 
-/** A photo can support a claim; it never confirms a count. */
-export async function observePhoto(u: Upload, cands: Candidate[]): Promise<DamageHint | null> {
+/** Set when the model could not look at a photo: the photo is kept as evidence and the person is told (spec A5.5). */
+export const PHOTO_FAILED = Symbol("photo_failed");
+/** A photo can support a claim; it never confirms a count. Returns PHOTO_FAILED, never a silent null, when the read fails. */
+export async function observePhoto(u: Upload, cands: Candidate[]): Promise<DamageHint | null | typeof PHOTO_FAILED> {
   if (!/^image\//.test(u.mime) || offlineRules()) return null;
   try {
     const r = await structured<unknown>({ purpose: "observe_photo", tier: "vision", system: SYSTEM + "\nDescribe only what is visible. Say if damage is uncertain.", parts: modelParts(u, null, null), schemaName: "photo_observation", schema: props({ visible_damage: { type: "boolean" }, description: { type: "string" }, quantity_text: { type: ["string", "null"] }, confidence: { type: "number" } }), maxOutputTokens: 400 });
@@ -368,6 +370,6 @@ export async function observePhoto(u: Upload, cands: Candidate[]): Promise<Damag
     const c = hintLine(d.description, cands);
     return { line_id: c?.line_id ?? null, units: c && d.quantity_text ? parseQuantity(d.quantity_text, c.product).units : null, text: d.description, kind: "damaged", source: "photo", confidence: d.confidence };
   } catch {
-    return null;
+    return PHOTO_FAILED;
   }
 }

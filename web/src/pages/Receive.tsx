@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { AlertTriangle, Bot, Camera, Check, FileText, Upload } from "lucide-react";
+import { AlertTriangle, Bot, Camera, Check, FileText, RotateCcw, Upload } from "lucide-react";
 import { useView } from "@/lib/api";
 import { ago, day, plural } from "@/lib/format";
 import { useAction } from "@/lib/useAction";
@@ -31,7 +31,7 @@ interface RModel {
   demo: { samples: boolean };
   reader: string;
   lines: RLine[];
-  extractions: { id: string; filename: string; kind: string; source: string; created_at: string; flags: { kind: string; text: string }[]; lines: unknown[]; damage: unknown[]; notes: string[] }[];
+  extractions: { id: string; document_id: string; filename: string; kind: string; source: string; created_at: string; flags: { kind: string; text: string }[]; lines: unknown[]; damage: unknown[]; notes: string[]; failed: boolean }[];
 }
 
 const FLAG_TEXT: Record<string, string> = { possible_damage: "Photo may show damage", not_on_note: "Not on the delivery note", low_confidence: "Reader isn't sure", unit_mismatch: "Units don't match the order" };
@@ -120,8 +120,17 @@ export default function Receive() {
                 <ul className="mt-2 space-y-2">
                   {m.extractions.map((e) => (
                     <li key={e.id} className="rounded-md border border-border p-3 text-sm">
-                      <p className="flex flex-wrap items-center gap-2"><span className="font-semibold">{e.filename}</span><Stamp tone="quiet">{e.source}</Stamp><span className="text-muted-foreground">{ago(e.created_at)}</span></p>
-                      <p className="text-muted-foreground">{plural(e.lines.length, "line")} read{e.damage.length ? ` · ${e.damage.length} damage note${e.damage.length > 1 ? "s" : ""}` : ""}</p>
+                      <p className="flex flex-wrap items-center gap-2"><span className="font-semibold">{e.filename}</span>{e.failed ? <Stamp tone="stop">Not read</Stamp> : <Stamp tone="quiet">{e.source}</Stamp>}<span className="text-muted-foreground">{ago(e.created_at)}</span></p>
+                      {e.failed ? (
+                        <div className="mt-1" role="alert">
+                          <p>{e.notes[0] ?? "I couldn't read that. Try again, or fill it in below."} It's kept as evidence; nothing was guessed from it.</p>
+                          <Button size="sm" variant="outline" className="mt-2" disabled={!!busy} onClick={() => run(`reread-${e.document_id}`, `/po/${m.po.id}/receive/reread/${e.document_id}`, {}, { stay: true })}>
+                            {busy === `reread-${e.document_id}` ? <Spinner /> : <RotateCcw aria-hidden="true" />} Read it again
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">{plural(e.lines.length, "line")} read{e.damage.length ? ` · ${e.damage.length} damage note${e.damage.length > 1 ? "s" : ""}` : ""}</p>
+                      )}
                       {e.flags.length > 0 && <p className="mt-1 flex gap-1.5 text-stop"><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> {plural(e.flags.length, "instruction")} in the document ignored: {e.flags.map((f) => f.kind.replace(/_/g, " ")).join(", ")}</p>}
                     </li>
                   ))}
