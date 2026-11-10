@@ -111,6 +111,8 @@ export interface PayPalApi {
   verifyCredentials(): Promise<{ appId?: string; scopes: string[] }>;
   createSetupToken(input: { returnUrl: string; cancelUrl: string; description: string }, requestId: string): Promise<PPSetupToken>;
   createPaymentToken(setupTokenId: string, requestId: string): Promise<{ id: string; customerId?: string; payerEmail?: string }>;
+  /** Spec A2.1: reads a saved payment token; a 404 means it was removed and needs re-approval. */
+  getPaymentToken(id: string): Promise<{ id: string; payerEmail?: string } | null>;
   /** Merchant-initiated order on a vaulted PayPal token, intent AUTHORIZE: places a hold. */
   createVaultedAuthorizeOrder(input: HoldInput, requestId: string): Promise<PPOrder>;
   getOrder(id: string): Promise<PPOrder>;

@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { getDb, type Queryable } from "../db.js";
+import { getDb, type Queryable, currentWs } from "../db.js";
 import { shipmentsOf } from "./parts.js";
 import { extractInvoice, type Candidate } from "../ai/extract.js";
 import { fmt } from "../core/money.js";
@@ -166,6 +166,8 @@ export async function placeHold(poId: string, opts: { checkFunding?: boolean; ag
   if (op.status === "succeeded") return "funded";
   const opRequest: string = op.request_id;
   if (!buyer?.vault_token_id) throw new GtError("Buyer has no saved PayPal.", "no_paypal", 409);
+  // Spec A2.1: the demo's saved wallet pays only inside a demo workspace.
+  if ((buyer as any).vault_source === "demo_wallet" && !currentWs()) throw new GtError("The demo's saved wallet only pays inside a demo workspace.", "no_paypal", 409);
   // B.6: dry run against the mandate and live state before any PayPal write. A refused hold is a refusal, not a retry.
   const run: Run = await startRun({ actor: opts.agentId ? "agent" : "code", agentId: opts.agentId ?? null, subject: `hold ${po.number} ${fmt(total)}`, entity: "po", entityId: po.id }, db);
   const verdict = await dryRun({ action: "authorize", ownerId: po.buyer_id, agentScope: opts.agentId ? `agent:${opts.agentId}` : `org:${po.buyer_id}`, entity: "po", entityId: po.id, cents: total, trustedCents: [total] }, run, db);
@@ -182,7 +184,7 @@ export async function placeHold(poId: string, opts: { checkFunding?: boolean; ag
     await db.query("UPDATE payment_ops SET attempts = attempts + 1, status = 'pending', updated_at = now() WHERE id = $1", [op.id]);
     const t0 = Date.now();
     const order = await paypal().createVaultedAuthorizeOrder(
-      { vaultId: buyer.vault_token_id, amountCents: total, currency: po.currency, customId: po.id, invoiceId: `${po.number}-${tag}-H${opRequest.includes(":r") ? opRequest.split(":r").pop() : ""}`, description: `StockSure ${po.number}: ${po.supplier_name} hold` },
+      { vaultId: buyer.vault_token_id, amountCents: total, currency: po.currency, customId: currentWs() ? `${currentWs()}:${po.id}` : po.id, invoiceId: `${po.number}-${tag}-H${opRequest.includes(":r") ? opRequest.split(":r").pop() : ""}`, description: `StockSure ${po.number}: ${po.supplier_name} hold` },
       opRequest,
     );
     await run.step({ actor: "paypal", tool: "createVaultedAuthorizeOrder", pp_request_id: opRequest, gate: "allowed", result: { order_id: order.id, status: order.status }, duration_ms: Date.now() - t0 });

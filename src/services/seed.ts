@@ -1,9 +1,9 @@
-import type { Queryable } from "../db.js";
+import { currentWs, type Queryable } from "../db.js";
 import { newId } from "../lib/ids.js";
 import { hashKey, newSecret } from "../lib/util.js";
 import { linesOf, putSetting, setting, type PO } from "../store.js";
 
-const TABLES = ["negotiation_rounds", "negotiations", "agreements", "carts", "agent_requests", "agent_trace", "agent_runs", "approvals", "provenance", "channel_messages", "channel_links", "push_subscriptions", "policies", "kill_switches", "passkeys", "defect_claims", "shipments", "eta_updates", "po_risks", "stock_holds", "stock_moves", "stock", "saga_steps", "payment_ops", "resolutions", "messages", "invoice_lines", "receipt_lines", "receipts", "extractions", "documents", "po_lines", "purchase_orders", "products", "people", "orgs", "events", "jobs", "demo_faults"];
+const TABLES = ["negotiation_rounds", "negotiations", "agreements", "carts", "agent_requests", "agent_trace", "agent_runs", "approvals", "provenance", "channel_messages", "channel_links", "push_subscriptions", "policies", "kill_switches", "passkeys", "defect_claims", "shipments", "eta_updates", "po_risks", "stock_holds", "stock_moves", "stock", "saga_steps", "payment_ops", "resolutions", "messages", "invoice_lines", "receipt_lines", "receipts", "extractions", "documents", "po_lines", "purchase_orders", "products", "people", "orgs", "events", "demo_faults"];
 
 export interface DemoIds {
   supplier: string;
@@ -15,15 +15,30 @@ export interface DemoIds {
   demoPo: string;
 }
 
-/** One cooperating wholesaler, a small catalog, three buyers and one complete shortage/damage scenario. */
-export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean } = {}): Promise<{ ids: DemoIds; keys: Record<string, string> }> {
-  const saved = opts.keepPayPal ? (await q.query<{ name: string; vault_token_id: string; vault_payer: string }>("SELECT name, vault_token_id, vault_payer FROM orgs WHERE vault_token_id IS NOT NULL")).rows : [];
+/** Keys and token links made inside a workspace name it, so an MCP client or a phone finds the right one. */
+export const wsKey = (prefix: string) => {
+  const ws = currentWs();
+  const secret = newSecret(prefix);
+  return ws ? `${prefix}_${ws}~${secret.slice(prefix.length + 1)}` : secret;
+};
+export const keyWorkspace = (key: string): string | null => /^ss[a-z]_([a-z0-9]{6,24})~/.exec(key.trim())?.[1] ?? null;
+
+/**
+ * One cooperating wholesaler, a small catalog, three buyers and one complete shortage/damage scenario.
+ * `wallet`: in a demo workspace, every buyer pays from the demo's saved sandbox wallet (spec A2.1). Never outside one.
+ */
+export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean; wallet?: { tokenId: string; payer: string } | null } = {}): Promise<{ ids: DemoIds; keys: Record<string, string> }> {
+  if (opts.wallet && !currentWs()) throw new Error("The demo wallet is only attached inside a demo workspace.");
+  const saved = opts.keepPayPal ? (await q.query<{ name: string; vault_token_id: string; vault_payer: string; vault_source: string | null }>("SELECT name, vault_token_id, vault_payer, vault_source FROM orgs WHERE vault_token_id IS NOT NULL")).rows : [];
   for (const t of TABLES) await q.query(`DELETE FROM ${t}`);
+  // The job queue is shared: clear only this workspace's jobs.
+  await q.query("DELETE FROM jobs WHERE ws_id IS NOT DISTINCT FROM $1", [currentWs()]);
   await q.query("DELETE FROM settings WHERE key IN ('po_seq','demo_ids','demo_keys','instance_tag')");
   const org = async (kind: "buyer" | "supplier", name: string) => {
     const id = newId(kind === "buyer" ? "byr" : "sup");
     const v = saved.find((s) => s.name === name);
-    await q.query("INSERT INTO orgs (id, kind, name, vault_token_id, vault_payer) VALUES ($1,$2,$3,$4,$5)", [id, kind, name, v?.vault_token_id ?? null, v?.vault_payer ?? null]);
+    const w = kind === "buyer" && opts.wallet ? { vault_token_id: opts.wallet.tokenId, vault_payer: opts.wallet.payer || "the demo's saved sandbox wallet", vault_source: "demo_wallet" } : null;
+    await q.query("INSERT INTO orgs (id, kind, name, vault_token_id, vault_payer, vault_source) VALUES ($1,$2,$3,$4,$5,$6)", [id, kind, name, w?.vault_token_id ?? v?.vault_token_id ?? null, w?.vault_payer ?? v?.vault_payer ?? null, w?.vault_source ?? v?.vault_source ?? (v ? "owner" : null)]);
     return id;
   };
   const supplier = await org("supplier", "Harbour Wholesale Co.");
@@ -34,13 +49,13 @@ export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean } = {}
   const keys: Record<string, string> = {};
   const person = async (key: string, orgId: string, name: string, role: string) => {
     const id = newId("per");
-    const secret = newSecret("ssk");
+    const secret = wsKey("ssk");
     await q.query("INSERT INTO people (id, org_id, name, role, key_hash) VALUES ($1,$2,$3,$4,$5)", [id, orgId, name, role, hashKey(secret)]);
     people[key] = id;
     keys[key] = secret;
   };
   await person("ana", supplier, "Ana Ruiz", "supplier");
-  await q.query("UPDATE people SET driver_token = $2 WHERE id = $1", [people.ana, newSecret("drv").replace(/[^A-Za-z0-9_-]/g, "")]);
+  await q.query("UPDATE people SET driver_token = $2 WHERE id = $1", [people.ana, wsKey("drv").replace(/[^A-Za-z0-9_~-]/g, "")]);
   await person("jordan", laneway, "Jordan Lee", "owner");
   await person("sam", laneway, "Sam Ortiz", "receiving");
   await person("priya", bayside, "Priya Nair", "owner");
@@ -71,9 +86,9 @@ export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean } = {}
     const id = newId("po");
     const number = `SS-${++seq}`;
     await q.query(
-      `INSERT INTO purchase_orders (id, number, buyer_id, supplier_id, root_id, status, deliver_by, spend_limit_cents, quote_version, accepted_quote_version, dispatched_at, received_at, agreed_at, closed_at, note, is_demo, created_at)
-       VALUES ($1,$2,$3,$4,$1,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,$15)`,
-      [id, number, buyer, supplier, status, deliverBy, limit, extra.quote_version ?? 0, extra.accepted_quote_version ?? null, extra.dispatched_at ?? null, extra.received_at ?? null, extra.agreed_at ?? null, extra.closed_at ?? null, extra.note ?? "", extra.created_at ?? new Date()],
+      `INSERT INTO purchase_orders (id, number, buyer_id, supplier_id, root_id, status, deliver_by, spend_limit_cents, quote_version, accepted_quote_version, dispatched_at, received_at, agreed_at, closed_at, note, is_demo, created_at, is_sample)
+       VALUES ($1,$2,$3,$4,$1,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,$15,$16)`,
+      [id, number, buyer, supplier, status, deliverBy, limit, extra.quote_version ?? 0, extra.accepted_quote_version ?? null, extra.dispatched_at ?? null, extra.received_at ?? null, extra.agreed_at ?? null, extra.closed_at ?? null, extra.note ?? "", extra.created_at ?? new Date(), status === "closed"],
     );
     let n = 0;
     for (const [sku, qty, subs] of lines) {
@@ -83,7 +98,8 @@ export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean } = {}
     return id;
   };
 
-  // Imported history (no PayPal activity): gives supplier performance something to measure.
+  // Sample history (is_sample, no PayPal activity): gives supplier performance something to measure. Every list shows
+  // these with a "Sample" chip and no figure described as confirmed by PayPal includes them.
   const day = 864e5;
   const now = Date.now();
   const hist = async (buyer: string, daysAgo: number, lines: [string, number][], received: Record<string, [number, number, number]>, opts: { late?: boolean; disputed?: boolean } = {}) => {
@@ -96,7 +112,7 @@ export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean } = {}
       agreed_at: new Date(due.getTime() + (opts.disputed ? 1.5 : -0.1) * day),
       closed_at: new Date(due.getTime() + (opts.disputed ? 1.6 : 0) * day),
       created_at: new Date(due.getTime() - 2 * day),
-      note: "Imported history (settled before StockSure)",
+      note: "Sample history (no PayPal money moved)",
     });
     const rid = newId("rc");
     await q.query("INSERT INTO receipts (id, po_id, version, status, confirmed_by, created_at) VALUES ($1,$2,1,'confirmed','import',$3)", [rid, id, new Date(due.getTime())]);
@@ -112,7 +128,8 @@ export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean } = {}
   await hist(laneway, 9, [["OAT-12", 15], ["BEAN-1", 5]], {});
 
   // The demo scenario: Laneway orders 20 cases of oat milk at $10, limit $210, Barista Oat and mill-direct approved.
-  const tomorrow = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1, 6, 0));
+  // Deadlines are relative to the seed, two days out, so a demo opened later the same day never starts late.
+  const tomorrow = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 2, 6, 0));
   const demoPo = await po(laneway, "draft", tomorrow, 21000, [["OAT-12", 20, ["OAT-B12", "OAT-M12"]]], { note: "Weekly milk order" });
   await po(corner, "draft", tomorrow, 30000, [["CUP-12", 2, []], ["BEAN-1", 4, []]], { note: "Cups and beans" });
   await putSetting(q, "po_seq", String(seq));

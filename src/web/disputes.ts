@@ -6,7 +6,8 @@ import { Router, type Request, type Response } from "express";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { fmt } from "../core/money.js";
-import { GtError, newSecret } from "../lib/util.js";
+import { GtError } from "../lib/util.js";
+import { wsKey } from "../services/seed.js";
 import { paypal } from "../paypal/index.js";
 import { disputesForSupplier, evidencePack, provideEvidence, syncDisputes } from "../services/disputes.js";
 import type { Person } from "../store.js";
@@ -118,7 +119,7 @@ ${driver?.driver_token ? html`<p class="mono small">${config.appUrl}/driver/${dr
     page(async (req, res) => {
       const p = await needSupplier(req, res);
       if (!p) return;
-      const token = newSecret("drv").replace(/[^A-Za-z0-9_-]/g, "");
+      const token = wsKey("drv").replace(/[^A-Za-z0-9_~-]/g, "");
       await (await getDb()).query("UPDATE people SET driver_token = $2 WHERE id = $1", [p.id, token]);
       back(res, "/disputes", "Driver link ready");
     }, () => "/disputes"),

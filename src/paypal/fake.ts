@@ -99,6 +99,10 @@ export class FakePayPal implements PayPalApi {
     });
   }
 
+  async getPaymentToken(id: string) {
+    return this.run("getPaymentToken", null, null, () => (this.tokens.has(id) ? { id, payerEmail: "buyer@example.com" } : null));
+  }
+
   async createPaymentToken(setupTokenId: string, requestId: string) {
     return this.run("createPaymentToken", requestId, { setupTokenId }, () => {
       if (!this.setupApproved.has(setupTokenId)) throw new PayPalError("Setup token not approved", 422, "UNPROCESSABLE_ENTITY", "fake", null);

@@ -118,6 +118,16 @@ export class PayPalClient implements PayPalApi {
     return { id: String(d.id), customerId: d.customer?.id, payerEmail: d.payment_source?.paypal?.email_address };
   }
 
+  async getPaymentToken(id: string) {
+    try {
+      const d = await this.call<Json>("GET", `/v3/vault/payment-tokens/${encodeURIComponent(id)}`);
+      return { id: String(d.id), payerEmail: d.payment_source?.paypal?.email_address };
+    } catch (e) {
+      if (e instanceof PayPalError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
   async createVaultedAuthorizeOrder(input: HoldInput, requestId: string) {
     return this.call<PPOrder>(
       "POST",
