@@ -36,14 +36,18 @@ cp .env.example .env      # PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET (sandbox), A
 npm run dev               # or: npm run build && npm start
 ```
 
-Open `/demo` and choose **Reset and load demo data**, then sign in as Jordan. Connect PayPal once with a sandbox buyer, then follow the steps on `/demo`. Optional pieces:
+Locally, open `/demo` and sign in as Jordan (one-click sign-in to the local data is on outside production). On the live site every visitor presses **Try the live demo** and gets a private demo of their own (see Wave 1 below). Settings:
 
-- `ANTHROPIC_API_KEY` enables reading photo and PDF documents.
-- Without it, text documents are parsed deterministically, and images are kept as evidence for a person to count.
+- `OPENAI_API_KEY` and `AI_PROVIDER=openai` read dockets, invoices and photos. In production the server refuses to start without them, or without the PayPal credentials and `SESSION_SECRET`.
+- `PAYPAL_DEMO_VAULT_TOKEN` and `PAYPAL_DEMO_VAULT_PAYER`: the saved sandbox wallet that demo buyers pay from.
+- `SS_ADMIN_KEY` guards `/admin/*` (workspaces, showcase, wallet re-approval).
+- `SS_OFFLINE_RULES=1` (never in production) runs the labelled offline text parser instead of a model, for tests and the e2e server.
 
 ```bash
-npm test                  # 44 tests: arithmetic, extraction, flows on a fake PayPal (no model, no network)
+npm test                  # 89 tests on a fake PayPal: arithmetic, extraction, flows, workspaces (no model, no network)
+npm run e2e               # Playwright, 8 browser tests on a hermetic server (port 4471)
 npm run sandbox:check     # what the sandbox app can do
+npx tsx scripts/wave1-live-check.mts   # Wave 1 acceptance against the live site
 ```
 
 ## How money stays correct
@@ -90,7 +94,7 @@ npm run sandbox:check     # what the sandbox app can do
 |---|---|
 | Vault connect, AUTHORIZE holds, partial and final capture, void, refund, webhooks | Real PayPal sandbox calls (see the live runs below) |
 | Reauthorize after 3 days, disputes list and evidence, Transaction Search, Balances, order tracking, invoices, payouts | Implemented in the client and the fake with `PayPal-Mock-Response` support; exercised by tests; sandbox recording pending (needs credentials in this instance) |
-| Document reading (delivery notes, invoices, photos) | Real OpenAI Responses API calls when `AI_PROVIDER=openai`; Anthropic optional; the text parser otherwise. Output is always a proposal a person confirms; instruction-like lines are removed before reading |
+| Document reading (delivery notes, invoices, photos) | Real OpenAI Responses API calls (gpt-6.1-sol, backup gpt-6-sol; gpt-6-luna for short answers). If both fail the page says "I couldn't read that" and offers "Read it again"; no rules reader stands in. The text parser runs only in labelled offline test mode. Output is always a proposal a person confirms; instruction-like lines are removed before reading |
 | Negotiation wording, mandate compile, ask-the-ledger | Model writes words only; prices, quantities and rules come from code and are checked verbatim |
 | Agents | Buyer and supplier agents are rule-driven; every offer passes a guard; the agreement is hashed and HMAC-signed by both sides |
 | Channels | Telegram and WhatsApp adapters with webhooks; live only with tokens. The simulator at `/channels` always works. Web push needs VAPID keys |
@@ -209,3 +213,51 @@ Tests: `test/safety.test.ts`; the model's measured results are on `/safety/model
 ## Accessibility (9 Nov 2026)
 
 `public/a11y.js` and `public/a11y.css` on every page: a **Display and help** button with text size, high contrast, Atkinson Hyperlegible, read-aloud, voice input (on-device where the browser supports it), plain words, bigger targets, more time (removes the dock page's auto-refresh) and no motion. A first-visit card offers the same choices. The profile stays in this browser's `localStorage`; typing and buttons always work without it. AG Grid keeps its own keyboard navigation and ARIA grid roles.
+
+## Wave 1 (11 Nov 2026): private demos, saved wallet, no fallbacks
+
+Done for `MASTER_IMPROVEMENT_SPEC.md` Part C, Wave 1. Deployed from `main` at `3b43763`; checked on the live site with `scripts/wave1-live-check.mts` (21 of 21 checks passed) and with `scripts/pp-check.mts` against PayPal itself.
+
+**A2.1 Saved demo wallet.** Demo buyers pay from one saved sandbox wallet (a Vault payment token), so a judge places holds and captures with no PayPal login. It is attached only inside a demo workspace, checked with PayPal daily, and re-approvable on `/admin/paypal/wallet`. If PayPal no longer has it, new demos are created without it and the owner is offered PayPal's own approval page. Pages say "Paid from the demo's saved sandbox wallet".
+
+**A1 Private workspaces.** Each visitor gets a Postgres schema of their own (`stocksure_ws_<id>`), chosen per request and per job. The seed runs the real order path: the almond milk order is held and dispatched; the espresso beans are held, counted in full and captured; the cups are held, one carton is agreed as crushed, the rest is captured, and a replacement is held and dispatched. That is 6 PayPal operations, counted on `/start` as "N of 6 payments confirmed by PayPal". Older closed orders are marked **Sample** and never touched PayPal. A join link and QR code put a second device in the same demo. "Reset my demo" gives you a new one and closes the old one; nobody else's is touched. Idle demos close after 48 hours, and their open holds are voided and read back first. Limits: 5 new demos per address per hour, 300 live. The landing preview reads from a read-only showcase demo rebuilt daily. Webhooks find their demo from `custom_id` (`<workspace>:<order>`), else from the PayPal ids the demo recorded. A query into a closed demo fails instead of falling through to the base data.
+
+**A4 Hosting and decay.** `/healthz` checks the database and returns the commit. A GitHub Actions job requests it every 10 minutes (`.github/workflows/keep-warm.yml`; set the repository variable `KEEP_WARM=off` to stop it). A sweeper puts jobs left `running` by a restart back in the queue, re-queues a settlement stuck with no job using the same PayPal request ids, and surfaces it as "needs you" if it is still stuck an hour later. Seeds have no fixed dates; PayPal's 3-day honor period is handled by the existing reauthorize job, so no per-demo clock was needed here.
+
+**A11, A5.1, A5.4, A5.5 AI and no fallbacks.** The Anthropic path and the rules stand-ins are gone. Each tier has a primary and a backup GPT-6 model with strict JSON schema; broken JSON gets one repair attempt. When every model fails, the reading is stored as failed with "I couldn't read that. Try again, or fill it in below.", the raw error goes to the audit table only, and the receiving page offers **Read it again**. Photo and invoice read failures are said on the page too. Production refuses to start without its keys. The hard-code audit (the spec's word list over `web/src` and `src/web`) found two more issues, both fixed. The Evidence page now reads eval results from where they were recorded and shows the date, instead of saying "not run yet" inside every demo. In-app simulator alerts now say "in simulator" instead of "sent". The rest of the word list is labelled demo controls (sample dockets and invoices) or "simulated" labels.
+
+**Bugs.**
+- P0 scam-hold loop: an approved scam-check hold was never found, so settlement held it again forever. Approvals now hash the move only (action, order, amount), and older rows are matched by payload.
+- S4: the held message is posted once per approval.
+- S1: one server-side "needs you" drives Home, its empty state and the nav badge.
+- S2: the money panel shows charged, held now, being released, released and refunding, all computed on the server from PayPal state. A test uses $180, $24, $20 and $6.
+- S3: every amount reads as currency, including older activity rows.
+- "1 orders" is fixed.
+- Found on the way:
+  - A bare count for a product sold in bags ("3") was refused as an unknown unit.
+  - The e2e server picked up a real OpenAI key from the shell.
+
+**Live results (11 Nov 2026, `pph-stocksure.onrender.com`).**
+
+| Check | Result |
+|---|---|
+| `/healthz` with commit | Pass: 200, `3b43763`, database 3 ms |
+| No demo: nobody to sign in as, preview from the showcase | Pass |
+| Two visitors get two demos; ids, people and orders don't overlap; A's person can't sign in to B | Pass |
+| Seeding through the real path | Pass: 6 of 6 confirmed by PayPal in 35 s, in both demos |
+| No-login hold from the saved wallet | Pass: authorization `4X4865885N4062817`, CREATED, $200.00 |
+| Seeded ids read back from PayPal | Pass: captures `6D921500F08256803` ($96.00) and `1N198921MU796225A` ($85.00) COMPLETED; holds `3ER86399D87832629` and `94367020JL215953K` CAPTURED, `97F8328608403670L` and `7G262260FA170053E` CREATED. Every one carries its demo's id in `custom_id` |
+| Connecting PayPal goes to PayPal's own sandbox page | Pass: `www.sandbox.paypal.com/agreements/approve` |
+| An unreadable document | Pass: "I couldn't read that. Try again, or fill it in below.", source none, no raw error on the page |
+| Reset gives B a new demo and leaves A alone | Pass |
+
+**Not verified on the live site.**
+- **Wallet gone.** The case where the saved wallet no longer works is covered by tests only. Removing the live token would break every judge's demo.
+- **Idle wake-up.** The A4 "first byte under 2 s after 12 idle hours" check needs 12 idle hours. On Render's free plan an always-awake service uses about 730 of the workspace's 750 shared free hours a month, so the owner should move StockSure to an always-on instance.
+- **Expiry timing.** The 48-hour expiry and the daily showcase rebuild have not run in production yet. Both are covered by tests.
+
+**Owner actions.**
+- Upgrade the Render instance to always-on (approved in 0.3; a dashboard purchase).
+- Provide a dedicated sandbox buyer for judges who want to connect their own PayPal.
+- The GPT-6 per-token prices in the cost estimates come from secondary sources.
+

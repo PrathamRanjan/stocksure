@@ -747,7 +747,7 @@ describe("StockSure flows", () => {
     });
     await orderAndHold();
     await dispatch(ids.demoPo, "");
-    ok(await sam.post(`/po/${ids.demoPo}/receive/upload`, { note_text: "Delivery docket: 20 cs Oat Milk 12 x 1 L" }));
+    expect(err(await sam.post(`/po/${ids.demoPo}/receive/upload`, { note_text: "Delivery docket: 20 cs Oat Milk 12 x 1 L" }))).toBe("1 document stored, but I couldn't read it. Try again, or fill the counts in below.");
     // The primary and the backup model were both tried; nothing else read the docket.
     expect(new Set(models)).toEqual(new Set([config.ai.models.read, config.ai.models.readBackup]));
     const view = (await sam.get(`/api/ui/po/${ids.demoPo}/receive`)).json;

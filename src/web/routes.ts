@@ -64,7 +64,7 @@ export function routes() {
       // Demo sign-in picks a person in the visitor's own workspace; there is no shared demo to sign in to.
       if (!currentWs() && !config.demo.baseSignIn) return back(res, "/login", "Start your own demo first: it takes a few seconds and nobody else can see it.", true);
       p = await personById(db, String(req.body.person_id));
-      if (!p) return back(res, "/login", "That person isn't in your demo any more (it was reset). Pick again from the list.", true);
+      if (!p) return back(res, "/login", "That person isn't in this demo (it may have been reset, or they belong to someone else's). Pick from the list.", true);
     } else if (req.body.key) {
       const key = String(req.body.key);
       const ws = keyWorkspace(key);
@@ -166,7 +166,11 @@ export function routes() {
     if (fields.note_text?.trim()) (await uploadReceivingDoc(p, po.id, "delivery_note", textFile("pasted-delivery-note.txt", fields.note_text)), n++);
     for (const f of files.photo ?? []) (await uploadReceivingDoc(p, po.id, "photo", f), n++);
     if (!n) throw new GtError("Choose a file, paste the note or use a sample.", "invalid");
-    back(res, `/po/${po.id}/receive`, `${n} document${n > 1 ? "s" : ""} stored and read. Check the proposal, then confirm.`);
+    // Say what happened: a document the model couldn't read is stored, not "read".
+    const unread = Number((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM (SELECT e.lines FROM extractions e JOIN documents d ON d.id = e.document_id WHERE d.po_id = $1 ORDER BY e.created_at DESC LIMIT $2) x WHERE (x.lines->>'failed')::boolean", [po.id, n])).rows[0]?.n ?? 0);
+    const docs = `${n} document${n > 1 ? "s" : ""}`;
+    if (unread) back(res, `/po/${po.id}/receive`, unread === n ? `${docs} stored, but I couldn't read ${n > 1 ? "them" : "it"}. Try again, or fill the counts in below.` : `${docs} stored; I couldn't read ${unread} of them. Check the proposal, fill in the rest, then confirm.`, unread === n);
+    else back(res, `/po/${po.id}/receive`, `${docs} stored and read. Check the proposal, then confirm.`);
   }));
 
   r.post("/po/:id/receive/reread/:doc", act(async (req, res, p) => {
