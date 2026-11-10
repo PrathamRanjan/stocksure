@@ -17,7 +17,8 @@ export default defineConfig({
   webServer: BASE ? undefined : {
     command: `npx tsx scripts/e2e-server.ts`,
     cwd: "..",
-    env: { E2E_PORT: String(PORT), SS_DEMO_MODE: "1" },
+    // Hermetic: no model key even if the shell has one; the labelled offline text parser reads the sample dockets.
+    env: { E2E_PORT: String(PORT), SS_DEMO_MODE: "1", SS_OFFLINE_RULES: "1", OPENAI_API_KEY: "", AI_PROVIDER: "none", NODE_ENV: "development", RENDER: "" },
     url: `http://127.0.0.1:${PORT}/healthz`,
     reuseExistingServer: false,
     timeout: 60_000,

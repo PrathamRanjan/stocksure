@@ -8,7 +8,13 @@ import { setPayPal } from "../src/paypal/index.js";
 import { seedDemo } from "../src/services/seed.js";
 import { startWorker } from "../src/worker.js";
 
+import { config } from "../src/config.js";
+
 const port = Number(process.env.E2E_PORT || 4471);
+// Belt and braces: never call a real model from the e2e server, whatever the environment says.
+config.ai.openaiKey = "";
+config.ai.provider = "none";
+if (!config.offlineRules) throw new Error("e2e server needs SS_OFFLINE_RULES=1 (the labelled offline text parser)");
 const db = await openDb({ memory: true });
 setDb(db);
 const fake = new FakePayPal();

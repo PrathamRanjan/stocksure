@@ -71,7 +71,8 @@ export async function deliver(messageId: string): Promise<void> {
       await db.query("UPDATE channel_messages SET status = 'simulated' WHERE id = $1", [messageId]);
       return;
     }
-    await db.query("UPDATE channel_messages SET status = 'sent', external_id = $2 WHERE id = $1", [messageId, externalId]);
+    // Spec A11: only a message a real channel accepted is "sent"; the in-app simulator copy says what it is.
+    await db.query("UPDATE channel_messages SET status = $3, external_id = $2 WHERE id = $1", [messageId, externalId, m.channel === "simulator" ? "in simulator" : "sent"]);
   } catch (e) {
     await db.query("UPDATE channel_messages SET status = 'failed' WHERE id = $1", [messageId]);
     throw e;
