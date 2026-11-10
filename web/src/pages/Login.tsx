@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PublicShell } from "@/components/public-shell";
 import { ErrorBlock, Spinner, Stamp } from "@/components/brand";
+import { seedLine, useWorkspace } from "@/lib/demo";
 
 interface Person {
   id: string;
@@ -29,7 +30,8 @@ export default function Login() {
   const next = safeNext(q.get("next"));
   const nav = useNavigate();
   const { refresh, session } = useSession();
-  const people = useView<{ people: Person[] }>("/api/ui/people");
+  const people = useView<{ people: Person[]; needs_workspace?: boolean }>("/api/ui/people");
+  const ws = useWorkspace(4000);
   const [busy, setBusy] = useState<string | null>(null);
   const [key, setKey] = useState("");
 
@@ -60,7 +62,21 @@ export default function Login() {
         </div>
       )}
 
-      {people.data && !people.data.people.length && (
+      {ws.data?.workspace?.kind === "visitor" && ws.data.seed && (
+        <p className="mt-4 flex flex-wrap items-center gap-2 rounded-md bg-paper-2 p-3 text-sm" role="status" aria-live="polite">
+          <Stamp tone="quiet">Your private demo</Stamp> {seedLine(ws.data)}
+        </p>
+      )}
+
+      {people.data?.needs_workspace && (
+        <div className="mt-6 rounded-lg border-2 border-foreground bg-card p-5">
+          <p className="font-heading text-xl font-bold">Start your own demo first</p>
+          <p className="mt-1 text-muted-foreground">Each visitor gets a private café and wholesaler, so nobody sees or changes anyone else's orders.</p>
+          <Button asChild size="lg" className="mt-4"><Link to="/start">Start the live demo <ArrowRight aria-hidden="true" /></Link></Button>
+        </div>
+      )}
+
+      {people.data && !people.data.people.length && !people.data.needs_workspace && (
         <p className="mt-6 rounded-lg border border-dashed border-input p-5">Demo sign-in is off on this server. Use your access key below.</p>
       )}
 

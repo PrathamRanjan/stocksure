@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { config } from "./config.js";
-import { getDb } from "./db.js";
+import { getDb, withWorkspace, WS_ID } from "./db.js";
 import { enqueue } from "./jobs.js";
 import { paypal } from "./paypal/index.js";
 import { postMessage } from "./store.js";
@@ -15,10 +15,30 @@ export async function receiveWebhook(req: Request, res: Response) {
   let verified = false;
   if (config.paypal.webhookId) verified = await paypal().verifyWebhookSignature(headers, body, config.paypal.webhookId).catch(() => false);
   const db = await getDb();
-  const r = await db.query("INSERT INTO webhook_events (id, event_type, resource_id, body, verified) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING RETURNING id", [id, String(body.event_type), String(body.resource?.id ?? ""), JSON.stringify(body), verified]);
+  const ws = await workspaceForEvent(body);
+  const r = await withWorkspace(null, () => db.query("INSERT INTO webhook_events (id, event_type, resource_id, body, verified, ws_id) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO NOTHING RETURNING id", [id, String(body.event_type), String(body.resource?.id ?? ""), JSON.stringify(body), verified, ws]));
   if (!verified) return res.status(400).json({ error: "signature not verified" });
-  if (r.rows.length) await enqueue(db, "process_webhook", { eventId: id }, new Date(), `wh:${id}`);
+  // The event is processed inside the workspace whose order it is about (or the base schema).
+  if (r.rows.length) await withWorkspace(ws, () => enqueue(db, "process_webhook", { eventId: id }, new Date(), `wh:${id}`));
   res.json({ ok: true });
+}
+
+/**
+ * Spec A1.1: which workspace an event belongs to. First the resource's custom_id ("<workspace>:<order id>", set on
+ * every order a workspace creates), then the ids recorded when the workspace created them. Null: the base schema.
+ */
+export async function workspaceForEvent(body: any): Promise<string | null> {
+  const res = body?.resource ?? {};
+  const custom = String(res.custom_id ?? res.purchase_units?.[0]?.custom_id ?? "");
+  const m = /^([a-z0-9]{6,24}):/.exec(custom);
+  const db = await getDb();
+  const known = async (ws: string) => (await withWorkspace(null, () => db.query("SELECT 1 FROM workspaces WHERE id = $1", [ws]))).rows.length > 0;
+  if (m && WS_ID.test(m[1]) && (await known(m[1]))) return m[1];
+  const related = res.supplementary_data?.related_ids ?? {};
+  const ids = [res.id, related.authorization_id, related.order_id, related.capture_id].filter((x) => typeof x === "string" && x);
+  if (!ids.length) return null;
+  const row = (await withWorkspace(null, () => db.query<{ ws_id: string }>("SELECT ws_id FROM paypal_refs WHERE resource_id = ANY($1) LIMIT 1", [ids]))).rows[0];
+  return row?.ws_id ?? null;
 }
 
 export async function processWebhook(eventId: string) {

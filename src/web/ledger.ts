@@ -8,7 +8,7 @@ import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { fmt } from "../core/money.js";
 import { GtError } from "../lib/util.js";
-import { hasOpenAI, structured } from "../ai/provider.js";
+import { AI_FAILED_MESSAGE, offlineRules, structured } from "../ai/provider.js";
 import { quarantine } from "../ai/grounding.js";
 import { supplierPerformance } from "../services/records.js";
 import type { Person } from "../store.js";
@@ -72,10 +72,10 @@ export async function askLedger(p: Person, question: string) {
   const d = await ledgerData(p, 365);
   const rows = d.orders.slice(0, 120).map((o) => ({ number: o.number, status: o.status, supplier: o.supplier, buyer: o.buyer, quote: Number(o.quote_cents) / 100, captured: Number(o.captured_cents) / 100, refunded: Number(o.refunded_cents) / 100, billed: Number(o.billed_cents) / 100, limit: Number(o.spend_limit_cents) / 100, deliver_by: o.deliver_by, closed_at: o.closed_at, by_agent: o.created_by_agent }));
   const q = quarantine(question.slice(0, 500));
-  if (!hasOpenAI()) {
+  if (offlineRules()) {
     const words = q.clean.toLowerCase().split(/\W+/).filter((w) => w.length > 3);
     const hit = rows.filter((r) => words.some((w) => `${r.number} ${r.status} ${r.supplier} ${r.buyer}`.toLowerCase().includes(w)));
-    return { answer: `No model configured: ${hit.length} order(s) mention your words (${words.join(", ")}).`, rows: hit.slice(0, 50), chart: null as null | { kind: string; series: { label: string; value: number }[] }, quarantined: q.quarantined, by: "rules" };
+    return { answer: `Offline test mode (no model): ${hit.length} order(s) mention your words (${words.join(", ")}).`, rows: hit.slice(0, 50), chart: null as null | { kind: string; series: { label: string; value: number }[] }, quarantined: q.quarantined, by: "text search (offline test mode)" };
   }
   const r = await structured<{ answer: string; matching_row_indexes: number[]; chart: { kind: "bar" | "none"; series: { label: string; value: number }[] } }>({
     purpose: "owner_question",
@@ -108,7 +108,7 @@ export function ledgerRouter() {
       const d = await ledgerData(p, 90);
       const w = d.widgets;
       const studio = Boolean(config.agStudioLicense);
-      const asked = typeof req.query.q === "string" && req.query.q.trim() ? await askLedger(p, req.query.q).catch((e) => ({ answer: `Could not answer: ${(e as Error).message.slice(0, 120)}`, rows: [], chart: null, quarantined: [], by: "error" })) : null;
+      const asked = typeof req.query.q === "string" && req.query.q.trim() ? await askLedger(p, req.query.q).catch(() => ({ answer: `${AI_FAILED_MESSAGE.replace("fill it in below", "filter the tables below")}`, rows: [], chart: null, quarantined: [], by: "error" })) : null;
       res.send(
         layout(
           { title: "Ledger", who: whoOf(p), flash: flashOf(req), head: AGGRID, scripts: raw(`<script src="/static/ledger.js" defer></script>`) },

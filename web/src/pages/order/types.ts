@@ -84,7 +84,7 @@ export interface Op {
   updated_at: string;
 }
 export interface PoModel {
-  po: { id: string; number: string; status: string; kind: string; root_id: string; buyer_name: string; supplier_name: string; deliver_by: string; limit_cents: number; note: string; exception: string | null; quote_version: number; dispatched_at: string | null; closed_at: string | null; created_at: string; history: boolean };
+  po: { id: string; number: string; status: string; kind: string; root_id: string; buyer_name: string; supplier_name: string; deliver_by: string; limit_cents: number; note: string; exception: string | null; quote_version: number; dispatched_at: string | null; closed_at: string | null; created_at: string; history: boolean; sample?: boolean };
   me: { side: "buyer" | "supplier"; role: string; owner: boolean };
   tree: { id: string; number: string; status: string; kind: string; parent_id: string | null }[];
   children: { id: string; number: string; status: string; kind: string }[];
@@ -93,7 +93,8 @@ export interface PoModel {
   disputed: boolean;
   quote_total_cents: number;
   over_limit: boolean;
-  paypal: { connected: boolean; payer: string | null } | null;
+  /** demo_wallet: the buyer pays from the demo's saved sandbox wallet (spec A2.1). */
+  paypal: { connected: boolean; payer: string | null; demo_wallet?: boolean } | null;
   delivery: { mode: string; part: { accepted_cents: number; status: string; packs: Record<string, number> } | null };
   funding: (FundingNums & { holds?: unknown[] }) | null;
   approvals: ApprovalRow[];

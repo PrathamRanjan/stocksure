@@ -3,7 +3,8 @@
  * mandate (max over catalog, concession per round, walk-away, max rounds) and the supplier's floor. A model may
  * phrase a proposal; it never chooses a price. Anything the model writes is shown as wording only.
  */
-import { hasOpenAI, structured } from "../ai/provider.js";
+import { fmt } from "../core/money.js";
+import { offlineRules, structured } from "../ai/provider.js";
 import type { Rules } from "../guard/policy.js";
 import type { PoLine } from "../store.js";
 
@@ -47,7 +48,7 @@ export function guardBuyerOffer(offer: Offer, lines: PoLine[], rules: Rules, spe
   }
   const total = totalOf(lines, out);
   if (total > spendLimitCents) reasons.push(`total ${total} exceeds the order's spend limit ${spendLimitCents}`);
-  if (total > rules.max_order_cents) reasons.push(`total ${total} exceeds the mandate's max_order_cents ${rules.max_order_cents}`);
+  if (total > rules.max_order_cents) reasons.push(`total ${fmt(total)} is above the owner's per-order limit of ${fmt(rules.max_order_cents)}`);
   return { ok: total <= spendLimitCents && total <= rules.max_order_cents, reasons, offer: out };
 }
 
@@ -85,7 +86,7 @@ export function hopeless(lines: PoLine[], rules: Rules, floorPct: number, spendL
   if (bad) return `${bad.product.sku}: supplier floor ${floor[bad.id]} is above the mandate ceiling ${ceiling[bad.id]}`;
   const minTotal = totalOf(lines, floor);
   if (minTotal > spendLimitCents) return `even at the supplier's floor the order costs ${minTotal}, above the spend limit ${spendLimitCents}`;
-  if (minTotal > rules.max_order_cents) return `even at the supplier's floor the order costs ${minTotal}, above max_order_cents ${rules.max_order_cents}`;
+  if (minTotal > rules.max_order_cents) return `even at the supplier's floor the order costs ${fmt(minTotal)}, above the owner's per-order limit of ${fmt(rules.max_order_cents)}`;
   return null;
 }
 
@@ -93,7 +94,7 @@ export function hopeless(lines: PoLine[], rules: Rules, floorPct: number, spendL
 export async function wording(side: "buyer" | "supplier", round: number, lines: PoLine[], offer: Offer, context: string): Promise<{ text: string; by: string }> {
   const summary = lines.map((l) => `${l.product.sku} ${l.qty_packs} ${l.product.pack_label}${l.qty_packs === 1 ? "" : "s"} at $${((offer[l.id] ?? 0) / 100).toFixed(2)} each`).join(", ");
   const template = side === "buyer" ? `Round ${round}: we can take ${summary}. ${context}`.trim() : `Round ${round}: we can supply ${summary}. ${context}`.trim();
-  if (!hasOpenAI()) return { text: template, by: "template" };
+  if (offlineRules()) return { text: template, by: "template (offline test mode)" };
   try {
     const r = await structured<{ message: string }>({
       purpose: "negotiate",
@@ -109,6 +110,6 @@ export async function wording(side: "buyer" | "supplier", round: number, lines: 
     if (!text || !priceOk || /\$\s?\d/.test(text.replace(new RegExp(lines.map((l) => ((offer[l.id] ?? 0) / 100).toFixed(2).replace(".", "\\.")).join("|"), "g"), ""))) return { text: template, by: "template (model wording rejected)" };
     return { text, by: r.model };
   } catch {
-    return { text: template, by: "template" };
+    return { text: template, by: "template (model unavailable; the numbers are code's)" };
   }
 }

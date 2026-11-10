@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { getDb, type Queryable } from "../db.js";
+import { getDb, type Queryable, currentWs } from "../db.js";
 import { shipmentsOf } from "./parts.js";
 import { extractInvoice, type Candidate } from "../ai/extract.js";
 import { fmt } from "../core/money.js";
@@ -166,6 +166,8 @@ export async function placeHold(poId: string, opts: { checkFunding?: boolean; ag
   if (op.status === "succeeded") return "funded";
   const opRequest: string = op.request_id;
   if (!buyer?.vault_token_id) throw new GtError("Buyer has no saved PayPal.", "no_paypal", 409);
+  // Spec A2.1: the demo's saved wallet pays only inside a demo workspace.
+  if ((buyer as any).vault_source === "demo_wallet" && !currentWs()) throw new GtError("The demo's saved wallet only pays inside a demo workspace.", "no_paypal", 409);
   // B.6: dry run against the mandate and live state before any PayPal write. A refused hold is a refusal, not a retry.
   const run: Run = await startRun({ actor: opts.agentId ? "agent" : "code", agentId: opts.agentId ?? null, subject: `hold ${po.number} ${fmt(total)}`, entity: "po", entityId: po.id }, db);
   const verdict = await dryRun({ action: "authorize", ownerId: po.buyer_id, agentScope: opts.agentId ? `agent:${opts.agentId}` : `org:${po.buyer_id}`, entity: "po", entityId: po.id, cents: total, trustedCents: [total] }, run, db);
@@ -182,7 +184,7 @@ export async function placeHold(poId: string, opts: { checkFunding?: boolean; ag
     await db.query("UPDATE payment_ops SET attempts = attempts + 1, status = 'pending', updated_at = now() WHERE id = $1", [op.id]);
     const t0 = Date.now();
     const order = await paypal().createVaultedAuthorizeOrder(
-      { vaultId: buyer.vault_token_id, amountCents: total, currency: po.currency, customId: po.id, invoiceId: `${po.number}-${tag}-H${opRequest.includes(":r") ? opRequest.split(":r").pop() : ""}`, description: `StockSure ${po.number}: ${po.supplier_name} hold` },
+      { vaultId: buyer.vault_token_id, amountCents: total, currency: po.currency, customId: currentWs() ? `${currentWs()}:${po.id}` : po.id, invoiceId: `${po.number}-${tag}-H${opRequest.includes(":r") ? opRequest.split(":r").pop() : ""}`, description: `StockSure ${po.number}: ${po.supplier_name} hold` },
       opRequest,
     );
     await run.step({ actor: "paypal", tool: "createVaultedAuthorizeOrder", pp_request_id: opRequest, gate: "allowed", result: { order_id: order.id, status: order.status }, duration_ms: Date.now() - t0 });
@@ -351,6 +353,8 @@ export async function dispatchPo(person: Person, poId: string, invoice: UploadFi
       for (const l of ex.lines) await q.query("INSERT INTO invoice_lines (document_id, idx, po_line_id, description, billed_units, unit_price_cents, line_cents) VALUES ($1,$2,$3,$4,$5,$6,$7)", [d.id, i++, l.line_id, l.description, l.units, l.unit_price_cents, l.line_cents]);
       if (ex.instructions.length)
         await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename} contains ${ex.instructions.length} instruction-like line(s) (${[...new Set(ex.instructions.map((f) => f.kind.replace(/_/g, " ")))].join(", ")}). They were removed before reading and cannot change who is paid or how much.`, "system", d.id);
+      // Spec A5.5: an unread invoice is said out loud, not shown as an invoice with no lines.
+      if (ex.failed) await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename}: ${ex.notes[0] ?? "I couldn't read this invoice."} The settlement doesn't depend on it: code pays the agreed counts at the quoted price.`, "system", d.id);
     }
     await setPo(q, po.id, { status: "dispatched", dispatched_at: new Date() });
     await notifyOrder("buyer", po.buyer_id, `${po.number} is on its way from ${po.supplier_name}. Open the dock when it arrives.`, po.id, q).catch(() => undefined);

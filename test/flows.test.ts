@@ -5,17 +5,19 @@ import { createApp } from "../src/app.js";
 import { config } from "../src/config.js";
 import { openDb, setDb, type Db } from "../src/db.js";
 import { drain } from "../src/jobs.js";
-import { setModelFetch } from "../src/ai/anthropic.js";
+import { setProviderFetch } from "../src/ai/provider.js";
 import { FakePayPal } from "../src/paypal/fake.js";
 import { PayPalError, setPayPal } from "../src/paypal/index.js";
 import { seedDemo, type DemoIds } from "../src/services/seed.js";
-import { fundingOf, getPo, latestReceipt, latestResolution, linesOf } from "../src/store.js";
+import { fundingOf, getPo, postMessage, latestReceipt, latestResolution, linesOf } from "../src/store.js";
 import { lineFingerprint } from "../src/services/receiving.js";
 import { instanceTag } from "../src/services/orders.js";
 import { handlers } from "../src/worker.js";
 import { Client } from "./client.js";
+import { DEMO_SUPPLIER_CHANGE } from "../src/web/safety.js";
 
 let db: Db;
+const savedAi = { key: config.ai.openaiKey, provider: config.ai.provider };
 let fake: FakePayPal;
 let server: Server;
 let base: string;
@@ -109,8 +111,9 @@ beforeEach(async () => {
 afterEach(async () => {
   server.close();
   setPayPal(null);
-  setModelFetch(null);
-  config.models.anthropicKey = "";
+  setProviderFetch(null);
+  config.ai.openaiKey = savedAi.key;
+  config.ai.provider = savedAi.provider;
   await db.close();
 });
 
@@ -527,6 +530,68 @@ describe("StockSure flows", () => {
     expect(calls("createVaultedAuthorizeOrder")).toBe(2);
   });
 
+  it("a capture held by the scam check, once approved, settles once (no approval loop, one held message)", async () => {
+    await toResolution();
+    await postMessage(db, ids.demoPo, null, "Ana Ruiz", "supplier", DEMO_SUPPLIER_CHANGE);
+    const r = await approveBoth();
+    await run();
+    expect(calls("captureAuthorization")).toBe(0);
+    const { handlers: h } = await import("../src/worker.js");
+    await h.settle({ poId: ids.demoPo, version: r.version });
+    await h.settle({ poId: ids.demoPo, version: r.version });
+    const pending = (await db.query<any>("SELECT id, payload FROM approvals WHERE status = 'pending'")).rows;
+    expect(pending).toHaveLength(1);
+    expect((typeof pending[0].payload === "string" ? JSON.parse(pending[0].payload) : pending[0].payload).safety_rule).toBe("supplier_details_changed_in_message");
+    const held = (await db.query<any>("SELECT body FROM messages WHERE po_id = $1 AND body LIKE '%waits for the buyer''s approval%'", [ids.demoPo])).rows;
+    expect(held).toHaveLength(1);
+    expect((await db.query("SELECT 1 FROM events WHERE po_id = $1 AND type = 'settle.held'", [ids.demoPo])).rows).toHaveLength(1);
+    // The owner approves (by click; the amount is under the passkey threshold).
+    ok(await jordan.post(`/guard/approvals/${pending[0].id}/click`, { approve: "1" }));
+    await run();
+    await run();
+    expect(calls("captureAuthorization")).toBe(1);
+    expect((await po()).status).toBe("awaiting_replacement");
+    expect((await db.query("SELECT 1 FROM approvals WHERE status = 'pending'")).rows).toHaveLength(0);
+    // S3: every amount in the activity reads as currency.
+    const texts = (await db.query<{ summary: string }>("SELECT summary FROM events WHERE po_id = $1", [ids.demoPo])).rows.map((e) => e.summary).join("\n");
+    expect(texts).toMatch(/Owner approved the \$\d+\.\d\d charge/);
+    expect(texts).not.toMatch(/\d+ cents/);
+  });
+
+  it("stuck settlement clears itself: a job orphaned by a restart is reclaimed; no job means re-queue, then 'needs you'", async () => {
+    const { sweepStuck } = await import("../src/services/sweeper.js");
+    await toResolution();
+    await approveBoth();
+    // The process "dies" mid-settle: the job is left running and the order sits in settling.
+    await db.query("UPDATE jobs SET status = 'running', updated_at = now() - interval '30 minutes' WHERE type = 'settle'");
+    await db.query("UPDATE purchase_orders SET updated_at = now() - interval '30 minutes' WHERE id = $1", [ids.demoPo]);
+    expect((await sweepStuck()).reclaimed).toBe(1);
+    await run();
+    expect((await po()).status).toBe("awaiting_replacement");
+    expect(calls("captureAuthorization")).toBe(1);
+
+    // A second order stuck in settling with no job at all (e.g. it failed five times).
+    await db.query("UPDATE purchase_orders SET status = 'settling', updated_at = now() - interval '30 minutes' WHERE id = $1", [ids.demoPo]);
+    await db.query("UPDATE jobs SET status = 'failed', last_error = 'boom' WHERE type = 'settle'");
+    const first = await sweepStuck();
+    expect(first.requeued).toEqual([`base:${(await po()).number}`]);
+    expect((await db.query("SELECT 1 FROM jobs WHERE type = 'settle' AND status = 'pending'")).rows).toHaveLength(1);
+    // Still stuck after the retry: it surfaces as an exception the owner sees.
+    await db.query("UPDATE jobs SET status = 'failed', last_error = 'boom again' WHERE type = 'settle'");
+    await db.query("UPDATE purchase_orders SET updated_at = now() - interval '30 minutes' WHERE id = $1", [ids.demoPo]);
+    const second = await sweepStuck();
+    expect(second.surfaced).toHaveLength(1);
+    const p = await po();
+    expect(p.status).toBe("exception");
+    expect(p.exception).toMatch(/boom again/);
+    const home = (await jordan.get("/api/ui/home")).json;
+    expect(home.orders.find((o: any) => o.id === ids.demoPo).needs_you).toBe(true);
+    // Retrying from the page never charges twice: the capture step is already recorded.
+    ok(await jordan.post(`/po/${ids.demoPo}/retry-settle`));
+    await run();
+    expect(calls("captureAuthorization")).toBe(1);
+  });
+
   it("a 503 on capture retries with the same request id: one capture", async () => {
     await toResolution();
     await approveBoth();
@@ -643,28 +708,58 @@ describe("StockSure flows", () => {
   });
 
   it("model output cannot carry a payee or an amount; hidden instructions never reach payments", async () => {
-    config.models.anthropicKey = "test-key";
-    setModelFetch(async (_url, init) => {
+    config.ai.openaiKey = "test-key";
+    config.ai.provider = "openai";
+    setProviderFetch(async (_url, init) => {
       const body = JSON.parse(String(init?.body));
-      const tool = body.tools[0].name;
-      const sent = JSON.stringify(body.messages);
+      const schema = body.text.format.name;
+      const sent = JSON.stringify(body.input);
       expect(sent).not.toMatch(/harbour-billing|ASSISTANT:/);
-      const input =
-        tool === "record_invoice_lines"
-          ? { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", unit_price: "10.00", line_total: "200.00", payee: "attacker@example.com" }], total: "500.00", pay_to: "attacker@example.com" }
+      const out =
+        schema === "invoice_lines"
+          ? { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", unit_price: "10.00", line_total: "200.00", payee: "attacker@example.com" }], total_seen: "500.00", pay_to: "attacker@example.com" }
           : { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", confidence: 0.95 }], damage: [{ description: "2 cases crushed", quantity_text: "2 cs", product_hint: "OAT-12", kind: "damaged", confidence: 0.7 }], approve_amount: 50000 };
-      return new Response(JSON.stringify({ model: "claude-haiku-5-5", content: [{ type: "tool_use", name: tool, input }] }), { status: 200 });
+      return new Response(JSON.stringify({ model: body.model, status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(out) }] }], usage: { input_tokens: 100, output_tokens: 50 } }), { status: 200 });
     });
     await toResolution();
     const res = (await latestResolution(db, ids.demoPo))!;
     expect(res.body.totals.accepted_cents).toBe(18000);
     expect(JSON.stringify(res.body)).not.toMatch(/attacker|pay_to|approve_amount/);
     const ex = (await db.query<{ lines: any; source: string }>("SELECT e.lines, e.source FROM extractions e JOIN documents d ON d.id = e.document_id WHERE d.kind = 'invoice'")).rows[0];
-    expect(ex.source).toBe("claude-haiku-5-5");
+    expect(ex.source).toMatch(/gpt-6/);
     expect(JSON.stringify(ex.lines)).not.toMatch(/attacker/);
     await approveBoth();
     await run();
     expect(fake.bodies.filter((b) => b.method === "captureAuthorization").map((b) => (b.body as any).amountCents)).toEqual([18000]);
+  });
+
+  it("when every model fails the reading says so (no rules stand-in), and Read it again works once a model answers", async () => {
+    config.ai.openaiKey = "test-key";
+    config.ai.provider = "openai";
+    let up = false;
+    const models: string[] = [];
+    setProviderFetch(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      models.push(body.model);
+      if (!up) return new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 500 });
+      const out = { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", confidence: 0.95 }], damage: [] };
+      return new Response(JSON.stringify({ model: body.model, status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(out) }] }], usage: { input_tokens: 10, output_tokens: 10 } }), { status: 200 });
+    });
+    await orderAndHold();
+    await dispatch(ids.demoPo, "");
+    ok(await sam.post(`/po/${ids.demoPo}/receive/upload`, { note_text: "Delivery docket: 20 cs Oat Milk 12 x 1 L" }));
+    // The primary and the backup model were both tried; nothing else read the docket.
+    expect(new Set(models)).toEqual(new Set([config.ai.models.read, config.ai.models.readBackup]));
+    const view = (await sam.get(`/api/ui/po/${ids.demoPo}/receive`)).json;
+    expect(view.extractions[0]).toMatchObject({ failed: true, source: "none", lines: [] });
+    expect(view.extractions[0].notes.join(" ")).toMatch(/couldn't read that/);
+    expect(JSON.stringify(view)).not.toMatch(/overloaded|OpenAI 500/);
+    up = true;
+    ok(await sam.post(`/po/${ids.demoPo}/receive/reread/${view.extractions[0].document_id}`));
+    const after = (await sam.get(`/api/ui/po/${ids.demoPo}/receive`)).json;
+    expect(after.extractions).toHaveLength(1);
+    expect(after.extractions[0].failed).toBe(false);
+    expect(after.extractions[0].lines).toHaveLength(1);
   });
 
   it("access control: other buyers see nothing; roles are enforced server-side", async () => {

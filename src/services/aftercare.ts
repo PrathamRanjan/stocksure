@@ -148,7 +148,7 @@ async function refundPart(c: any, op: any): Promise<"done" | "waiting" | "failed
       const verdict = await dryRun({ action: "refund", ownerId: c.supplier_id, agentScope: `org:${c.buyer_id}`, entity: "claim", entityId: c.id, cents: op.amount_cents, trustedCents: [op.amount_cents, c.amount_cents], captureId: op.parent_paypal_id }, run, db);
       if (verdict.gate === "held") {
         await run.end("held");
-        await postMessage(db, c.po_id, c.po_line_id, "StockSure", "system", `Refund of ${fmt(op.amount_cents)} waits for approval: ${verdict.reason}`, "system");
+        if (verdict.fresh) await postMessage(db, c.po_id, c.po_line_id, "StockSure", "system", `Refund of ${fmt(op.amount_cents)} waits for approval: ${verdict.reason}`, "system");
         return "held";
       }
       if (verdict.gate !== "allowed") {

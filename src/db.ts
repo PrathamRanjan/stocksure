@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { config } from "./config.js";
 
 export interface Queryable {
@@ -10,26 +11,87 @@ export interface Db extends Queryable {
   tx<T>(fn: (q: Queryable) => Promise<T>): Promise<T>;
   close(): Promise<void>;
   kind: "pglite" | "postgres";
+  /** The schema that holds the shared tables (workspaces, jobs, webhook events, the saved wallet). */
+  base: string;
 }
+
+// ---------- Private demo workspaces (spec A1.1): one Postgres schema per visitor ----------
+//
+// Every query runs against the schema of the workspace the current request (or job) belongs to. The workspace is
+// carried in AsyncLocalStorage, so services keep calling getDb().query(...) unchanged. Outside a workspace the
+// search path is the base schema, as before. Shared tables exist only in the base schema, so inside a workspace an
+// unqualified `jobs` or `webhook_events` still resolves to the shared table.
+
+const wsStore = new AsyncLocalStorage<{ ws: string | null }>();
+export const WS_ID = /^[a-z0-9]{6,24}$/;
+/** The workspace the current request or job runs in; null means the base schema. */
+export const currentWs = (): string | null => wsStore.getStore()?.ws ?? null;
+/** Runs fn (and everything it awaits) inside a workspace. Pass null to run in the base schema. */
+export function withWorkspace<T>(ws: string | null, fn: () => T): T {
+  if (ws !== null && !WS_ID.test(ws)) throw new Error("Invalid workspace id");
+  return wsStore.run({ ws }, fn);
+}
+export const wsSchema = (ws: string) => {
+  if (!WS_ID.test(ws)) throw new Error("Invalid workspace id");
+  return `stocksure_ws_${ws}`;
+};
+/**
+ * A workspace whose schema is gone (closed, or never created). Raised instead of letting the search path fall
+ * through to the base schema, which would quietly show the base data inside someone's demo.
+ */
+export class WorkspaceGone extends Error {
+  readonly status = 410;
+  readonly code = "workspace_closed";
+  readonly userMessage = "This demo has closed. Start a new one.";
+  constructor(readonly ws: string) {
+    super(`Workspace ${ws} is closed (its schema no longer exists)`);
+  }
+}
+const pathFor = (base: string, ws: string | null) => (ws ? `"${wsSchema(ws)}", "${base}"` : `"${base}"`);
 
 async function openPglite(path: string | null): Promise<Db> {
   const { PGlite } = await import("@electric-sql/pglite");
   if (path) mkdirSync(path, { recursive: true });
   const pg = path ? new PGlite(path) : new PGlite();
   await pg.waitReady;
-  // PGlite is single-connection: serialise transactions so concurrent requests don't interleave.
+  const base = String(((await pg.query<{ s: string }>("SELECT current_schema() AS s")).rows[0] as any).s);
+  // PGlite is one connection and runs one statement at a time. Setting the search path and running the statement
+  // must happen together, so every call goes through one chain; transactions hold it until they finish.
   let chain: Promise<unknown> = Promise.resolve();
+  let current = "";
+  const serial = <T>(fn: () => Promise<T>): Promise<T> => {
+    const run = chain.then(fn);
+    chain = run.catch(() => undefined);
+    return run;
+  };
+  const ensurePath = async () => {
+    const ws = currentWs();
+    const want = pathFor(base, ws);
+    // Every call inside a workspace checks its schema still exists; the fallback to the base is for shared tables only.
+    if (ws && !(await pg.query("SELECT 1 FROM pg_namespace WHERE nspname = $1", [wsSchema(ws)])).rows.length) throw new WorkspaceGone(ws);
+    if (want !== current) {
+      await pg.exec(`SET search_path TO ${want}`);
+      current = want;
+    }
+  };
   return {
     kind: "pglite",
-    query: async (sql, params) => ({ rows: (await pg.query(sql, params as any[])).rows as any[] }),
-    exec: async (sql) => {
-      await pg.exec(sql);
-    },
-    tx: (fn) => {
-      const run = chain.then(() => pg.transaction(async (t) => fn({ query: async (s, p) => ({ rows: (await t.query(s, p as any[])).rows as any[] }) })));
-      chain = run.catch(() => undefined);
-      return run as any;
-    },
+    base,
+    query: (sql, params) =>
+      serial(async () => {
+        await ensurePath();
+        return { rows: (await pg.query(sql, params as any[])).rows as any[] };
+      }),
+    exec: (sql) =>
+      serial(async () => {
+        await ensurePath();
+        await pg.exec(sql);
+      }),
+    tx: (fn) =>
+      serial(async () => {
+        await ensurePath();
+        return pg.transaction(async (t) => fn({ query: async (s, p) => ({ rows: (await t.query(s, p as any[])).rows as any[] }) }));
+      }) as any,
     close: async () => {
       await pg.close();
     },
@@ -40,26 +102,50 @@ async function openPostgres(url: string): Promise<Db> {
   const pgmod = await import("pg");
   const Pool = (pgmod as any).default?.Pool ?? (pgmod as any).Pool;
   const pool = new Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: false }, max: 10 });
+  // The connection string chooses this app's schema (search_path option); that is the base schema.
+  const base = String((await pool.query("SELECT current_schema() AS s")).rows[0].s);
+  /** Checks out one client, points it at the current workspace, runs fn, and releases it. The path a client was
+   *  last set to is remembered, so the SET is only sent when a client moves between workspaces. */
+  async function withClient<T>(fn: (c: any) => Promise<T>): Promise<T> {
+    const client = await pool.connect();
+    try {
+      const ws = currentWs();
+      const want = pathFor(base, ws);
+      if (ws) {
+        // One round trip both confirms the workspace schema exists and points the client at it. Without the check a
+        // dropped schema would fall through to the base schema's tables.
+        const r = await client.query("SELECT set_config('search_path', $1, false) FROM pg_namespace WHERE nspname = $2", [want, wsSchema(ws)]);
+        if (!r.rows.length) {
+          client.__ssPath = undefined;
+          throw new WorkspaceGone(ws);
+        }
+        client.__ssPath = want;
+      } else if (client.__ssPath !== want) {
+        await client.query(`SET search_path TO ${want}`);
+        client.__ssPath = want;
+      }
+      return await fn(client);
+    } finally {
+      client.release();
+    }
+  }
   return {
     kind: "postgres",
-    query: async (sql, params) => ({ rows: (await pool.query(sql, params)).rows }),
-    exec: async (sql) => {
-      await pool.query(sql);
-    },
-    tx: async (fn) => {
-      const client = await pool.connect();
-      try {
+    base,
+    query: (sql, params) => withClient(async (c) => ({ rows: (await c.query(sql, params)).rows })),
+    exec: (sql) => withClient(async (c) => void (await c.query(sql))),
+    tx: (fn) =>
+      withClient(async (client) => {
         await client.query("BEGIN");
-        const out = await fn({ query: async (s: string, p?: unknown[]) => ({ rows: (await client.query(s, p)).rows }) });
-        await client.query("COMMIT");
-        return out;
-      } catch (e) {
-        await client.query("ROLLBACK");
-        throw e;
-      } finally {
-        client.release();
-      }
-    },
+        try {
+          const out = await fn({ query: async (s: string, p?: unknown[]) => ({ rows: (await client.query(s, p)).rows }) });
+          await client.query("COMMIT");
+          return out;
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        }
+      }),
     close: async () => {
       await pool.end();
     },
@@ -308,28 +394,6 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS webhook_events (
-  id TEXT PRIMARY KEY,
-  event_type TEXT NOT NULL,
-  resource_id TEXT,
-  body JSONB NOT NULL,
-  verified BOOLEAN NOT NULL,
-  processed_at TIMESTAMPTZ,
-  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS jobs (
-  id BIGSERIAL PRIMARY KEY,
-  type TEXT NOT NULL,
-  dedupe_key TEXT UNIQUE,
-  payload JSONB NOT NULL DEFAULT '{}',
-  run_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','done','failed','cancelled')),
-  attempts INTEGER NOT NULL DEFAULT 0,
-  last_error TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS jobs_due ON jobs(status, run_at);
 CREATE TABLE IF NOT EXISTS shipments (
   id TEXT PRIMARY KEY,
   po_id TEXT NOT NULL REFERENCES purchase_orders(id),
@@ -607,14 +671,92 @@ ALTER TABLE people ADD COLUMN IF NOT EXISTS mcp_key_hash TEXT;
 ALTER TABLE people ADD COLUMN IF NOT EXISTS driver_token TEXT;
 ALTER TABLE orgs ADD COLUMN IF NOT EXISTS floor_pct INTEGER NOT NULL DEFAULT 90;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS reservation_cents INTEGER;
+-- Spec A2.1 / 0.2.4: where a buyer's saved PayPal came from, and which rows are samples rather than real PayPal activity.
+ALTER TABLE orgs ADD COLUMN IF NOT EXISTS vault_source TEXT;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS is_sample BOOLEAN NOT NULL DEFAULT false;
+`;
+
+/** Tables shared by every workspace. They live in the base schema only. */
+export const SHARED_SCHEMA = `
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  resource_id TEXT,
+  body JSONB NOT NULL,
+  verified BOOLEAN NOT NULL,
+  processed_at TIMESTAMPTZ,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS jobs (
+  id BIGSERIAL PRIMARY KEY,
+  type TEXT NOT NULL,
+  dedupe_key TEXT UNIQUE,
+  payload JSONB NOT NULL DEFAULT '{}',
+  run_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','done','failed','cancelled')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS jobs_due ON jobs(status, run_at);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ws_id TEXT;
+ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS ws_id TEXT;
+CREATE TABLE IF NOT EXISTS workspaces (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('visitor','showcase')),
+  ip_hash TEXT,
+  join_token TEXT UNIQUE,
+  seed_version INTEGER NOT NULL DEFAULT 1,
+  seed_state TEXT NOT NULL DEFAULT 'seeding' CHECK (seed_state IN ('seeding','ready','failed','expired')),
+  seed_progress JSONB NOT NULL DEFAULT '{}',
+  error TEXT,
+  checklist JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS workspaces_ip ON workspaces(ip_hash, created_at);
+-- Every PayPal object a workspace creates, so a webhook whose resource does not echo custom_id still finds it.
+CREATE TABLE IF NOT EXISTS paypal_refs (
+  resource_id TEXT PRIMARY KEY,
+  ws_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Spec A2.1: the saved sandbox buyer wallet every demo workspace pays from. One row.
+CREATE TABLE IF NOT EXISTS demo_wallet (
+  id TEXT PRIMARY KEY DEFAULT 'main',
+  payment_token_id TEXT,
+  payer_email TEXT,
+  source TEXT NOT NULL DEFAULT 'setting',
+  status TEXT NOT NULL DEFAULT 'unchecked',
+  detail TEXT,
+  pending_setup_token TEXT,
+  checked_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
 let shared: Db | null = null;
 
 export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
   const db = opts.memory ? await openPglite(null) : config.databaseUrl ? await openPostgres(config.databaseUrl) : await openPglite(config.pglitePath);
-  await db.exec(SCHEMA);
+  await withWorkspace(null, async () => {
+    await db.exec(SCHEMA);
+    await db.exec(SHARED_SCHEMA);
+  });
   return db;
+}
+
+/** Creates the schema for a workspace with every per-workspace table. Shared tables are not copied. */
+export async function createWorkspaceSchema(db: Db, ws: string): Promise<void> {
+  await withWorkspace(null, () => db.exec(`CREATE SCHEMA IF NOT EXISTS "${wsSchema(ws)}"`));
+  await withWorkspace(ws, () => db.exec(SCHEMA));
+}
+
+export async function dropWorkspaceSchema(db: Db, ws: string): Promise<void> {
+  await withWorkspace(null, () => db.exec(`DROP SCHEMA IF EXISTS "${wsSchema(ws)}" CASCADE`));
 }
 
 export async function getDb(): Promise<Db> {

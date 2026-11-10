@@ -3,7 +3,10 @@ import { guardCard } from "./safetyui.js";
 import { icon } from "./icons.js";
 import { Router, type Request, type Response } from "express";
 import { config } from "../config.js";
-import { getDb } from "../db.js";
+import { currentWs, getDb, withWorkspace } from "../db.js";
+import { liveWorkspace } from "../demo/workspaces.js";
+import { WS_COOKIE } from "../demo/routes.js";
+import { sign } from "../lib/crypto.js";
 import { decideDefect, reportDefect } from "../services/aftercare.js";
 import { decideRisk, recordEta, riskyPos } from "../services/supply-watch.js";
 import { dispatchPart } from "../services/parts.js";
@@ -13,9 +16,9 @@ import { GtError } from "../lib/util.js";
 import { armFault, FAULTABLE, type FaultKind } from "../paypal/index.js";
 import { recordCsv, recordJson, supplierPerformance } from "../services/records.js";
 import { acceptQuote, completeConnect, createPo, dispatchPo, quotePo, quoteTotal, retryHold, startConnect, submitPo, type UploadFile } from "../services/orders.js";
-import { confirmReceipt, postLineMessage, supplierReview, uploadReceivingDoc, type CountInput } from "../services/receiving.js";
+import { confirmReceipt, postLineMessage, supplierReview, uploadReceivingDoc, type CountInput, rereadReceivingDoc } from "../services/receiving.js";
 import { approveResolution, reviseResolution } from "../services/resolution.js";
-import { demoIds, sampleDeliveryNote, sampleInvoice, seedDemo } from "../services/seed.js";
+import { demoIds, keyWorkspace, sampleDeliveryNote, sampleInvoice } from "../services/seed.js";
 import { retrySettle } from "../services/settle.js";
 import { catalog, fundingOf, getPo, linesOf, orgById, personById, poFor, setting, type Person, type PO } from "../store.js";
 import { authed, me, personByKey, signIn, signOut, whoOf } from "./auth.js";
@@ -57,8 +60,21 @@ export function routes() {
   r.post("/login", async (req, res) => {
     const db = await getDb();
     let p: Person | null = null;
-    if (req.body.person_id && config.demoMode) p = await personById(db, String(req.body.person_id));
-    else if (req.body.key) p = await personByKey(String(req.body.key));
+    if (req.body.person_id && config.demoMode) {
+      // Demo sign-in picks a person in the visitor's own workspace; there is no shared demo to sign in to.
+      if (!currentWs() && !config.demo.baseSignIn) return back(res, "/login", "Start your own demo first: it takes a few seconds and nobody else can see it.", true);
+      p = await personById(db, String(req.body.person_id));
+      if (!p) return back(res, "/login", "That person isn't in your demo any more (it was reset). Pick again from the list.", true);
+    } else if (req.body.key) {
+      const key = String(req.body.key);
+      const ws = keyWorkspace(key);
+      if (ws && config.demoMode) {
+        const w = await liveWorkspace(ws);
+        if (!w || w.kind !== "visitor") return back(res, "/login", "That key belongs to a demo that has closed.", true);
+        p = await withWorkspace(ws, () => personByKey(key));
+        if (p) res.cookie(WS_COOKIE, sign(ws), { httpOnly: true, sameSite: "lax", secure: config.appUrl.startsWith("https://"), maxAge: 7 * 864e5, path: "/" });
+      } else p = await personByKey(key);
+    }
     if (!p) return back(res, "/login", "That key is not valid.", true);
     signIn(res, p, config.appUrl.startsWith("https://"));
     const next = String(req.body.next ?? "/home");
@@ -151,6 +167,12 @@ export function routes() {
     for (const f of files.photo ?? []) (await uploadReceivingDoc(p, po.id, "photo", f), n++);
     if (!n) throw new GtError("Choose a file, paste the note or use a sample.", "invalid");
     back(res, `/po/${po.id}/receive`, `${n} document${n > 1 ? "s" : ""} stored and read. Check the proposal, then confirm.`);
+  }));
+
+  r.post("/po/:id/receive/reread/:doc", act(async (req, res, p) => {
+    const r1 = await rereadReceivingDoc(p, req.params.id, req.params.doc);
+    if (r1.failed) back(res, `/po/${req.params.id}/receive`, "I still couldn't read that. Fill the counts in below; the document is kept as evidence.", true);
+    else back(res, `/po/${req.params.id}/receive`, "Read again. Check the proposal, then confirm.");
   }));
 
   r.post("/po/:id/receive/confirm", act(async (req, res, p) => {
@@ -271,29 +293,6 @@ export function routes() {
       back(res, "/home", `PayPal connection failed: ${(e as Error).message}`, true);
     }
   }));
-
-  // ---------- Demo ----------
-  r.post("/demo/reset", async (req, res) => {
-    if (!config.demoMode) return res.status(403).send("Demo mode is off");
-    const db = await getDb();
-    try {
-      await db.tx((q) => seedDemo(q, { keepPayPal: req.body.keep === "1" }));
-    } catch (e) {
-      // Never take the server down from a demo reset; nothing was changed (the reset is one transaction).
-      return back(res, "/demo", `Reset failed, nothing changed: ${(e as Error).message}`, true);
-    }
-    signOut(res);
-    back(res, "/login", "Demo loaded. Sign in as Jordan to start.");
-  });
-
-  r.post("/demo/fault", async (req, res) => {
-    if (!config.demoMode) return res.status(403).send("Demo mode is off");
-    const method = String(req.body.method);
-    const kind = String(req.body.kind) as FaultKind;
-    if (!(FAULTABLE as readonly string[]).includes(method) || !["fail_503", "lose_response", "fail_422", "stale_read"].includes(kind)) return back(res, "/demo", "Unknown fault", true);
-    await armFault(method, kind);
-    back(res, "/demo", `Armed: next ${method} → ${kind}.`);
-  });
 
   return r;
 }

@@ -23,12 +23,13 @@ import { buildServer } from "./mcp/tools.js";
 import { installChannelHandlers } from "./channels/handlers.js";
 import { uiRouter } from "./web/ui-api.js";
 import { config } from "./config.js";
+import { demoRouter, refuseShowcaseWrites, workspaceMiddleware } from "./demo/routes.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const spaDir = join(root, "web", "dist");
 
 /** Pages the React front end owns. Everything else (guard, ledger, deliveries, dock, safety, evidence…) stays server-rendered in the same identity. */
-export const SPA_PATHS = ["/", "/login", "/home", "/approvals", "/po/new", "/po/:id", "/po/:id/receive", "/stock", "/catalog", "/performance", "/demo", "/judge", "/about"];
+export const SPA_PATHS = ["/", "/start", "/login", "/home", "/approvals", "/po/new", "/po/:id", "/po/:id/receive", "/stock", "/catalog", "/performance", "/demo", "/judge", "/about"];
 
 /**
  * The front end posts to the same handlers as the old forms, with `X-StockSure-UI: 1`. For those requests a redirect
@@ -46,7 +47,7 @@ function uiJsonMode(req: express.Request, res: express.Response, next: express.N
     parsed.searchParams.delete("ok");
     parsed.searchParams.delete("err");
     const to = parsed.pathname + parsed.search + parsed.hash;
-    if (parsed.pathname === "/login" && req.path !== "/login" && req.path !== "/demo/reset") return res.status(401).json({ ok: false, message: "Sign in first.", to, auth: true });
+    if (parsed.pathname === "/login" && req.path !== "/login" && !req.path.startsWith("/demo/")) return res.status(401).json({ ok: false, message: "Sign in first.", to, auth: true });
     res.json({ ok: !err, message: err ?? okm ?? "", to });
   };
   next();
@@ -62,18 +63,25 @@ export function createApp() {
   app.use(express.json({ limit: "200kb" }));
   app.use(express.urlencoded({ extended: false, limit: "200kb" }));
   app.use(cookieParser());
+  // Spec A1: every request below runs inside the visitor's private workspace (or the base schema).
+  app.use(workspaceMiddleware());
+  app.use(refuseShowcaseWrites());
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     next();
   });
   app.use("/static", express.static(join(root, "public"), { maxAge: 0, setHeaders: (res, file) => { if (/[\\/]safety[\\/]/.test(file)) res.setHeader("Cache-Control", "public, max-age=86400"); } }));
+  // Spec A4: the health check reads the database and names the build, so a keep-warm ping proves both.
   app.get("/healthz", async (_req, res) => {
+    const t0 = Date.now();
     try {
       await (await getDb()).query("SELECT 1");
-      res.json({ ok: true });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ok: true, db: "ok", db_ms: Date.now() - t0, commit: config.commit || null, uptime_s: Math.round(process.uptime()) });
     } catch (e) {
-      res.status(500).json({ ok: false, error: (e as Error).message });
+      console.error("[stocksure healthz]", (e as Error).message);
+      res.status(500).json({ ok: false, db: "error", error: "The database did not answer.", commit: config.commit || null });
     }
   });
   app.post("/webhooks/paypal", (req, res, next) => receiveWebhook(req, res).catch(next));
@@ -102,6 +110,7 @@ export function createApp() {
     res.type("html").send(`<!doctype html><meta charset="utf-8"><title>StockSure</title><p>The StockSure front end is not built. Run <code>npm run build</code>.</p>`);
   };
   for (const p of SPA_PATHS) app.get(p, spa);
+  app.use(demoRouter());
   app.use(uiRouter());
   app.use(merchantRouter());
   app.use(guardRouter());

@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { getDb } from "../db.js";
+import { currentWs, getDb, withWorkspace } from "../db.js";
 import { PayPalClient } from "./client.js";
 import { PayPalApi, PayPalError, UnknownOutcomeError } from "./types.js";
 
@@ -48,8 +48,44 @@ function withFaults(p: PayPalApi): PayPalApi {
   });
 }
 
+/**
+ * Spec A1.1: every PayPal object a workspace creates is recorded in the shared `paypal_refs`, so a webhook about it
+ * finds its workspace even when the resource does not carry custom_id.
+ */
+async function recordRefs(method: string, out: any) {
+  const ws = currentWs();
+  if (!ws || !out || typeof out !== "object") return;
+  const refs: [string, string][] = [];
+  if (method === "createVaultedAuthorizeOrder" || method === "authorizeOrder") {
+    if (out.id) refs.push([String(out.id), "order"]);
+    for (const a of out.purchase_units?.[0]?.payments?.authorizations ?? []) if (a?.id) refs.push([String(a.id), "authorization"]);
+  } else if (method === "captureAuthorization" && out.id) refs.push([String(out.id), "capture"]);
+  else if (method === "reauthorize" && out.id) refs.push([String(out.id), "authorization"]);
+  else if (method === "refundCapture" && out.id) refs.push([String(out.id), "refund"]);
+  if (!refs.length) return;
+  const db = await getDb();
+  await withWorkspace(null, async () => {
+    for (const [id, kind] of refs) await db.query("INSERT INTO paypal_refs (resource_id, ws_id, kind) VALUES ($1,$2,$3) ON CONFLICT (resource_id) DO NOTHING", [id, ws, kind]);
+  });
+}
+
+const RECORDED = new Set(["createVaultedAuthorizeOrder", "authorizeOrder", "captureAuthorization", "reauthorize", "refundCapture"]);
+function withRefs(p: PayPalApi): PayPalApi {
+  return new Proxy(p, {
+    get(target, prop, recv) {
+      const v = Reflect.get(target, prop, recv);
+      if (typeof v !== "function" || !RECORDED.has(String(prop))) return v;
+      return async (...args: unknown[]) => {
+        const out = await (v as (...a: unknown[]) => Promise<unknown>).apply(target, args);
+        await recordRefs(String(prop), out).catch((e) => console.error("[stocksure] paypal_refs", (e as Error).message));
+        return out;
+      };
+    },
+  });
+}
+
 export function paypal(): PayPalApi {
-  return withFaults(base());
+  return withRefs(withFaults(base()));
 }
 
 export function setPayPal(p: PayPalApi | null) {

@@ -112,29 +112,35 @@ export interface FundingNums {
   inflight_cents?: number;
   expected?: { label: string; cents: number }[];
   spendable_cents: number;
+  /** Server-computed from PayPal state (spec S2). The panel shows these as given; it does no money arithmetic. */
+  held_now_cents?: number;
+  releasing_cents?: number;
+  released_cents?: number;
+  refunding_cents?: number;
 }
 
-/** The spend limit split into captured, still held, released-but-not-confirmed and headroom. */
+/** The spend limit split into charged, held now, being released (awaiting PayPal's read-back) and spendable. */
 export function SettlementBar({ f, className, compact = false }: { f: FundingNums; className?: string; compact?: boolean }) {
   const lim = Math.max(1, f.limit_cents);
   const captured = Math.max(0, f.captured_cents - (f.refunded_cents ?? 0));
-  const held = f.held_cents + (f.inflight_cents ?? 0);
-  const exp = (f.expected ?? []).reduce((a, x) => a + x.cents, 0);
-  const heldOnly = Math.max(0, held - exp);
-  const pct = (c: number) => `${Math.min(100, (c / lim) * 100)}%`;
-  const label = `Limit ${money(f.limit_cents)}: ${money(captured)} charged, ${money(heldOnly)} held, ${money(exp)} being released, ${money(f.spendable_cents)} spendable now.`;
+  const held = f.held_now_cents ?? f.held_cents + (f.inflight_cents ?? 0);
+  const releasing = f.releasing_cents ?? 0;
+  const released = f.released_cents ?? 0;
+  const refunding = f.refunding_cents ?? 0;
+  const pct = (c: number) => `${Math.min(100, (Math.max(0, c) / lim) * 100)}%`;
+  const label = `Limit ${money(f.limit_cents)}: ${money(captured)} charged, ${money(held)} held, ${money(releasing)} being released, ${money(f.spendable_cents)} spendable now.`;
   return (
     <div className={cn("@container", className)}>
       <div className="sbar" role="img" aria-label={label}>
         <span data-k="captured" style={{ width: pct(captured) }} />
-        <span data-k="held" style={{ width: pct(heldOnly) }} />
-        <span data-k="expected" style={{ width: pct(exp) }} />
+        <span data-k="held" style={{ width: pct(held) }} />
+        <span data-k="expected" style={{ width: pct(releasing) }} />
       </div>
       {!compact && (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm @lg:grid-cols-4">
-          <Fig k="Charged" v={captured} dot="var(--paid)" hint={f.refunded_cents ? `${money(f.refunded_cents)} refunded` : undefined} />
-          <Fig k="Held on PayPal" v={heldOnly} dot="var(--held)" />
-          <Fig k="Being released" v={exp} dot="var(--released)" hint="not spendable until PayPal confirms" />
+          <Fig k="Charged" v={captured} dot="var(--paid)" hint={[f.refunded_cents ? `${money(f.refunded_cents)} refunded` : "", refunding ? `${money(refunding)} refund on its way` : ""].filter(Boolean).join(" · ") || undefined} />
+          <Fig k="Held on PayPal" v={held} dot="var(--held)" hint="live holds that can still be charged" />
+          <Fig k="Being released" v={releasing} dot="var(--released)" hint={releasing ? "not spendable until PayPal confirms" : released ? `${money(released)} released, confirmed by PayPal` : "nothing waiting"} />
           <Fig k="Spendable now" v={f.spendable_cents} hint={`of ${money(f.limit_cents)} limit`} />
         </dl>
       )}

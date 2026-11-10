@@ -19,7 +19,7 @@ export interface Qty {
   reason?: string;
 }
 
-const PACK = new Set(["case", "cases", "cs", "ctn", "ctns", "carton", "cartons", "box", "boxes", "pk", "pks", "pack", "packs", "tray", "trays", "sack", "sacks", "crate", "crates"]);
+const PACK = new Set(["case", "cases", "cs", "ctn", "ctns", "carton", "cartons", "box", "boxes", "pk", "pks", "pack", "packs", "tray", "trays", "sack", "sacks", "bag", "bags", "crate", "crates"]);
 const EACH = new Set(["ea", "each", "unit", "units", "btl", "btls", "bottle", "bottles", "pc", "pcs", "piece", "pieces", "tin", "tins", "jar", "jars"]);
 const MASS: Record<string, number> = { kg: 1000, kgs: 1000, g: 1, gm: 1, gms: 1, gram: 1, grams: 1 };
 const VOLUME: Record<string, number> = { l: 1000, ltr: 1000, litre: 1000, litres: 1000, liter: 1000, liters: 1000, ml: 1 };
@@ -37,7 +37,10 @@ export function unitKind(token: string): { kind: "pack" | "each" | "mass" | "vol
 /** Converts one "<number> <unit>" term to base units (possibly fractional) or explains why it cannot. */
 function termUnits(n: number, token: string, spec: UnitSpec): { units: number | null; uncertain: boolean; reason?: string } {
   if (!token) return { units: n * spec.pack_units, uncertain: true, reason: `no unit stated; read as ${spec.pack_label}s` };
-  const k = unitKind(token);
+  // The product's own pack noun ("bag", "tub") always means one pack, even if it is not in the list above.
+  const own = spec.pack_label.toLowerCase();
+  const t = token.toLowerCase().replace(/\.$/, "");
+  const k = t === own || t === `${own}s` || t === `${own}es` ? { kind: "pack" as const, factor: 1 } : unitKind(token);
   if (!k) return { units: null, uncertain: true, reason: `unknown unit "${token}"` };
   if (k.kind === "pack") return { units: n * spec.pack_units, uncertain: false };
   if (k.kind === "each") {

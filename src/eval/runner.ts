@@ -9,7 +9,7 @@
  */
 import { writeFileSync } from "node:fs";
 import { config } from "../config.js";
-import { getDb } from "../db.js";
+import { getDb, withWorkspace } from "../db.js";
 import { newId } from "../lib/ids.js";
 import { extractDelivery, parseDeliveryText, scanInstructions, type Candidate, type DeliveryExtraction } from "../ai/extract.js";
 import { hasOpenAI } from "../ai/provider.js";
@@ -154,9 +154,10 @@ function writeReport(suite: string, summaries: ArmSummary[], perArm: Map<Arm, { 
   writeFileSync(`eval/three-arm.md`, lines.join("\n") + "\n");
 }
 
+/** Eval results are recorded once, in the base schema (by npm run eval:*), and read from there by every workspace. */
 export async function latestSummary(suite = "receiving") {
   const db = await getDb();
-  return (
+  return withWorkspace(null, async () => (
     await db.query<{ arm: string; cases: string; correct: string; traps: string; traps_paid: string; paid: string; naive: string; p50: string }>(
       `SELECT arm, count(*) AS cases, count(*) FILTER (WHERE correct) AS correct, count(*) FILTER (WHERE trap) AS traps,
               count(*) FILTER (WHERE trap AND ours_paid_cents > 0) AS traps_paid, coalesce(sum(ours_paid_cents),0) AS paid, coalesce(sum(naive_paid_cents),0) AS naive,
@@ -165,10 +166,16 @@ export async function latestSummary(suite = "receiving") {
        GROUP BY arm ORDER BY arm`,
       [suite],
     )
-  ).rows.map((r) => ({ arm: r.arm, cases: Number(r.cases), correct: Number(r.correct), traps: Number(r.traps), traps_paid: Number(r.traps_paid), paid_usd: Number(r.paid) / 100, naive_usd: Number(r.naive) / 100, p50_ms: Math.round(Number(r.p50)) }));
+  ).rows.map((r) => ({ arm: r.arm, cases: Number(r.cases), correct: Number(r.correct), traps: Number(r.traps), traps_paid: Number(r.traps_paid), paid_usd: Number(r.paid) / 100, naive_usd: Number(r.naive) / 100, p50_ms: Math.round(Number(r.p50)) })));
+}
+
+/** When the latest run of a suite was recorded (null: never). Shown beside its figures (spec A11). */
+export async function latestRunAt(suite: string): Promise<Date | null> {
+  const db = await getDb();
+  return withWorkspace(null, async () => (await db.query<{ at: Date | null }>("SELECT max(at) AS at FROM eval_runs WHERE suite = $1", [suite])).rows[0]?.at ?? null);
 }
 
 export async function evalRows(suite = "receiving", limit = 2000) {
   const db = await getDb();
-  return (await db.query("SELECT id, arm, case_id, expected, actual, correct, trap, naive_paid_cents, ours_paid_cents, latency_ms, detail, at FROM eval_runs WHERE suite = $1 ORDER BY at DESC LIMIT $2", [suite, limit])).rows as any[];
+  return withWorkspace(null, async () => (await db.query("SELECT id, arm, case_id, expected, actual, correct, trap, naive_paid_cents, ours_paid_cents, latency_ms, detail, at FROM eval_runs WHERE suite = $1 ORDER BY at DESC LIMIT $2", [suite, limit])).rows as any[]);
 }

@@ -47,8 +47,8 @@ export async function fundingPanel(q: Queryable, po: PO): Promise<Raw> {
 <div class="fund">
 <div class="kpi"><div class="label">Limit</div><div class="value">${fmt(f.limit_cents)}</div></div>
 <div class="kpi"><div class="label">Captured</div><div class="value">${fmt(f.captured_cents - f.refunded_cents)}</div><div class="hint">${f.refunded_cents ? `${fmt(f.refunded_cents)} refunded` : "charged so far"}</div></div>
-<div class="kpi"><div class="label">Held on PayPal</div><div class="value">${fmt(f.held_cents + f.inflight_cents)}</div><div class="hint">${f.inflight_cents ? `${fmt(f.inflight_cents)} being placed` : "live authorizations"}</div></div>
-<div class="kpi expected"><div class="label">Expected, not spendable</div><div class="value">${fmt(exp)}</div><div class="hint">${f.expected.length ? f.expected.map((x) => x.label).join("; ") : "nothing pending"}</div></div>
+<div class="kpi"><div class="label">Held on PayPal</div><div class="value">${fmt(f.held_now_cents)}</div><div class="hint">${f.inflight_cents ? `${fmt(f.inflight_cents)} being placed` : "live authorizations"}</div></div>
+<div class="kpi expected"><div class="label">Being released or refunded</div><div class="value">${fmt(exp)}</div><div class="hint">${f.expected.length ? f.expected.map((x) => x.label).join("; ") : "nothing pending"}</div></div>
 <div class="kpi"><div class="label">Spendable now</div><div class="value">${fmt(f.spendable_cents)}</div></div>
 </div>
 ${f.holds.length ? html`<div class="table-wrap"><table><caption class="sr">PayPal holds</caption><thead><tr><th>Hold</th><th>PO</th><th class="num">Authorized</th><th class="num">Captured</th><th class="num">Still held</th><th>PayPal status</th></tr></thead><tbody>${f.holds.map((h) => html`<tr><td class="mono">${h.id}</td><td>${h.po_number ?? ""}</td><td class="num">${fmt(h.amount_cents)}</td><td class="num">${fmt(h.captured_cents)}</td><td class="num">${fmt(h.live_cents)}</td><td>${pill(h.status)}</td></tr>`)}</tbody></table></div>` : ""}

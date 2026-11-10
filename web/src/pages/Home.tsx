@@ -14,8 +14,11 @@ export interface OrderCardData {
   status: string;
   buyer: string;
   history: boolean;
+  /** Seeded sample history: no PayPal money moved. */
+  sample?: boolean;
   late: boolean;
   needs_you: boolean;
+  approval_waiting?: boolean;
   next: string | null;
   total_cents: number | null;
   limit_cents: number | null;
@@ -37,10 +40,12 @@ export interface ApprovalRow {
   created_at: string;
 }
 interface HomeData {
-  org: { name: string; side: "buyer" | "supplier"; paypal_connected: boolean; payer: string | null };
+  org: { name: string; side: "buyer" | "supplier"; paypal_connected: boolean; payer: string | null; demo_wallet?: boolean };
   can_create: boolean;
   can_connect: boolean;
   approvals: ApprovalRow[];
+  /** The server's one count of what needs you (orders plus approvals not tied to an order). */
+  needs_count: number;
   orders: OrderCardData[];
 }
 
@@ -55,6 +60,7 @@ function OrderCard({ o, supplierView, tour }: { o: OrderCardData; supplierView: 
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-heading text-lg font-bold">{o.number}</span>
           {o.kind === "replacement" && <Stamp tone="carbon">Replacement</Stamp>}
+          {o.sample && <Stamp tone="carbon">Sample</Stamp>}
           <StatusStamp status={o.status} />
           {o.late && <Stamp tone="stop"><Clock className="size-3" aria-hidden="true" /> Running late</Stamp>}
           {o.moving && <Stamp tone="held"><Spinner className="size-3" /> PayPal working</Stamp>}
@@ -126,7 +132,7 @@ export default function Home() {
       {d.can_connect && d.org.paypal_connected && (
         <p className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <Stamp tone="paid">PayPal connected</Stamp>
-          <span className="min-w-0 break-all">{d.org.payer ? `as ${d.org.payer} · ` : ""}sandbox</span>
+          <span className="min-w-0 break-all">{d.org.demo_wallet ? `Paid from the demo's saved sandbox wallet${d.org.payer ? ` (${d.org.payer})` : ""} · no PayPal login needed` : `${d.org.payer ? `as ${d.org.payer} · ` : ""}sandbox`}</span>
         </p>
       )}
 
@@ -152,7 +158,7 @@ export default function Home() {
             {needs.map((o, i) => <OrderCard key={o.id} o={o} supplierView={supplierView} tour={i === 0} />)}
           </ul>
         ) : (
-          <Empty title={live.length ? "Nothing needs you right now" : "No orders yet"}>
+          <Empty title={d.needs_count ? `${plural(d.needs_count, "thing")} waiting for you above` : live.length ? "Nothing needs you right now" : "No orders yet"}>
             {live.length ? "Everything below is waiting on someone else or already settled." : d.can_create ? "Start one from your supplier's catalog. A PayPal hold is placed only when you accept the quote." : supplierView ? "Orders appear here when a buyer sends one for a quote." : "Deliveries appear here once the owner orders."}
             {!live.length && session?.demo && <> In the demo, <Link to="/demo" className="font-semibold underline">reset the data</Link> to load the scripted order.</>}
           </Empty>
@@ -172,8 +178,8 @@ export default function Home() {
 
       {history.length > 0 && (
         <details className="mt-8 rounded-lg border border-border bg-card px-4">
-          <summary className="flex min-h-12 cursor-pointer items-center font-semibold">Imported history ({history.length} orders)</summary>
-          <p className="text-sm text-muted-foreground">Past deliveries loaded for the supplier record. They're read-only.</p>
+          <summary className="flex min-h-12 cursor-pointer items-center font-semibold">Sample history ({plural(history.length, "order")})</summary>
+          <p className="text-sm text-muted-foreground">Past deliveries loaded for the supplier record, so its performance numbers have something to count. They're read-only and no PayPal money moved for them.</p>
           <ul className="grid gap-2 py-4 lg:grid-cols-2">
             {history.map((o) => <OrderCard key={o.id} o={o} supplierView={supplierView} />)}
           </ul>

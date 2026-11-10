@@ -4,7 +4,8 @@
  * adopts the exact compiled version. Rules are per buyer organisation.
  */
 import { z } from "zod";
-import { hasOpenAI, structured } from "../ai/provider.js";
+import { offlineRules, structured } from "../ai/provider.js";
+import { GtError } from "../lib/util.js";
 import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
 import { newId } from "../lib/ids.js";
@@ -122,7 +123,7 @@ const ModelSchema = {
 /** Model-assisted compile: the model proposes, the validator decides, the owner confirms. */
 export async function compilePolicy(text: string): Promise<Compiled> {
   const local = compileLocal(text);
-  if (!hasOpenAI()) return local;
+  if (offlineRules()) return { ...local, compiler: "local rules (offline test mode, no model)" };
   try {
     const r = await structured<any>({
       purpose: "compile_policy",
@@ -147,7 +148,8 @@ export async function compilePolicy(text: string): Promise<Compiled> {
     const rules = clampRules(merged, unexpressed);
     return { rules, unexpressed, compiler: `${r.model} + validator (${r.via})` };
   } catch {
-    return local;
+    // Spec A11: the local parser no longer stands in for the model. The owner is told and nothing is adopted.
+    throw new GtError("I couldn't read that mandate just now. Try again, or set the numbers directly in the rules table.", "ai_unavailable", 503);
   }
 }
 

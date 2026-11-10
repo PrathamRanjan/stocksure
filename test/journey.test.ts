@@ -12,6 +12,7 @@ import { handlers } from "../src/worker.js";
 import { Client } from "./client.js";
 import { serveTracked } from "./journey-coverage.js";
 import { walkFoundation } from "./journey-foundation.js";
+import { WORKSPACE_ROUTES } from "./workspace-routes.js";
 
 // Acceptance journey: the demo scenario end to end over HTTP for buyer owner, receiver and supplier,
 // including two-part delivery, a disputed and revised receipt, a re-planned replacement, an ETA warning,
@@ -86,8 +87,17 @@ describe("StockSure acceptance journey", () => {
       const rec = (await latestReceipt(db, poId))!;
       return lineFingerprint(rec.receipt.version, rec.lines[0]);
     };
+    let reread = false;
     const receive = async (poId: string, delivered: string, damaged: string, sample: "damaged" | "clean" | null) => {
       if (sample) ok(await sam.post(`/po/${poId}/receive/upload`, { sample }));
+      if (sample && !reread) {
+        // "Read it again" re-reads the stored document and replaces its reading (no second extraction row).
+        reread = true;
+        const doc = (await db.query<{ id: string }>("SELECT id FROM documents WHERE po_id = $1 AND kind = 'delivery_note' ORDER BY created_at DESC LIMIT 1", [poId])).rows[0];
+        const before = (await db.query("SELECT 1 FROM extractions WHERE document_id = $1", [doc.id])).rows.length;
+        ok(await sam.post(`/po/${poId}/receive/reread/${doc.id}`));
+        expect((await db.query("SELECT 1 FROM extractions WHERE document_id = $1", [doc.id])).rows.length).toBe(before);
+      }
       const l = await line(poId);
       return sam.post(`/po/${poId}/receive/confirm`, { [`delivered_${l}`]: delivered, [`damaged_${l}`]: damaged, [`wrong_${l}`]: "0", [`note_${l}`]: "", checked: "1" });
     };
@@ -243,6 +253,7 @@ describe("StockSure acceptance journey", () => {
     expect((await marco.post("/logout")).status).toBe(302);
 
     expect(srv.failures).toEqual([]);
-    expect(srv.missed()).toEqual([]);
+    // Workspace and admin routes are walked end to end in test/workspaces.test.ts.
+    expect(srv.missed(Object.fromEntries(WORKSPACE_ROUTES.map((r) => [r, "covered by test/workspaces.test.ts"])))).toEqual([]);
   });
 });

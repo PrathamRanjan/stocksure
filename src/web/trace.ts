@@ -7,14 +7,14 @@ import { Router, type Request } from "express";
 import { readFileSync } from "node:fs";
 import { timingSafeEqual } from "node:crypto";
 import { config } from "../config.js";
-import { getDb } from "../db.js";
+import { getDb, currentWs } from "../db.js";
 import { GtError } from "../lib/util.js";
 import { newId } from "../lib/ids.js";
 import { aiUsageSummary, providerLabel } from "../ai/provider.js";
 import { verifyChain } from "../guard/audit.js";
 import { conversation, link, receive, recentMessages, telegramReady, telegramUpdate, whatsappReady, whatsappUpdate, type Party } from "../channels/index.js";
 import { pushReady, subscribe } from "../channels/push.js";
-import { evalRows, latestSummary } from "../eval/runner.js";
+import { evalRows, latestSummary, latestRunAt } from "../eval/runner.js";
 import { loadRun, recentRuns, renderTrace, runsFor } from "../trace.js";
 import type { Person } from "../store.js";
 import { me, personByKey, whoOf } from "./auth.js";
@@ -121,7 +121,7 @@ ${t.run.entity === "po" ? html`<p class="small"><a href="/po/${t.run.entity_id}"
     "/evidence",
     page(async (req, res) => {
       const p = await me(req);
-      const [three, arena, ai, chain] = await Promise.all([latestSummary("receiving"), evalRows("arena", 80), aiUsageSummary(), verifyChain()]);
+      const [three, arena, ai, chain, threeAt, arenaAt] = await Promise.all([latestSummary("receiving"), evalRows("arena", 80), aiUsageSummary(), verifyChain(), latestRunAt("receiving"), latestRunAt("arena")]);
       const db = await getDb();
       const real = (await db.query<any>(`SELECT
         (SELECT count(*) FROM purchase_orders WHERE auth_id IS NOT NULL) AS orders_with_hold,
@@ -164,17 +164,17 @@ ${t.run.entity === "po" ? html`<p class="small"><a href="/po/${t.run.entity_id}"
 <tr><th>Audit chain</th><td>${chain.ok ? `intact, ${chain.rows} rows` : `BROKEN at row ${chain.broken_at}`}, head <span class="mono">${chain.head.slice(0, 16)}…</span></td></tr>
 </tbody></table></div>
 
-<div class="card"><h2>This instance so far</h2>
+<div class="card"><h2>${currentWs() ? "Your demo so far" : "This instance so far"}</h2>
 <div class="stats"><div><b>${real.orders_with_hold}</b><span>orders with a PayPal hold</span></div><div><b>${real.captures}</b><span>captures ($${(Number(real.captured_cents) / 100).toFixed(2)})</span></div><div><b>${real.refunds}</b><span>refunds</span></div><div><b>${real.reauths}</b><span>reauthorizations</span></div><div><b>${real.receipts}</b><span>receipts confirmed</span></div><div><b>${real.auto_resolutions}</b><span>clean receipts settled by code</span></div><div><b>${real.person_resolutions}</b><span>resolutions needing people</span></div><div><b>${real.negotiations_agreed}/${real.negotiations}</b><span>negotiations agreed</span></div><div><b>${real.agreements_countersigned}</b><span>agreements countersigned</span></div><div><b>${real.agent_orders}</b><span>orders from agents</span></div><div><b>${real.runs}</b><span>agent runs traced</span></div><div><b>${real.approvals_pending}</b><span>approvals waiting</span></div><div><b>${real.docs_with_instruction_flags}/${real.documents}</b><span>documents with instruction-like lines removed</span></div></div></div>
 
-<div class="card"><h2>Three-arm receiving eval</h2>
+<div class="card"><h2>Three-arm receiving eval</h2>${threeAt ? html`<p class="small"><b>Recorded on ${fmtDate(threeAt)}</b> on this server's base data.</p>` : ""}
 <p class="small muted">The same ${labels.length} labelled delivery notes through three arms: rules only (the text parser), rules + model (the production reader), and an oracle. "Dollars paid" assumes a naive system that pays what the document says; traps are notes that try to change the payee, the amount, or the count. StockSure pays from confirmed counts and quote prices, so document text cannot move money in any arm; the eval measures how many traps each reader catches and how many clean notes it reads correctly.</p>
 ${three.length
   ? html`<div class="table-wrap"><table><thead><tr><th>Arm</th><th>Cases</th><th>Correct</th><th>Traps</th><th>Traps that would pay naively</th><th>Dollars at risk</th><th>Dollars StockSure pays on traps</th><th>p50 latency</th></tr></thead><tbody>${raw(three.map((a) => `<tr><td><b>${a.arm}</b></td><td>${a.cases}</td><td>${a.correct} (${a.cases ? ((100 * a.correct) / a.cases).toFixed(1) : 0}%)</td><td>${a.traps}</td><td>${a.traps}</td><td>$${a.naive_usd.toFixed(2)}</td><td class="${a.traps_paid ? "bad" : "good"}">$${a.paid_usd.toFixed(2)}</td><td>${a.p50_ms} ms</td></tr>`).join(""))}</tbody></table></div><p class="small"><a href="/evidence/three-arm.md">Markdown report</a></p>`
   : html`<p class="muted">Not run yet on this instance: <span class="mono">npm run eval:three-arm</span>.</p>`}
 </div>
 
-<div class="card"><h2>Negotiation arena and adversarial agents</h2>
+<div class="card"><h2>Negotiation arena and adversarial agents</h2>${arenaAt ? html`<p class="small"><b>Recorded on ${fmtDate(arenaAt)}</b> on this server's base data.</p>` : ""}
 <p class="small muted">Buyer and supplier agents play honest, greedy and hostile strategies against each other; then an evil agent, an evil model and an evil document attack the gate. Every attack row must end denied, held or rejected.</p>
 ${arenaRows.length
   ? html`<div class="table-wrap"><table class="small"><thead><tr><th>Case</th><th>Kind</th><th>What happens</th><th>Outcome</th><th>Detail</th></tr></thead><tbody>${raw(arenaRows.map((a) => `<tr><td class="mono">${a.case_id}</td><td>${a.detail?.attacker ?? a.detail?.kind ?? ""}</td><td>${String(a.detail?.description ?? "").replace(/</g, "&lt;")}</td><td><span class="pill ${a.correct ? "good" : "bad"}">${a.actual}</span></td><td class="small">${String(a.detail?.detail ?? "").replace(/</g, "&lt;").slice(0, 160)}</td></tr>`).join(""))}</tbody></table></div><p class="small"><a href="/evidence/arena.md">Markdown report</a></p>`
