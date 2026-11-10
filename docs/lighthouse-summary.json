@@ -93,5 +93,59 @@
    "cls": "0.037",
    "tbt": "0 ms"
   }
+ },
+ "live": {
+  "url": "https://pph-stocksure.onrender.com",
+  "date": "2026-11-10",
+  "pages": {
+   "home-desktop": {
+    "performance": 100,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "lcp": "0.5 s",
+    "cls": "0.022"
+   },
+   "home-mobile": {
+    "performance": 95,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "lcp": "2.6 s",
+    "cls": "0"
+   },
+   "landing-desktop": {
+    "performance": 100,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "lcp": "0.5 s",
+    "cls": "0.007"
+   },
+   "landing-mobile": {
+    "performance": 92,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "lcp": "2.7 s",
+    "cls": "0"
+   },
+   "login-desktop": {
+    "performance": 100,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "lcp": "0.6 s",
+    "cls": "0.022"
+   },
+   "login-mobile": {
+    "performance": 94,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "lcp": "2.7 s",
+    "cls": "0"
+   }
+  }
  }
 }

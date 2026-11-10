@@ -1,6 +1,6 @@
 {
  "base": "https://pph-stocksure.onrender.com",
- "ran_at": "2026-11-10T01:54:42.651Z",
+ "ran_at": "2026-11-10T01:57:12.650Z",
  "po": "SS-1006",
  "accepted_cents": 18000,
  "quote_cents": 20000,
@@ -12,14 +12,14 @@
   "inflight_cents": 0,
   "expected": [
    {
-    "label": "Release of the rest of hold 3G263766CV479370M (SS-1006)",
+    "label": "Release of the rest of hold 5MD69055VC2423637 (SS-1006)",
     "cents": 2000
    }
   ],
   "spendable_cents": 1000,
   "holds": [
    {
-    "id": "3G263766CV479370M",
+    "id": "5MD69055VC2423637",
     "po_number": "SS-1006",
     "amount_cents": 20000,
     "captured_cents": 18000,
@@ -36,9 +36,9 @@
    "paypal_status": "CREATED",
    "amount": "200.00",
    "final_capture": false,
-   "paypal_id": "3G263766CV479370M",
-   "request_id": "hold:po_ybjfr4hyje5ajfoh:1",
-   "at": "2026-11-10T01:54:26.670Z"
+   "paypal_id": "5MD69055VC2423637",
+   "request_id": "hold:po_yawkdn9iwzrdxd7w:1",
+   "at": "2026-11-10T01:56:56.589Z"
   },
   {
    "po": "SS-1006",
@@ -47,9 +47,32 @@
    "paypal_status": "COMPLETED",
    "amount": "180.00",
    "final_capture": true,
-   "paypal_id": "1MG98193RB767814X",
-   "request_id": "cap:po_ybjfr4hyje5ajfoh:1",
-   "at": "2026-11-10T01:54:41.346Z"
+   "paypal_id": "7LA86677X48449538",
+   "request_id": "cap:po_yawkdn9iwzrdxd7w:1",
+   "at": "2026-11-10T01:57:12.154Z"
   }
- ]
+ ],
+ "read_back_after_worker": {
+  "note": "Read from /api/ui/po a minute after the run, once the worker had placed the replacement hold.",
+  "po_status": "awaiting_replacement",
+  "holds": [
+   {
+    "po": "SS-1006",
+    "authorization": "5MD69055VC2423637",
+    "amount": "200.00",
+    "captured": "180.00",
+    "still_held": "0.00",
+    "paypal_status": "CAPTURED"
+   },
+   {
+    "po": "SS-1006-R1",
+    "authorization": "07R62181F24019456",
+    "amount": "24.00",
+    "captured": "0.00",
+    "still_held": "24.00",
+    "paypal_status": "CREATED"
+   }
+  ],
+  "spendable_after": "6.00 of 210.00"
+ }
 }

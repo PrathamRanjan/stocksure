@@ -113,7 +113,15 @@ The roadmap in `../ROADMAP.md` (Part B foundation, Part C.2 features S1 to S10) 
 - **Judge mode** `/judge`, **PWA** (manifest, service worker, push subscribe).
 - **Eval explorer** `/evidence/eval` (every eval row, sliced by arm, outcome and trap, CSV); `/llms.txt`; skill file `skill/SKILL.md` at `/skill.md`; file map in `docs/foundation.md`.
 
-Not done yet: sandbox recordings for the new PayPal endpoints (needs credentials), deployment and video, integrator keys (Telegram, WhatsApp, VAPID, AG Studio). The three-arm numbers on `/evidence` are a regression suite on synthetic notes built from the demo catalog, not an independent benchmark.
+Not done yet: the demo video; sandbox recordings for reauthorize, disputes and void (they need a 3-day-old hold or a buyer-opened dispute). The three-arm numbers on `/evidence` are a regression suite on synthetic notes built from the demo catalog, not an independent benchmark.
+
+## Front end and tests
+
+The signed-in app and public pages are a React + Vite + Tailwind + shadcn front end in `web/`, built into `web/dist` and served by Express. It reads `/api/ui/*` JSON views and posts to the same form handlers with `X-StockSure-UI: 1`; money is always computed on the server. Control pages (`/guard`, `/ledger`, `/deliveries`, …) stay server-rendered in the same Docket theme. Judge Mode: `/?tour=judge` or "Take the tour".
+
+- `npm test`: 80 server tests. `npm run e2e`: Playwright against a hermetic server (fake PayPal, in-memory DB): persona journey, axe and 360 px per persona, tours.
+- `cd web && E2E_BASE=https://pph-stocksure.onrender.com LIVE=1 npx playwright test e2e/live.spec.ts`: a real sandbox journey through the UI; ids land in `docs/sandbox-run.json`.
+- Design, screenshots, Lighthouse and scores: [docs/REDESIGN_REPORT.md](docs/REDESIGN_REPORT.md).
 
 ## Deploy
 
