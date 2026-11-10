@@ -35,6 +35,18 @@ export const wsSchema = (ws: string) => {
   if (!WS_ID.test(ws)) throw new Error("Invalid workspace id");
   return `stocksure_ws_${ws}`;
 };
+/**
+ * A workspace whose schema is gone (closed, or never created). Raised instead of letting the search path fall
+ * through to the base schema, which would quietly show the base data inside someone's demo.
+ */
+export class WorkspaceGone extends Error {
+  readonly status = 410;
+  readonly code = "workspace_closed";
+  readonly userMessage = "This demo has closed. Start a new one.";
+  constructor(readonly ws: string) {
+    super(`Workspace ${ws} is closed (its schema no longer exists)`);
+  }
+}
 const pathFor = (base: string, ws: string | null) => (ws ? `"${wsSchema(ws)}", "${base}"` : `"${base}"`);
 
 async function openPglite(path: string | null): Promise<Db> {
@@ -53,7 +65,10 @@ async function openPglite(path: string | null): Promise<Db> {
     return run;
   };
   const ensurePath = async () => {
-    const want = pathFor(base, currentWs());
+    const ws = currentWs();
+    const want = pathFor(base, ws);
+    // Every call inside a workspace checks its schema still exists; the fallback to the base is for shared tables only.
+    if (ws && !(await pg.query("SELECT 1 FROM pg_namespace WHERE nspname = $1", [wsSchema(ws)])).rows.length) throw new WorkspaceGone(ws);
     if (want !== current) {
       await pg.exec(`SET search_path TO ${want}`);
       current = want;
@@ -94,8 +109,18 @@ async function openPostgres(url: string): Promise<Db> {
   async function withClient<T>(fn: (c: any) => Promise<T>): Promise<T> {
     const client = await pool.connect();
     try {
-      const want = pathFor(base, currentWs());
-      if (client.__ssPath !== want) {
+      const ws = currentWs();
+      const want = pathFor(base, ws);
+      if (ws) {
+        // One round trip both confirms the workspace schema exists and points the client at it. Without the check a
+        // dropped schema would fall through to the base schema's tables.
+        const r = await client.query("SELECT set_config('search_path', $1, false) FROM pg_namespace WHERE nspname = $2", [want, wsSchema(ws)]);
+        if (!r.rows.length) {
+          client.__ssPath = undefined;
+          throw new WorkspaceGone(ws);
+        }
+        client.__ssPath = want;
+      } else if (client.__ssPath !== want) {
         await client.query(`SET search_path TO ${want}`);
         client.__ssPath = want;
       }

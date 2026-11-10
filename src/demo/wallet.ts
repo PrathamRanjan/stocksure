@@ -27,6 +27,7 @@ interface Row {
   detail: string | null;
   checked_at: Date | null;
   source: string;
+  pending_setup_token: string | null;
 }
 
 async function row(): Promise<Row | null> {

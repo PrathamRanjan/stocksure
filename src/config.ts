@@ -64,6 +64,9 @@ export const config = {
     perAddressPerHour: num(process.env.SS_WORKSPACES_PER_ADDRESS_HOUR, 5),
     /** Behind this key: the global reset, the wallet re-approval page and workspace housekeeping. Empty disables them. */
     adminKey: process.env.SS_ADMIN_KEY || "",
+    /** One-click sign-in to the shared base demo. Tests and local runs only; in production every visitor gets a
+     *  private workspace instead. */
+    baseSignIn: !production && bool(process.env.SS_BASE_DEMO_SIGNIN, true),
   },
   /** Roadmap B.8: channels. Empty tokens mean the in-app simulator only. */
   channels: {
@@ -86,4 +89,27 @@ export const config = {
 
 export function paypalBaseUrl(env: "sandbox" | "live" = config.paypal.env): string {
   return env === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+}
+
+/**
+ * Spec A11: in production the server will not start without its keys, so no page can quietly run on rules or show
+ * a PayPal step that cannot work. Returns the missing settings (empty when ready).
+ */
+export function missingProductionKeys(): string[] {
+  if (!config.production) return [];
+  const miss: string[] = [];
+  if (!config.ai.openaiKey) miss.push("OPENAI_API_KEY");
+  if (config.ai.provider !== "openai") miss.push("AI_PROVIDER=openai");
+  if (!config.paypal.clientId) miss.push("PAYPAL_CLIENT_ID");
+  if (!config.paypal.clientSecret) miss.push("PAYPAL_CLIENT_SECRET");
+  if (!process.env.SESSION_SECRET) miss.push("SESSION_SECRET");
+  return miss;
+}
+
+export function assertProductionReady() {
+  const miss = missingProductionKeys();
+  if (miss.length) {
+    console.error(`[stocksure] refusing to start in production: missing ${miss.join(", ")}`);
+    process.exit(1);
+  }
 }

@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { parseCents } from "../core/money.js";
 import { parseQuantity, type UnitSpec } from "../core/units.js";
-import { forcedToolCall, hasModel } from "./anthropic.js";
-import { hasOpenAI, structured, type Part } from "./provider.js";
+import { AI_FAILED_MESSAGE, offlineRules, structured, type Part } from "./provider.js";
 import { quarantine } from "./grounding.js";
 
 /**
@@ -49,6 +48,8 @@ export interface InstructionFlag {
 
 export interface DeliveryExtraction {
   source: string;
+  /** Spec A5.5: true when the model could not read it. The page shows a plain sentence, a retry and the manual form. */
+  failed?: boolean;
   lines: ProposedLine[];
   damage: DamageHint[];
   instructions: InstructionFlag[];
@@ -62,6 +63,7 @@ export interface InvoiceLineProposal extends ProposedLine {
 
 export interface InvoiceExtraction {
   source: string;
+  failed?: boolean;
   lines: InvoiceLineProposal[];
   total_cents: number | null;
   instructions: InstructionFlag[];
@@ -293,168 +295,78 @@ const invoiceSchema = z.object({
 });
 const photoSchema = z.object({ visible_damage: z.boolean(), description: z.string().max(300), quantity_text: z.string().max(60).nullish(), confidence: z.number().min(0).max(1) });
 
-function blocks(u: Upload, cleanText: string | null): unknown[] {
-  const out: unknown[] = [];
-  if (/^image\/(png|jpe?g|gif|webp)$/.test(u.mime)) out.push({ type: "image", source: { type: "base64", media_type: u.mime === "image/jpg" ? "image/jpeg" : u.mime, data: u.body.toString("base64") } });
-  else if (u.mime === "application/pdf") out.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: u.body.toString("base64") } });
-  if (cleanText) out.push({ type: "text", text: `<document>\n${cleanText.slice(0, 20000)}\n</document>` });
-  return out;
-}
-
-/** Roadmap B.1: OpenAI Responses API path. Returns null when this upload cannot go to OpenAI (PDF without text). */
-function openaiParts(u: Upload, cleanText: string | null, ctx: string | null): Part[] | null {
+/** Parts for the model: images and PDFs go as files, text as quarantined document text, plus the PO context. */
+function modelParts(u: Upload, cleanText: string | null, ctx: string | null): Part[] {
   const parts: Part[] = [];
-  const m = /^image\/(png|jpe?g|webp)$/.exec(u.mime);
-  if (m) parts.push({ type: "image", mediaType: (u.mime === "image/jpg" ? "image/jpeg" : u.mime) as Part extends { mediaType: infer M } ? M : never, data: u.body });
-  else if (u.mime === "application/pdf" && !cleanText) return null;
+  if (/^image\/(png|jpe?g|webp)$/.test(u.mime)) parts.push({ type: "image", mediaType: (u.mime === "image/jpg" ? "image/jpeg" : u.mime) as "image/jpeg", data: u.body });
+  else if (u.mime === "application/pdf" && !cleanText) parts.push({ type: "file", mediaType: "application/pdf", data: u.body, filename: "document.pdf" });
   if (cleanText) parts.push({ type: "text", text: `<document>\n${quarantine(cleanText).clean.slice(0, 20000)}\n</document>` });
   if (ctx) parts.push({ type: "text", text: ctx });
-  return parts.length ? parts : null;
+  return parts;
 }
-const useOpenAI = () => hasOpenAI();
+const tierOf = (u: Upload) => (/^image\/|^application\/pdf$/.test(u.mime) && !u.text ? "vision" : "read") as "vision" | "read";
+/** Offline test mode only (no key, NODE_ENV=test or SS_OFFLINE_RULES): the text parser, labelled as such. */
+const OFFLINE = "text parser (offline test mode, no model)";
 
 const props = (o: Record<string, unknown>) => ({ type: "object", properties: o, required: Object.keys(o) });
 const LINE_PROPS = { sku: { type: ["string", "null"] }, description: { type: "string" }, quantity_text: { type: "string" }, confidence: { type: "number" } };
+const DELIVERY_SCHEMA = props({ lines: { type: "array", items: props(LINE_PROPS) }, damage: { type: "array", items: props({ description: { type: "string" }, quantity_text: { type: ["string", "null"] }, product_hint: { type: ["string", "null"] }, kind: { type: "string", enum: ["damaged", "missing", "wrong"] }, confidence: { type: "number" } }) } });
+const INVOICE_SCHEMA = props({ lines: { type: "array", items: props({ ...LINE_PROPS, unit_price: { type: ["string", "null"] }, line_total: { type: ["string", "null"] } }) }, total_seen: { type: ["string", "null"] } });
 
+/**
+ * Reads a delivery note or a photo of one into proposed counts. The model reads (a backup model if the first fails);
+ * when both fail the person gets an honest "couldn't read that" and the manual form: no rules reading stands in.
+ */
 export async function extractDelivery(u: Upload, cands: Candidate[]): Promise<DeliveryExtraction> {
   const scan = u.text ? scanInstructions(u.text) : { clean: null as string | null, flags: [] as InstructionFlag[] };
-  const ctxLine = `PO lines: ${cands.filter((c) => c.line_id).map((c) => `${c.product.sku} ${c.product.name} (${c.product.pack_label} of ${c.product.pack_units} ${c.product.base_unit})`).join("; ")}`;
-  const oaParts = useOpenAI() ? openaiParts(u, scan.clean, ctxLine) : null;
-  if (oaParts) {
-    try {
-      const r = await structured<unknown>({
-        purpose: "extract_delivery",
-        tier: /^image\//.test(u.mime) ? "vision" : "read",
-        system: SYSTEM,
-        parts: oaParts,
-        schemaName: "delivery_lines",
-        schema: props({ lines: { type: "array", items: props(LINE_PROPS) }, damage: { type: "array", items: props({ description: { type: "string" }, quantity_text: { type: ["string", "null"] }, product_hint: { type: ["string", "null"] }, kind: { type: "string", enum: ["damaged", "missing", "wrong"] }, confidence: { type: "number" } }) } }),
-        maxOutputTokens: 1500,
-      });
-      const d = deliverySchema.parse(r.output);
-      const lines = d.lines.map((l) => propose(l.sku ?? null, l.description, l.quantity_text, cands, l.confidence));
-      const damage: DamageHint[] = d.damage.map((x) => {
-        const c = hintLine(`${x.product_hint ?? ""} ${x.description}`, cands);
-        return { line_id: c?.line_id ?? null, units: c && x.quantity_text ? parseQuantity(x.quantity_text, c.product).units : null, text: x.description, kind: x.kind, source: "note", confidence: x.confidence };
-      });
-      attachDamage(lines, damage);
-      const echoed = scanInstructions(lines.map((l) => l.description).join("\n")).flags;
-      return { source: `${r.model} (${r.via})`, lines, damage, instructions: [...scan.flags, ...echoed], notes: [] };
-    } catch (e) {
-      if (!hasModel()) {
-        const fb = u.text ? parseDeliveryText(u.text, cands) : { source: "none", lines: [], damage: [], instructions: scan.flags, notes: [] as string[] };
-        fb.notes.push(`Model unavailable (${(e as Error).message.slice(0, 80)}); ${u.text ? "used the text parser" : "enter counts by hand"}.`);
-        return fb;
-      }
-    }
+  if (offlineRules()) {
+    if (u.text) return { ...parseDeliveryText(u.text, cands), source: OFFLINE };
+    return { source: OFFLINE, lines: [], damage: [], instructions: [], notes: ["Offline test mode has no model, so this image was kept as evidence. Enter the counts by hand."], failed: true };
   }
-  if (!hasModel()) {
-    if (u.text) return parseDeliveryText(u.text, cands);
-    return { source: "none", lines: [], damage: [], instructions: [], notes: ["No model is configured, so this image was stored as evidence only. Enter the counts by hand."] };
-  }
+  const ctx = `PO lines: ${cands.filter((c) => c.line_id).map((c) => `${c.product.sku} ${c.product.name} (${c.product.pack_label} of ${c.product.pack_units} ${c.product.base_unit})`).join("; ")}`;
   try {
-    const ctx = `PO lines: ${cands.filter((c) => c.line_id).map((c) => `${c.product.sku} ${c.product.name} (${c.product.pack_label} of ${c.product.pack_units} ${c.product.base_unit})`).join("; ")}`;
-    const { input, model } = await forcedToolCall<unknown>({
-      system: SYSTEM,
-      content: [...blocks(u, scan.clean), { type: "text", text: ctx }],
-      tool: { name: "record_delivery_lines", description: "Record the line items and any damage notes on this delivery note.", input_schema: props({ lines: { type: "array", items: props(LINE_PROPS) }, damage: { type: "array", items: props({ description: { type: "string" }, quantity_text: { type: ["string", "null"] }, product_hint: { type: ["string", "null"] }, kind: { type: "string", enum: ["damaged", "missing", "wrong"] }, confidence: { type: "number" } }) } }) },
-      maxTokens: 1500,
-    });
-    const d = deliverySchema.parse(input);
-    const lines = d.lines.map((l) => {
-      const p = propose(l.sku ?? null, l.description, l.quantity_text, cands, l.confidence);
-      return p;
-    });
+    const r = await structured<unknown>({ purpose: "extract_delivery", tier: tierOf(u), system: SYSTEM, parts: modelParts(u, scan.clean, ctx), schemaName: "delivery_lines", schema: DELIVERY_SCHEMA });
+    const d = deliverySchema.parse(r.output);
+    const lines = d.lines.map((l) => propose(l.sku ?? null, l.description, l.quantity_text, cands, l.confidence));
     const damage: DamageHint[] = d.damage.map((x) => {
       const c = hintLine(`${x.product_hint ?? ""} ${x.description}`, cands);
       return { line_id: c?.line_id ?? null, units: c && x.quantity_text ? parseQuantity(x.quantity_text, c.product).units : null, text: x.description, kind: x.kind, source: "note", confidence: x.confidence };
     });
     attachDamage(lines, damage);
     const echoed = scanInstructions(lines.map((l) => l.description).join("\n")).flags;
-    return { source: model, lines, damage, instructions: [...scan.flags, ...echoed], notes: [] };
-  } catch (e) {
-    const fb = u.text ? parseDeliveryText(u.text, cands) : { source: "none", lines: [], damage: [], instructions: scan.flags, notes: [] as string[] };
-    fb.notes.push(`Model unavailable (${(e as Error).message.slice(0, 80)}); ${u.text ? "used the text parser" : "enter counts by hand"}.`);
-    return fb;
+    return { source: `${r.model}${r.via === "fallback" ? " (backup model)" : ""}`, lines, damage, instructions: [...scan.flags, ...echoed], notes: [] };
+  } catch {
+    return { source: "none", lines: [], damage: [], instructions: scan.flags, notes: [AI_FAILED_MESSAGE], failed: true };
   }
 }
 
 export async function extractInvoice(u: Upload, cands: Candidate[]): Promise<InvoiceExtraction> {
   const scan = u.text ? scanInstructions(u.text) : { clean: null as string | null, flags: [] as InstructionFlag[] };
-  const oaParts = useOpenAI() ? openaiParts(u, scan.clean, null) : null;
-  if (oaParts) {
-    try {
-      const r = await structured<unknown>({
-        purpose: "extract_invoice",
-        tier: /^image\//.test(u.mime) ? "vision" : "read",
-        system: SYSTEM,
-        parts: oaParts,
-        schemaName: "invoice_lines",
-        schema: props({ lines: { type: "array", items: props({ ...LINE_PROPS, unit_price: { type: ["string", "null"] }, line_total: { type: ["string", "null"] } }) }, total_seen: { type: ["string", "null"] } }),
-        maxOutputTokens: 1500,
-      });
-      const raw = r.output as any;
-      const d = invoiceSchema.parse({ lines: raw?.lines ?? [], total: raw?.total_seen ?? null });
-      const lines = d.lines.map((l) => ({ ...propose(l.sku ?? null, l.description, l.quantity_text, cands, l.confidence), unit_price_cents: parseCents(l.unit_price ?? null), line_cents: parseCents(l.line_total ?? null) }));
-      const echoed = scanInstructions(lines.map((l) => l.description).join("\n")).flags;
-      return { source: `${r.model} (${r.via})`, lines, total_cents: parseCents(d.total ?? null), instructions: [...scan.flags, ...echoed], notes: [] };
-    } catch (e) {
-      if (!hasModel()) {
-        const fb = u.text ? parseInvoiceText(u.text, cands) : { source: "none", lines: [], total_cents: null, instructions: scan.flags, notes: [] as string[] };
-        fb.notes.push(`Model unavailable (${(e as Error).message.slice(0, 80)}).`);
-        return fb;
-      }
-    }
-  }
-  if (!hasModel()) {
-    if (u.text) return parseInvoiceText(u.text, cands);
-    return { source: "none", lines: [], total_cents: null, instructions: [], notes: ["No model is configured; the invoice is stored but not compared."] };
+  if (offlineRules()) {
+    if (u.text) return { ...parseInvoiceText(u.text, cands), source: OFFLINE };
+    return { source: OFFLINE, lines: [], total_cents: null, instructions: [], notes: ["Offline test mode has no model; the invoice is stored but not compared."], failed: true };
   }
   try {
-    const { input, model } = await forcedToolCall<unknown>({
-      system: SYSTEM,
-      content: blocks(u, scan.clean),
-      tool: { name: "record_invoice_lines", description: "Record the invoice line items exactly as printed.", input_schema: props({ lines: { type: "array", items: props({ ...LINE_PROPS, unit_price: { type: ["string", "null"] }, line_total: { type: ["string", "null"] } }) }, total: { type: ["string", "null"] } }) },
-      maxTokens: 1500,
-    });
-    const d = invoiceSchema.parse(input);
+    const r = await structured<unknown>({ purpose: "extract_invoice", tier: tierOf(u), system: SYSTEM, parts: modelParts(u, scan.clean, null), schemaName: "invoice_lines", schema: INVOICE_SCHEMA });
+    const raw = r.output as any;
+    const d = invoiceSchema.parse({ lines: raw?.lines ?? [], total: raw?.total_seen ?? null });
     const lines = d.lines.map((l) => ({ ...propose(l.sku ?? null, l.description, l.quantity_text, cands, l.confidence), unit_price_cents: parseCents(l.unit_price ?? null), line_cents: parseCents(l.line_total ?? null) }));
     const echoed = scanInstructions(lines.map((l) => l.description).join("\n")).flags;
-    return { source: model, lines, total_cents: parseCents(d.total ?? null), instructions: [...scan.flags, ...echoed], notes: [] };
-  } catch (e) {
-    const fb = u.text ? parseInvoiceText(u.text, cands) : { source: "none", lines: [], total_cents: null, instructions: scan.flags, notes: [] as string[] };
-    fb.notes.push(`Model unavailable (${(e as Error).message.slice(0, 80)}).`);
-    return fb;
+    return { source: `${r.model}${r.via === "fallback" ? " (backup model)" : ""}`, lines, total_cents: parseCents(d.total ?? null), instructions: [...scan.flags, ...echoed], notes: [] };
+  } catch {
+    return { source: "none", lines: [], total_cents: null, instructions: scan.flags, notes: ["I couldn't read this invoice. It is stored as sent and nothing is paid from it."], failed: true };
   }
 }
 
 /** A photo can support a claim; it never confirms a count. */
 export async function observePhoto(u: Upload, cands: Candidate[]): Promise<DamageHint | null> {
-  if (!/^image\//.test(u.mime)) return null;
-  const oaParts = useOpenAI() ? openaiParts(u, null, null) : null;
-  if (oaParts) {
-    try {
-      const r = await structured<unknown>({ purpose: "observe_photo", tier: "vision", system: SYSTEM + "\nDescribe only what is visible. Say if damage is uncertain.", parts: oaParts, schemaName: "photo_observation", schema: props({ visible_damage: { type: "boolean" }, description: { type: "string" }, quantity_text: { type: ["string", "null"] }, confidence: { type: "number" } }), maxOutputTokens: 400 });
-      const d = photoSchema.parse(r.output);
-      if (!d.visible_damage) return null;
-      const c = hintLine(d.description, cands);
-      return { line_id: c?.line_id ?? null, units: c && d.quantity_text ? parseQuantity(d.quantity_text, c.product).units : null, text: d.description, kind: "damaged", source: "photo", confidence: d.confidence };
-    } catch {
-      if (!hasModel()) return null;
-    }
-  }
-  if (!hasModel()) return null;
+  if (!/^image\//.test(u.mime) || offlineRules()) return null;
   try {
-    const { input } = await forcedToolCall<unknown>({
-      system: SYSTEM + "\nDescribe only what is visible. Say if damage is uncertain.",
-      content: blocks(u, null),
-      tool: { name: "record_photo_observation", description: "Record visible damage in this receiving photo.", input_schema: props({ visible_damage: { type: "boolean" }, description: { type: "string" }, quantity_text: { type: ["string", "null"] }, confidence: { type: "number" } }) },
-      maxTokens: 400,
-    });
-    const o = photoSchema.parse(input);
-    if (!o.visible_damage) return null;
-    const c = hintLine(o.description, cands);
-    return { line_id: c?.line_id ?? null, units: c && o.quantity_text ? parseQuantity(o.quantity_text, c.product).units : null, text: o.description, kind: "damaged", source: "photo", confidence: o.confidence };
+    const r = await structured<unknown>({ purpose: "observe_photo", tier: "vision", system: SYSTEM + "\nDescribe only what is visible. Say if damage is uncertain.", parts: modelParts(u, null, null), schemaName: "photo_observation", schema: props({ visible_damage: { type: "boolean" }, description: { type: "string" }, quantity_text: { type: ["string", "null"] }, confidence: { type: "number" } }), maxOutputTokens: 400 });
+    const d = photoSchema.parse(r.output);
+    if (!d.visible_damage) return null;
+    const c = hintLine(d.description, cands);
+    return { line_id: c?.line_id ?? null, units: c && d.quantity_text ? parseQuantity(d.quantity_text, c.product).units : null, text: d.description, kind: "damaged", source: "photo", confidence: d.confidence };
   } catch {
     return null;
   }

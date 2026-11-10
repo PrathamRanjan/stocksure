@@ -62,7 +62,7 @@ export function routes() {
     let p: Person | null = null;
     if (req.body.person_id && config.demoMode) {
       // Demo sign-in picks a person in the visitor's own workspace; there is no shared demo to sign in to.
-      if (!currentWs()) return back(res, "/login", "Start your own demo first: it takes a few seconds and nobody else can see it.", true);
+      if (!currentWs() && !config.demo.baseSignIn) return back(res, "/login", "Start your own demo first: it takes a few seconds and nobody else can see it.", true);
       p = await personById(db, String(req.body.person_id));
       if (!p) return back(res, "/login", "That person isn't in your demo any more (it was reset). Pick again from the list.", true);
     } else if (req.body.key) {

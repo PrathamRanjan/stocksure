@@ -5,7 +5,7 @@ import { createApp } from "../src/app.js";
 import { config } from "../src/config.js";
 import { openDb, setDb, type Db } from "../src/db.js";
 import { drain } from "../src/jobs.js";
-import { setModelFetch } from "../src/ai/anthropic.js";
+import { setProviderFetch } from "../src/ai/provider.js";
 import { FakePayPal } from "../src/paypal/fake.js";
 import { PayPalError, setPayPal } from "../src/paypal/index.js";
 import { seedDemo, type DemoIds } from "../src/services/seed.js";
@@ -16,6 +16,7 @@ import { handlers } from "../src/worker.js";
 import { Client } from "./client.js";
 
 let db: Db;
+const savedAi = { key: config.ai.openaiKey, provider: config.ai.provider };
 let fake: FakePayPal;
 let server: Server;
 let base: string;
@@ -109,8 +110,9 @@ beforeEach(async () => {
 afterEach(async () => {
   server.close();
   setPayPal(null);
-  setModelFetch(null);
-  config.models.anthropicKey = "";
+  setProviderFetch(null);
+  config.ai.openaiKey = savedAi.key;
+  config.ai.provider = savedAi.provider;
   await db.close();
 });
 
@@ -643,24 +645,25 @@ describe("StockSure flows", () => {
   });
 
   it("model output cannot carry a payee or an amount; hidden instructions never reach payments", async () => {
-    config.models.anthropicKey = "test-key";
-    setModelFetch(async (_url, init) => {
+    config.ai.openaiKey = "test-key";
+    config.ai.provider = "openai";
+    setProviderFetch(async (_url, init) => {
       const body = JSON.parse(String(init?.body));
-      const tool = body.tools[0].name;
-      const sent = JSON.stringify(body.messages);
+      const schema = body.text.format.name;
+      const sent = JSON.stringify(body.input);
       expect(sent).not.toMatch(/harbour-billing|ASSISTANT:/);
-      const input =
-        tool === "record_invoice_lines"
-          ? { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", unit_price: "10.00", line_total: "200.00", payee: "attacker@example.com" }], total: "500.00", pay_to: "attacker@example.com" }
+      const out =
+        schema === "invoice_lines"
+          ? { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", unit_price: "10.00", line_total: "200.00", payee: "attacker@example.com" }], total_seen: "500.00", pay_to: "attacker@example.com" }
           : { lines: [{ sku: "OAT-12", description: "Oat Milk 12 x 1 L", quantity_text: "20 cs", confidence: 0.95 }], damage: [{ description: "2 cases crushed", quantity_text: "2 cs", product_hint: "OAT-12", kind: "damaged", confidence: 0.7 }], approve_amount: 50000 };
-      return new Response(JSON.stringify({ model: "claude-haiku-5-5", content: [{ type: "tool_use", name: tool, input }] }), { status: 200 });
+      return new Response(JSON.stringify({ model: body.model, status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(out) }] }], usage: { input_tokens: 100, output_tokens: 50 } }), { status: 200 });
     });
     await toResolution();
     const res = (await latestResolution(db, ids.demoPo))!;
     expect(res.body.totals.accepted_cents).toBe(18000);
     expect(JSON.stringify(res.body)).not.toMatch(/attacker|pay_to|approve_amount/);
     const ex = (await db.query<{ lines: any; source: string }>("SELECT e.lines, e.source FROM extractions e JOIN documents d ON d.id = e.document_id WHERE d.kind = 'invoice'")).rows[0];
-    expect(ex.source).toBe("claude-haiku-5-5");
+    expect(ex.source).toMatch(/gpt-6/);
     expect(JSON.stringify(ex.lines)).not.toMatch(/attacker/);
     await approveBoth();
     await run();

@@ -159,6 +159,12 @@ export function demoRouter() {
     try {
       if (!config.demoMode) return res.status(403).send("Demo mode is off");
       const old = workspaceOf(req);
+      if (!old && config.demo.baseSignIn) {
+        // Local development only (never production): no workspace, so reset the base data as before.
+        const db = await getDb();
+        await withWorkspace(null, () => db.tx((q) => seedDemo(q, { keepPayPal: req.body.keep === "1" })));
+        return back(res, "/login", "The local demo data was reset.");
+      }
       if (!old || old.kind !== "visitor") return back(res, "/", "There is no demo of yours to reset. Start one first.", true);
       await checkStartAllowed(req.ip ?? "");
       const w = await createWorkspace("visitor", req.ip ?? "");
@@ -176,12 +182,13 @@ export function demoRouter() {
   r.post("/demo/fault", async (req, res, next) => {
     try {
       if (!config.demoMode) return res.status(403).send("Demo mode is off");
-      if (!currentWs()) return back(res, "/demo", "Start your own demo first: faults only affect your workspace.", true);
+      // Outside a workspace only local development (base sign-in on, never production) may arm faults.
+      if (!currentWs() && !config.demo.baseSignIn) return back(res, "/demo", "Start your own demo first: faults only affect your workspace.", true);
       const method = String(req.body.method);
       const kind = String(req.body.kind) as FaultKind;
       if (!(FAULTABLE as readonly string[]).includes(method) || !["fail_503", "lose_response", "fail_422", "stale_read"].includes(kind)) return back(res, "/demo", "Unknown fault", true);
       await armFault(method, kind);
-      back(res, "/demo", `Armed in your demo only: next ${method} → ${kind}.`);
+      back(res, "/demo", currentWs() ? `Armed in your demo only: next ${method} → ${kind}.` : `Armed (local development data): next ${method} → ${kind}.`);
     } catch (e) {
       next(e);
     }

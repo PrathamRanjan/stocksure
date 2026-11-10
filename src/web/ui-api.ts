@@ -6,7 +6,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { config } from "../config.js";
 import { getDb, type Queryable } from "../db.js";
-import { hasOpenAI } from "../ai/provider.js";
+import { hasOpenAI, offlineRules } from "../ai/provider.js";
 import { formatUnits } from "../core/units.js";
 import { GtError } from "../lib/util.js";
 import { FAULTABLE } from "../paypal/index.js";
@@ -270,7 +270,7 @@ async function receiveModel(q: Queryable, po: PO) {
     open: po.status === "dispatched" || po.status === "in_review",
     mode: ctx.mode,
     demo: { samples: config.demoMode },
-    reader: hasOpenAI() ? `OpenAI ${config.ai.models.read}` : config.models.anthropicKey ? `Anthropic ${config.models.model}` : "text parser (no model key)",
+    reader: hasOpenAI() ? `OpenAI ${config.ai.models.read}` : offlineRules() ? "text parser (offline test mode)" : "no model configured",
     lines: lines.map((l) => {
       const p = prop.lines.get(l.id)!;
       const o = prevBy.get(l.id);
@@ -330,7 +330,7 @@ export function uiRouter() {
         demo: config.demoMode,
         paypal_env: config.paypal.env,
         paypal_ready: !!(config.paypal.clientId && config.paypal.clientSecret),
-        reader: hasOpenAI() ? `OpenAI ${config.ai.models.read}` : config.models.anthropicKey ? `Anthropic ${config.models.model}` : "text parser",
+        reader: hasOpenAI() ? `OpenAI ${config.ai.models.read}` : offlineRules() ? "text parser (offline test mode)" : "no model configured",
         channels: { telegram: !!config.channels.telegramToken, push: !!(config.channels.vapidPublic && config.channels.vapidPrivate) },
         paypal,
         counts: { needs, approvals },

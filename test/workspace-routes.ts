@@ -1,0 +1,2 @@
+/** Demo-workspace and admin routes, walked in test/workspaces.test.ts rather than the base-data journey. */
+export const WORKSPACE_ROUTES = ["GET /admin/paypal/wallet", "GET /admin/paypal/wallet/return", "GET /admin/workspaces", "GET /api/ui/workspace", "GET /demo/join.svg", "GET /demo/join/:token", "GET /start", "POST /admin/expire", "POST /admin/login", "POST /admin/paypal/wallet/start", "POST /admin/reset-base", "POST /admin/showcase", "POST /demo/start"];

@@ -12,6 +12,7 @@ import { handlers } from "../src/worker.js";
 import { Client } from "./client.js";
 import { serveTracked } from "./journey-coverage.js";
 import { walkFoundation } from "./journey-foundation.js";
+import { WORKSPACE_ROUTES } from "./workspace-routes.js";
 
 // Acceptance journey: the demo scenario end to end over HTTP for buyer owner, receiver and supplier,
 // including two-part delivery, a disputed and revised receipt, a re-planned replacement, an ETA warning,
@@ -243,6 +244,7 @@ describe("StockSure acceptance journey", () => {
     expect((await marco.post("/logout")).status).toBe(302);
 
     expect(srv.failures).toEqual([]);
-    expect(srv.missed()).toEqual([]);
+    // Workspace and admin routes are walked end to end in test/workspaces.test.ts.
+    expect(srv.missed(Object.fromEntries(WORKSPACE_ROUTES.map((r) => [r, "covered by test/workspaces.test.ts"])))).toEqual([]);
   });
 });

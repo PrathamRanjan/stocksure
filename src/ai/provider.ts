@@ -22,7 +22,13 @@ export interface TextPart {
   type: "text";
   text: string;
 }
-export type Part = ImagePart | TextPart;
+export interface FilePart {
+  type: "file";
+  mediaType: "application/pdf";
+  data: Buffer;
+  filename: string;
+}
+export type Part = ImagePart | TextPart | FilePart;
 
 export interface StructuredCall<T> {
   purpose: Purpose;
@@ -158,7 +164,7 @@ export function hashInput(call: { system: string; parts: Part[]; schemaName: str
   h.update(call.system).update("\u0000").update(call.schemaName).update("\u0000");
   for (const p of call.parts) {
     if (p.type === "text") h.update("t:").update(p.text);
-    else h.update("i:").update(createHash("sha256").update(p.data).digest("hex"));
+    else h.update(p.type === "file" ? "f:" : "i:").update(createHash("sha256").update(p.data).digest("hex"));
   }
   return h.digest("hex");
 }
@@ -167,7 +173,9 @@ function toInput(parts: Part[]) {
   return parts.map((p) =>
     p.type === "text"
       ? { type: "input_text", text: p.text }
-      : { type: "input_image", image_url: `data:${p.mediaType};base64,${Buffer.from(p.data).toString("base64")}`, detail: "high" },
+      : p.type === "file"
+        ? { type: "input_file", filename: p.filename, file_data: `data:${p.mediaType};base64,${Buffer.from(p.data).toString("base64")}` }
+        : { type: "input_image", image_url: `data:${p.mediaType};base64,${Buffer.from(p.data).toString("base64")}`, detail: "high" },
   );
 }
 
