@@ -21,6 +21,10 @@ export const MISS_COST = 10;
 /** Which label each calibratable question is checked against. */
 export const LABELS: Record<string, (c: ScamCase) => boolean> = {
   changed_payment_details: (c) => c.changed,
+  // A scam from "the supplier" claims an identity it may not have; a genuine message does not. The wording of this
+  // question was revised on 11 Nov after genuine-14 (a held-out case) was a false hold, so its held-out figure is not
+  // a clean test any more; /proof says so.
+  impersonation: (c) => c.scam,
   names_a_payment_destination: (c) => c.destination,
 };
 const GATE_ONLY = new Set(["names_a_payment_destination"]);

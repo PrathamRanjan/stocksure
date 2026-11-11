@@ -123,6 +123,17 @@ describe("A6.2 never a false all-clear", () => {
     decisionsAnswer((n) => (n === "names_a_payment_destination" ? 0.9 : 0.02));
     expect(await checkMessage("Please pay the usual way.", { contactEmail: SUPPLIER_CONTACT })).toMatchObject({ level: "caution", green: false, advice: ADVICE_DESTINATION });
   });
+  it("a claimed identity or pressure alone is amber; on a message about money it holds", async () => {
+    decisionsAnswer((n) => (n === "impersonation" || n === "urgency_or_secrecy" ? 0.95 : 0.02));
+    const c = await checkMessage("Could you update the delivery contact to Sam? He'll be receiving from now on.", { contactEmail: SUPPLIER_CONTACT });
+    expect(c).toMatchObject({ level: "caution", green: false });
+    expect(c.readers.decisions.level).toBe("caution");
+    expect(c.reasons.join(" ")).toMatch(/doesn't ask for money/);
+    decisionsAnswer((n) => (n === "impersonation" || n === "asks_for_payment" ? 0.95 : 0.02));
+    const m = await checkMessage("It's Mia, the director. Please pay the supplier today.", { contactEmail: SUPPLIER_CONTACT });
+    expect(m.readers.decisions.level).toBe("hold");
+    expect(m.level).toBe("hold");
+  });
   it("when Decisions does not answer, nothing is marked safe", async () => {
     setProviderFetch((async () => new Response("down", { status: 400 })) as typeof fetch);
     const c = await checkMessage("The delivery is running late.", { contactEmail: SUPPLIER_CONTACT });

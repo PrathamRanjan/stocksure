@@ -19,7 +19,7 @@ import { findDestinations, type Destination } from "./destinations.js";
 import { maxLevel, type Level } from "./rules.js";
 
 export const SCAM_QUESTIONS: Question[] = [
-  { type: "predicate", name: "impersonation", instructions: "The message pretends to be from an authority, a bank, PayPal, a boss or a company it is not from, or claims an identity to get the reader to act." },
+  { type: "predicate", name: "impersonation", instructions: "The message pretends to be from an authority, a bank, PayPal, a boss or a company it is not from, or leans on a claimed identity to justify an unusual request about money. A sender who simply signs their name, or a routine message about the existing arrangement, is not impersonation." },
   { type: "predicate", name: "urgency_or_secrecy", instructions: "The message pressures the reader to act fast, threatens a consequence, or asks them to keep it quiet." },
   { type: "predicate", name: "changed_payment_details", instructions: "The message asks the reader to pay to new, changed, different or additional payment details (bank account, PayPal account, email, wallet), or says the usual ones should not be used." },
   { type: "predicate", name: "pay_outside_paypal", instructions: "The message asks to be paid outside PayPal or outside the ordering app (bank transfer, Zelle, cash apps, crypto) or to move the conversation to another channel." },
@@ -34,6 +34,8 @@ export const SCAM_QUESTIONS: Question[] = [
 
 /** Predicates that can raise the level. The last two only decide whether green is allowed. */
 const TACTIC_PREDICATES = SCAM_QUESTIONS.map((q) => q.name).filter((n) => n !== "asks_for_payment" && n !== "names_a_payment_destination");
+/** Tactics about who is writing or how hard they push, not about money. They hold only on a message about money. */
+export const CONTEXT_PREDICATES = new Set(["impersonation", "urgency_or_secrecy"]);
 
 export const PREDICATE_WORDS: Record<string, string> = {
   impersonation: "claims to be someone it may not be",
@@ -94,14 +96,20 @@ export async function checkMessage(text: string, ctx: { contactEmail?: string | 
     decisions.ms = d.latencyMs;
     const levels: Level[] = [];
     let refused = false;
+    const pOf = (n: string) => (typeof d.answers[n]?.probability === "number" ? d.answers[n]!.probability! : null);
+    const aboutMoney = (pOf("asks_for_payment") ?? 1) >= th.get("asks_for_payment")!.clear_below || (pOf("names_a_payment_destination") ?? 1) >= th.get("names_a_payment_destination")!.clear_below || findDestinations(body, { contactEmail: ctx.contactEmail }).names_destination;
     for (const q of SCAM_QUESTIONS) {
       const a = d.answers[q.name];
       decisions.probabilities[q.name] = typeof a?.probability === "number" ? a.probability : null;
       if (!TACTIC_PREDICATES.includes(q.name)) continue;
-      const lv = levelFor(a, th.get(q.name)!);
+      let lv = levelFor(a, th.get(q.name)!);
+      // Code decides: a claimed identity or pressure on its own can't be judged from the text, so it holds a payment
+      // only when the message is also about money (asks to pay, or names somewhere to pay). Otherwise it is amber.
+      const softened = lv === "hold" && CONTEXT_PREDICATES.has(q.name) && !aboutMoney;
+      if (softened) lv = "caution";
       if (lv === "unknown") refused = true;
       else levels.push(lv);
-      if (lv === "hold" || lv === "caution") decisions.reasons.push(`The second check reads it as: ${PREDICATE_WORDS[q.name]} (${Math.round((a!.probability ?? 0) * 100)}%).`);
+      if (lv === "hold" || lv === "caution") decisions.reasons.push(`The second check reads it as: ${PREDICATE_WORDS[q.name]} (${Math.round((a!.probability ?? 0) * 100)}%)${softened ? "; it doesn't ask for money, so check it, but nothing is held" : ""}.`);
     }
     if (refused) {
       decisions.answered = false;

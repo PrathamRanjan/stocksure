@@ -63,7 +63,11 @@ describe("agent loop", () => {
       { text: "A guess with no source.", cites: [], linked: false },
     ]);
     const steps = (await db.query<any>("SELECT tool, actor, args FROM agent_trace WHERE run_id = $1 ORDER BY step", [r.run_id])).rows;
-    expect(steps.map((s) => s.tool)).toEqual(["paypal_mcp.connect", "spendable", "payment_ops", "answer"]);
+    // The unlinked sentence was sent back once; the model sent the same answer, so it stays marked "not linked".
+    expect(steps.map((s) => s.tool)).toEqual(["paypal_mcp.connect", "spendable", "payment_ops", "answer", "answer.check_links"]);
+    expect(steps[4].args).toMatchObject({ unlinked: 1 });
+    expect(bodies[2].tool_choice).toBe("none");
+    expect(bodies[2].input.at(-1).content[0].text).toMatch(/A guess with no source/);
     expect(steps[1].args.cite_as).toBe("t1");
     // The second request carries the tool outputs back, tagged with their citation ids.
     const outputs = bodies[1].input.filter((x: any) => x.type === "function_call_output");
@@ -76,6 +80,20 @@ describe("agent loop", () => {
     const q = (await db.query<any>("SELECT status, cost_usd FROM agent_questions WHERE id = $1", [r.id])).rows[0];
     expect(q.status).toBe("done");
     expect(Number(q.cost_usd)).toBeGreaterThan(0);
+  });
+
+  it("an unlinked sentence is sent back once and the repaired answer is kept only when it links more", async () => {
+    const number = (await db.query<{ number: string }>("SELECT number FROM purchase_orders WHERE id = $1", [ids.demoPo])).rows[0].number;
+    script([
+      { calls: [{ name: "spendable", args: { po: number } }] },
+      { answer: { sentences: [{ text: "Nothing is held yet.", cites: ["t1"] }, { text: "Hope that helps!", cites: [] }], could_not_answer: null } },
+      { answer: { sentences: [{ text: "Nothing is held yet.", cites: ["t1"] }], could_not_answer: null } },
+    ]);
+    const r = await ask(jordan, "Why can't I spend the $20 yet?");
+    expect(r.sentences).toEqual([{ text: "Nothing is held yet.", cites: ["t1"], linked: true }]);
+    const last = (await db.query<any>("SELECT tool, result FROM agent_trace WHERE run_id = $1 ORDER BY step DESC LIMIT 1", [r.run_id])).rows[0];
+    expect(last.tool).toBe("answer.check_links");
+    expect(last.result).toMatchObject({ resent: true, unlinked_after: 0, kept: "repaired answer" });
   });
 
   it("a draft message is recorded, not sent", async () => {

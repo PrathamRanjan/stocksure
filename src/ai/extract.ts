@@ -169,7 +169,8 @@ function propose(sku: string | null, description: string, qtyText: string, cands
   let units: number | null = null;
   let confidence = baseConfidence - confidenceHit;
   if (!cand || score < 0.6) {
-    flags.push(cand ? "identity_uncertain" : "not_on_po");
+    // Too weak a match to put on an order line: it is not on the PO either way, and says so in red.
+    flags.push(...(cand ? (["identity_uncertain", "not_on_po"] as LineFlag[]) : (["not_on_po"] as LineFlag[])));
     confidence -= 0.3;
     if (cand) notes.push(`Possibly ${cand.product.sku} ${cand.product.name} (match ${Math.round(score * 100)}%)`);
   } else if (score < 1) {

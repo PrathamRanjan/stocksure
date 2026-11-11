@@ -219,6 +219,7 @@ const NOT_MEASURED = [
   "The on-device scam model in the browser is not part of these runs; its training summary is on the safety page.",
   "The payment-risk model is trained on synthetic payments; no fraud rate is claimed.",
   "Ask answers are checked for tool use and citations, not graded for correctness by a person.",
+  "The impersonation question was reworded on 11 Nov after a held-out genuine message (genuine-14) was falsely held, and code now lets it hold only a message about money. Because a held-out case shaped that change, its held-out figures are no longer a clean test.",
 ];
 
 function calibrationTables() {

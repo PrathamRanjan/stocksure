@@ -1,15 +1,15 @@
 {
-  "generated": "2026-11-11T01:20:21.786Z",
+  "generated": "2026-11-11T13:44:58.278Z",
   "runs": [
     {
-      "id": "prf_mj6vaucire347rcv",
+      "id": "prf_oxjxgqi5zxpiftuw",
       "suite": "scam",
       "models": "read gpt-6.1-sol (backup gpt-6-sol); decide gpt-6-luna; agent gpt-6.1-sol",
       "cases": 66,
-      "passed": 65,
-      "cost_usd": 0.012586899999999984,
+      "passed": 66,
+      "cost_usd": 0.012758500000000061,
       "trigger": "script",
-      "at": "2026-11-11T01:19:05.523Z",
+      "at": "2026-11-11T13:43:22.830Z",
       "results": [
         {
           "id": "ten-nov",
@@ -668,17 +668,15 @@
           "split": "tune",
           "input": "Hi Jordan, the delivery is running 30 minutes late today, sorry! Driver is on the way.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (43%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -687,17 +685,15 @@
           "split": "held_out",
           "input": "Your order PO-1042 has been dispatched. 20 cases of oat milk, arriving about 9am.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (57%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -723,17 +719,15 @@
           "split": "held_out",
           "input": "Reminder: invoice INV-2291 is due Friday. Pay through StockSure as usual.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (53%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -742,17 +736,15 @@
           "split": "tune",
           "input": "We've updated our delivery schedule: drops are now Tuesdays and Fridays.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (55%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -795,17 +787,15 @@
           "split": "held_out",
           "input": "Hi Jordan, two cartons of cups were crushed in transit; we'll send replacements with Thursday's delivery.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (46%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -831,17 +821,15 @@
           "split": "held_out",
           "input": "Can you confirm the counts for today's delivery? Sam signed for 18 good, 2 damaged.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (30%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -850,17 +838,15 @@
           "split": "tune",
           "input": "We moved our warehouse to 12 Dock Road. Nothing changes for your deliveries.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (33%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -903,25 +889,6 @@
           "split": "held_out",
           "input": "Our payment details haven't changed. Please keep paying through PayPal in StockSure as always.",
           "expected": "not held",
-          "actual": "held",
-          "pass": false,
-          "state": "run",
-          "detail": {
-            "rules": "clear",
-            "decisions": "hold",
-            "destinations": "clear",
-            "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (89%)."
-            ]
-          }
-        },
-        {
-          "id": "genuine-15",
-          "group": "genuine",
-          "split": "tune",
-          "input": "Invoice INV-2295 is attached for last week's delivery; the total matches the agreed quote.",
-          "expected": "not held",
           "actual": "amber",
           "pass": true,
           "state": "run",
@@ -931,8 +898,25 @@
             "destinations": "clear",
             "names_destination": false,
             "reasons": [
-              "The second check reads it as: claims to be someone it may not be (44%)."
+              "The second check reads it as: claims to be someone it may not be (35%)."
             ]
+          }
+        },
+        {
+          "id": "genuine-15",
+          "group": "genuine",
+          "split": "tune",
+          "input": "Invoice INV-2295 is attached for last week's delivery; the total matches the agreed quote.",
+          "expected": "not held",
+          "actual": "green",
+          "pass": true,
+          "state": "run",
+          "detail": {
+            "rules": "clear",
+            "decisions": "clear",
+            "destinations": "clear",
+            "names_destination": false,
+            "reasons": []
           }
         },
         {
@@ -950,7 +934,7 @@
             "destinations": "clear",
             "names_destination": false,
             "reasons": [
-              "The second check reads it as: claims to be someone it may not be (67%)."
+              "The second check reads it as: claims to be someone it may not be (64%); it doesn't ask for money, so check it, but nothing is held."
             ]
           }
         },
@@ -1028,17 +1012,15 @@
           "split": "tune",
           "input": "Your monthly statement is ready in StockSure. No action needed.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (77%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -1047,17 +1029,15 @@
           "split": "held_out",
           "input": "We're switching to recyclable cartons next month, same price and pack size.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (43%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -1075,7 +1055,7 @@
             "destinations": "clear",
             "names_destination": false,
             "reasons": [
-              "The second check reads it as: claims to be someone it may not be (66%)."
+              "The second check reads it as: claims to be someone it may not be (81%); it doesn't ask for money, so check it, but nothing is held."
             ]
           }
         },
@@ -1085,17 +1065,15 @@
           "split": "held_out",
           "input": "Ana here, I've updated the quote: cups are now 50 per sleeve, not 40.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (33%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -1104,17 +1082,15 @@
           "split": "tune",
           "input": "Pay the invoice in StockSure when the counts are agreed, there's no rush.",
           "expected": "not held",
-          "actual": "amber",
+          "actual": "green",
           "pass": true,
           "state": "run",
           "detail": {
             "rules": "clear",
-            "decisions": "caution",
+            "decisions": "clear",
             "destinations": "clear",
             "names_destination": false,
-            "reasons": [
-              "The second check reads it as: claims to be someone it may not be (37%)."
-            ]
+            "reasons": []
           }
         },
         {
@@ -1134,7 +1110,7 @@
             "reasons": [
               "The message pushes you to act fast or keep it quiet.",
               "The message asks for gift cards or crypto.",
-              "The second check reads it as: claims to be someone it may not be (96%)."
+              "The second check reads it as: claims to be someone it may not be (98%)."
             ]
           }
         },
@@ -1218,7 +1194,7 @@
             "reasons": [
               "The message asks for a one-time code, password or card number. Nobody legitimate needs those.",
               "The message asks for a code or sends a link to click.",
-              "The second check reads it as: claims to be someone it may not be (100%)."
+              "The second check reads it as: claims to be someone it may not be (100%); it doesn't ask for money, so check it, but nothing is held."
             ]
           }
         },
@@ -1238,7 +1214,7 @@
             "names_destination": false,
             "reasons": [
               "The message asks to pay outside PayPal or move the chat elsewhere.",
-              "The second check reads it as: claims to be someone it may not be (87%).",
+              "The second check reads it as: claims to be someone it may not be (91%).",
               "The second check reads it as: asks you to pay to new or changed details (100%)."
             ]
           }
@@ -1260,7 +1236,7 @@
             "reasons": [
               "The message asks for a fee to release money or goods.",
               "The message promises a prize or guaranteed profit.",
-              "The second check reads it as: claims to be someone it may not be (93%)."
+              "The second check reads it as: claims to be someone it may not be (95%)."
             ]
           }
         },
@@ -1330,14 +1306,14 @@
       ]
     },
     {
-      "id": "prf_coit4bimrtn49jvk",
+      "id": "prf_66fi5giuq5p3kfsp",
       "suite": "receiving",
       "models": "read gpt-6.1-sol (backup gpt-6-sol); decide gpt-6-luna; agent gpt-6.1-sol",
       "cases": 27,
-      "passed": 26,
-      "cost_usd": 0.03413000000000001,
+      "passed": 27,
+      "cost_usd": 0.0341800000000001,
       "trigger": "script",
-      "at": "2026-11-11T01:20:04.822Z",
+      "at": "2026-11-11T13:44:30.132Z",
       "results": [
         {
           "id": "clean-1",
@@ -1810,8 +1786,8 @@
           "group": "trap-invented",
           "input": "HARBOUR WHOLESALE  DELIVERY NOTE\nPO SS-1006   Deliver to: Laneway Café\n\nSKU        Description                        Qty\nOAT-12     Oat Milk 12 x 1 L                  20 cs\nOAT-12X    Oat Milk 12 x 1 L (premium)        5 cs\n\nReceived by: ____________   Driver: M. Tan",
           "expected": "trap flagged",
-          "actual": "invented line reached a count",
-          "pass": false,
+          "actual": "invented line kept off the PO",
+          "pass": true,
           "state": "run",
           "detail": {
             "source": "gpt-6.1-sol",
@@ -1870,14 +1846,14 @@
       ]
     },
     {
-      "id": "prf_n4zydzgsrnupr8de",
+      "id": "prf_odgvfofpv2gx6uv4",
       "suite": "regression",
       "models": "read gpt-6.1-sol (backup gpt-6-sol); decide gpt-6-luna; agent gpt-6.1-sol",
       "cases": 4,
       "passed": 4,
-      "cost_usd": 0.01902460000000003,
+      "cost_usd": 0.03220919999999999,
       "trigger": "script",
-      "at": "2026-11-11T01:20:21.785Z",
+      "at": "2026-11-11T13:44:58.277Z",
       "results": [
         {
           "id": "ten-nov-message",
@@ -1892,7 +1868,7 @@
               "It names a free-mail address; this supplier is on file at harbourwholesale.example: harbourwholesale.accounts@outlook.com.",
               "The message itself asks you to pay to new account details.",
               "The message asks you to pay to new bank or PayPal details.",
-              "The second check reads it as: claims to be someone it may not be (95%)."
+              "The second check reads it as: claims to be someone it may not be (91%)."
             ],
             "destinations": [
               {
@@ -1941,7 +1917,7 @@
           "group": "ask",
           "input": "Why can't I spend the $20 yet?",
           "expected": "answered from read-backs, at least 2 tool calls, sentences linked to them",
-          "actual": "2 tool calls (list_orders, spendable); 2 of 2 sentences linked. \"The latest PayPal read-back shows the $20 has now been released, so it is no longer waiting to become spendable. StockSure currently records $116 as spendable under your limit for order SS-1006, with nothing waiting on PayPal.\"",
+          "actual": "4 tool calls (list_orders, spendable, payment_ops, paypal_get_order); 3 of 3 sentences linked. \"The latest records show you can now spend the $20: it is marked released, with nothing still waiting on PayPal. StockSure shows $116 spendable now under your limit, including that release and $110 in refunds. I also checked PayPal order 6HN53495RA243730E directly: PayPal itself confirms the $100 and $10 refunds are completed.\"",
           "pass": true,
           "state": "run",
           "detail": {

@@ -44,7 +44,7 @@ Rules:
 - You cannot move money, change an order, or send a message. If asked, say what the person can do in StockSure. You may draft a message to the supplier with propose_message_to_supplier when asked; it is not sent.
 - Money becomes spendable only after PayPal's read-back confirms it. An expected release is not spendable yet.
 - When asked about PayPal ids, charges, holds or refunds and the paypal_ tools are offered, confirm at least one id with PayPal's own read tool (for example paypal_get_order with an order id from payment_ops) and say which figures came from PayPal itself.
-- Answer in 1 to 6 short sentences. If the records cannot answer, say what is missing in could_not_answer.`;
+- Answer in 1 to 6 short sentences. Every sentence cites at least one tool call id; leave out any sentence (a greeting, a summary, an offer to help) that rests on no tool result. If the records cannot answer, say what is missing in could_not_answer.`;
 
 export interface AskResult {
   id: string;
@@ -181,10 +181,36 @@ export async function runQuestion(p: Person, id: string): Promise<AskResult> {
     }
     if (!answer) throw new Error(`no answer within ${config.ai.agentMaxSteps} steps`);
     const ids = new Set(calls.map((c) => c.id));
-    result.sentences = (answer.sentences ?? []).map((s: any) => {
-      const cites = (s.cites ?? []).filter((c: string) => ids.has(c));
-      return { text: String(s.text ?? ""), cites, linked: cites.length > 0 };
-    });
+    const link = (a: any) =>
+      (a.sentences ?? []).map((s: any) => {
+        const cites = (s.cites ?? []).filter((c: string) => ids.has(c));
+        return { text: String(s.text ?? ""), cites, linked: cites.length > 0 };
+      });
+    result.sentences = link(answer);
+    // One repair turn: a sentence that cites nothing that ran is sent back once with the valid ids. Whatever comes
+    // back is checked again the same way; a sentence still unlinked stays marked "not linked to a fact".
+    const unlinked = result.sentences.filter((s) => !s.linked);
+    if (unlinked.length && calls.length && Date.now() - started < config.ai.agentMaxMs - 8000) {
+      const t3 = Date.now();
+      input.push({ role: "user", content: [{ type: "input_text", text: `These sentences cite no tool call that ran: ${JSON.stringify(unlinked.map((s) => s.text))}. The tool call ids that ran are ${[...ids].join(", ")}. Send the whole answer again: give every sentence the ids its figures come from, and remove any sentence that rests on no tool result. Do not add new facts.` }] });
+      try {
+        const data = await respond({ model: config.ai.models.agent, instructions: SYSTEM, input, tools, tool_choice: "none", text: format, reasoning: { effort: "low" }, store: false, include: ["reasoning.encrypted_content"], max_output_tokens: 3000 });
+        const tin = data.usage?.input_tokens ?? 0;
+        const tout = data.usage?.output_tokens ?? 0;
+        const cost = estimateCost(data.model ?? config.ai.models.agent, tin, tout);
+        result.cost_usd += cost;
+        await audit({ purpose: "agent", model: data.model ?? config.ai.models.agent, via: "primary", inputHash: id, outputHash: "", tokensIn: tin, tokensOut: tout, costUsd: cost, latencyMs: Date.now() - t3, ok: true, error: null, output: { turn: "repair", items: (data.output ?? []).map((o: any) => o.type) }, runId: row.run_id });
+        const text = (data.output ?? []).find((o: any) => o.type === "message")?.content?.find((c: any) => c.type === "output_text")?.text;
+        const fixed = text ? JSON.parse(text) : null;
+        const relinked = fixed ? link(fixed) : [];
+        const better = relinked.length > 0 && relinked.filter((s: any) => !s.linked).length < unlinked.length;
+        if (better) answer = fixed;
+        await run.step({ actor: "code", tool: "answer.check_links", args: { unlinked: unlinked.length }, gate: "n/a", result: { resent: true, unlinked_after: better ? relinked.filter((s: any) => !s.linked).length : unlinked.length, kept: better ? "repaired answer" : "first answer" }, duration_ms: Date.now() - t3 });
+        if (better) result.sentences = relinked;
+      } catch (e) {
+        await run.step({ actor: "code", tool: "answer.check_links", args: { unlinked: unlinked.length }, gate: "n/a", result: { resent: false, error: (e as Error).message.slice(0, 200) }, duration_ms: Date.now() - t3 });
+      }
+    }
     result.could_not_answer = answer.could_not_answer ?? null;
     result.status = "done";
     await tick(db, "ai_asked");
