@@ -386,7 +386,8 @@ export function DocsPanel({ m }: { m: PoModel }) {
 /* ---------------- Messages with the scam check ---------------- */
 export function Messages({ m, reload }: { m: PoModel; reload: () => void }) {
   const { run, busy } = useAction(reload);
-  const [body, setBody] = useState("");
+  // The judge page links here with ?say= to prefill a message; the person still presses Send.
+  const [body, setBody] = useState(() => new URLSearchParams(location.search).get("say")?.slice(0, 2000) ?? "");
   const [line, setLine] = useState("");
   return (
     <Panel label="msg-title" id="messages">
@@ -405,10 +406,16 @@ export function Messages({ m, reload }: { m: PoModel; reload: () => void }) {
                 </p>
                 <p className="mt-1 whitespace-pre-wrap break-words">{x.body}</p>
                 {x.scan && (
-                  <p className={cn("mt-2 flex gap-2 rounded-md px-3 py-2 text-sm", x.scan.level === "high" ? "bg-stop-soft" : "bg-held-soft")} role="note">
+                  <div className={cn("mt-2 flex gap-2 rounded-md px-3 py-2 text-sm", x.scan.level === "hold" ? "bg-stop-soft" : "bg-held-soft")} role="note">
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span><span className="font-semibold">Scam check:</span> this reads like a common payment scam ({x.scan.words.slice(0, 4).join(", ")}). Bank details can't change here; check by calling a number you already have.</span>
-                  </p>
+                    <div>
+                      <p><span className="font-semibold">{x.scan.level === "hold" ? "Scam check: don't pay on this." : "Scam check: check first."}</span> {x.scan.advice ?? "This reads like a common payment scam. Bank details can't change here; check by calling a number you already have."}</p>
+                      {x.scan.words.length > 0 && <ul className="mt-1 list-disc pl-5">{x.scan.words.slice(0, 3).map((w, i) => <li key={i}>{w}</li>)}</ul>}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {x.scan.readers ? `Rules: ${x.scan.readers.rules} · Decisions: ${x.scan.readers.decisions} · Destinations in code: ${x.scan.readers.code}` : "Rules only; this message has not had the full check."}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </li>
             );

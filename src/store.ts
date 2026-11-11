@@ -1,3 +1,4 @@
+import { EVENT_KEYS, tick } from "./demo/checklist.js";
 import type { Queryable } from "./db.js";
 import { funding, type FundOp } from "./core/funding.js";
 import type { UnitSpec } from "./core/units.js";
@@ -246,10 +247,15 @@ export async function fundingOf(q: Queryable, rootId: string) {
 
 export async function logEvent(q: Queryable, po: Pick<PO, "id" | "root_id"> | null, type: string, summary: string, data: unknown = null, actor = "system") {
   await q.query("INSERT INTO events (po_id, root_id, type, summary, data, actor) VALUES ($1,$2,$3,$4,$5,$6)", [po?.id ?? null, po?.root_id ?? null, type, summary, data === null ? null : JSON.stringify(data), actor]);
+  // Spec A3.1: the judge page's steps tick themselves from these events.
+  const key = EVENT_KEYS[type];
+  if (key) await tick(q, key);
+  if (type === "paypal.hold" && po && po.id !== po.root_id) await tick(q, "replacement_held");
 }
 
 export async function postMessage(q: Queryable, poId: string, lineId: string | null, author: string, role: string, body: string, kind: "message" | "system" = "message", documentId: string | null = null) {
-  await q.query("INSERT INTO messages (po_id, po_line_id, author, author_role, body, kind, document_id) VALUES ($1,$2,$3,$4,$5,$6,$7)", [poId, lineId, author, role, body.slice(0, 4000), kind, documentId]);
+  const r = await q.query<{ id: number }>("INSERT INTO messages (po_id, po_line_id, author, author_role, body, kind, document_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id", [poId, lineId, author, role, body.slice(0, 4000), kind, documentId]);
+  return Number(r.rows[0]?.id);
 }
 
 export async function setPo(q: Queryable, id: string, fields: Record<string, unknown>) {

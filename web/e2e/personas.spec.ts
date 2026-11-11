@@ -51,7 +51,7 @@ test("each persona's home and order pages pass axe and fit a 360 px screen", asy
 test("public pages, empty and error states", async ({ browser }) => {
   const ctx = await quietContext(browser, { viewport: { width: 360, height: 780 } });
   const p = await ctx.newPage();
-  for (const path of ["/", "/login", "/demo", "/no-such-page"]) {
+  for (const path of ["/", "/login", "/demo", "/judge", "/proof", "/ai", "/paypal", "/who-can-move-money", "/accessibility", "/agents", "/no-such-page"]) {
     await p.goto(path);
     await p.waitForLoadState("networkidle");
     await noHorizontalScroll(p);

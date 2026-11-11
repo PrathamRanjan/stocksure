@@ -24,7 +24,14 @@ const Performance = lazy(() => import("@/pages/Performance"));
 const Demo = lazy(() => import("@/pages/Demo"));
 const Start = lazy(() => import("@/pages/Start"));
 const Judge = lazy(() => import("@/pages/Judge"));
+const Ask = lazy(() => import("@/pages/Ask"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const Proof = lazy(() => import("@/pages/Public").then((m) => ({ default: m.Proof })));
+const AiCalls = lazy(() => import("@/pages/Public").then((m) => ({ default: m.AiCalls })));
+const PayPalApis = lazy(() => import("@/pages/Public").then((m) => ({ default: m.PayPalApis })));
+const WhoCanMoveMoney = lazy(() => import("@/pages/Public").then((m) => ({ default: m.WhoCanMoveMoney })));
+const Accessibility = lazy(() => import("@/pages/Public").then((m) => ({ default: m.Accessibility })));
+const Agents = lazy(() => import("@/pages/Public").then((m) => ({ default: m.Agents })));
 
 declare global {
   interface Window {
@@ -94,8 +101,15 @@ function App() {
         <Route path="/stock" element={<Authed><Stock /></Authed>} />
         <Route path="/catalog" element={<Authed><Catalog /></Authed>} />
         <Route path="/performance" element={<Authed><Performance /></Authed>} />
+        <Route path="/ask" element={<Authed><Ask /></Authed>} />
         <Route path="/demo" element={<Lazy><Demo /></Lazy>} />
         <Route path="/judge" element={<Lazy><Judge /></Lazy>} />
+        <Route path="/proof" element={<Lazy><Proof /></Lazy>} />
+        <Route path="/ai" element={<Lazy><AiCalls /></Lazy>} />
+        <Route path="/paypal" element={<Lazy><PayPalApis /></Lazy>} />
+        <Route path="/who-can-move-money" element={<Lazy><WhoCanMoveMoney /></Lazy>} />
+        <Route path="/accessibility" element={<Lazy><Accessibility /></Lazy>} />
+        <Route path="/agents" element={<Lazy><Agents /></Lazy>} />
         <Route path="*" element={<Lazy><NotFound /></Lazy>} />
       </Routes>
     </>

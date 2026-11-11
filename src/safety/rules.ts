@@ -9,11 +9,27 @@ export const TACTICS = ["impersonation", "urgency_secrecy", "changed_details", "
 export type Tactic = (typeof TACTICS)[number];
 
 const SEEDS: Record<Tactic, RegExp> = {
-  changed_details: /\b(new|updated?|changed?)\b.{0,40}\b(bank|account|acct|iban|beneficiary|payout|payment details|paypal (email|address|account)|upi id)\b|\b(bank|account) (details|number) (has|have) changed/i,
+  // Spec A6.3: new/updated/changed/different/switched/moved + bank(s)/account/details/PayPal/remittance/IBAN/
+  // beneficiary within 60 characters, in either order; "old one is being closed"; "use this account instead".
+  // The 10 Nov message ("we've moved banks … send this month's payment to our new PayPal") is the case that slipped.
+  changed_details: new RegExp(
+    [
+      String.raw`\b(new|updated?|changed?|changing|different|other|another|alternative|switch(ed|ing)?|mov(ed|ing)|migrat(ed|ing)|replac(ed|ing))\b[^.!?\n]{0,60}?\b(banks?(?! holiday)|banking|accounts?(?!\s+(manager|rep|representative|executive|team|holder name))|acct|(bank|payment|account|remittance|paypal|banking|transfer|wire) details|paypal|remittance|iban|beneficiary|bsb|sort code|routing number|payout|upi id)\b`,
+      String.raw`\b(banks?(?! holiday)|banking|bank account|account details|payment details|bank details|paypal|remittance|iban|beneficiary|payout)\b[^.!?\n]{0,60}?\b(new|updated|changed|different|switched|moved|replaced)\b`,
+      String.raw`\bno longer (using|use|accept(ing)?)\b[^.!?\n]{0,30}\b(paypal|account|bank)`,
+      String.raw`\b(paypal|account|bank)\b[^.!?\n]{0,30}\b(being closed|is closing|will close|closed down)\b`,
+      String.raw`\b(don'?t|do not|please don'?t) (use|pay) (the|our) (usual |old )?(paypal|account|bank)`,
+      String.raw`\b(old|previous|current|usual|existing) (one|account|bank|paypal|details)\b[^.!?\n]{0,40}\b(clos(ed|ing)|being closed|no longer|shut|frozen|under review|deactivated)\b`,
+      String.raw`\b(use|pay (to|into)|send (it|payment|the payment|funds)? ?(to|into)|remit to|transfer to)\b[^.!?\n]{0,40}\b(this|the following|below|attached)\b[^.!?\n]{0,20}\b(account|details|paypal|email)\b`,
+      String.raw`\b(account|details|paypal)\b[^.!?\n]{0,30}\binstead\b`,
+      String.raw`\b(bank|account) (details|number) (has|have) changed`,
+    ].join("|"),
+    "i",
+  ),
   off_platform: /\b(whatsapp|telegram|signal|outside (of )?(paypal|the app|platform)|pay (me )?directly|bank transfer instead|cash ?app|zelle|western union|moneygram)\b/i,
   gift_cards_crypto: /\b(gift ?cards?|itunes|google play card|steam card|bitcoin|btc|usdt|crypto|wallet address)\b/i,
   fee_to_release: /\b(processing|release|clearance|delivery|customs|handling|admin|unlock|activation) fee\b|pay .{0,20}\bto (release|claim|unlock|receive)\b/i,
-  otp_or_link: /\b(otp|one[- ]time (code|password)|verification code|passcode|pin)\b|https?:\/\/|\bclick (here|the link|below)\b|\bbit\.ly\b|\btinyurl\b/i,
+  otp_or_link: /\b(otp|one[- ]time (code|password)|verification code|passcode|pin|\d-digit code)\b|\bthe code\b.{0,30}\b(texted|sent|sms)\b|https?:\/\/|\bclick (here|the link|below)\b|\bbit\.ly\b|\btinyurl\b/i,
   overpay_refund: /\b(over ?pa(id|yment)|sent (you )?too much|refund (the|me the) (difference|extra|excess)|paid extra by mistake)\b/i,
   too_good: /\b(congratulations|you (have )?won|winner|lottery|prize|jackpot|guaranteed (returns?|profit)|double your|free (money|gift|iphone)|100% (profit|return))\b/i,
   impersonation: /\b(officer|police|cbi|irs|hmrc|iras|cpf|dbs|ocbc|uob|paypal (security|team|support)|customs|court|arrest warrant|your (bank|account) (team|officer)|microsoft support|amazon security|from (the )?(government|ministry)|(ceo|director|managing director|finance (head|director)) (here|asked|needs))\b/i,
@@ -34,7 +50,14 @@ export const TACTIC_WORDS: Record<Tactic, string> = {
 };
 
 /** A one-time code, password or card number mentioned anywhere is a hard stop (§4.1 last bullet). */
-const SECRET_RE = /\b(otp|one[- ]time (code|password)|verification code|password|passcode|cvv|card number|full card)\b/i;
+const SECRET_RE = /\b(otp|one[- ]time (code|password)|verification code|password|passcode|cvv|card number|full card|\d-digit code)\b/i;
+/** "Our payment details haven't changed" is the opposite of a change: a match with a negation in it does not count. */
+const NEGATED = /\b(not|never|no|haven'?t|hasn'?t|isn'?t|aren'?t|won'?t|don'?t|didn'?t)\b|n't\b/i;
+function changedDetails(t: string): boolean {
+  const g = new RegExp(SEEDS.changed_details.source, "gi");
+  for (const m of t.matchAll(g)) if (!NEGATED.test(m[0]) || /\b(don'?t|do not) (use|pay)\b/i.test(m[0]) || /\bno longer\b/i.test(m[0])) return true;
+  return false;
+}
 
 export interface TextScan {
   tactics: Record<Tactic, boolean>;
@@ -51,7 +74,7 @@ const TACTIC_FEATURE: Record<Tactic, string> = { impersonation: "t_impersonation
 
 export function scanText(text: string | null | undefined): TextScan {
   const t = (text ?? "").slice(0, 4000);
-  const tactics = Object.fromEntries(TACTICS.map((k) => [k, SEEDS[k].test(t)])) as Record<Tactic, boolean>;
+  const tactics = Object.fromEntries(TACTICS.map((k) => [k, k === "changed_details" ? changedDetails(t) : SEEDS[k].test(t)])) as Record<Tactic, boolean>;
   const fired = TACTICS.filter((k) => tactics[k]);
   // Feature names match guard-lab/scripts/train_risk.py (the exported forest's vocabulary), not the tactic ids.
   const features = Object.fromEntries(TACTICS.map((k) => [TACTIC_FEATURE[k], tactics[k] ? 1 : 0]));

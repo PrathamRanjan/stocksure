@@ -18,7 +18,7 @@
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "sandbox:check": "tsx --env-file-if-exists=.env scripts/sandbox-check.ts",
     "eval:three-arm": "tsx --env-file-if-exists=.env scripts/eval-three-arm.ts",
-    "eval:arena": "tsx --env-file-if-exists=.env scripts/eval-arena.ts",
+    "eval:arena": "tsx --env-file-if-exists=.env scripts/eval-arena.ts", "eval:proof": "tsx --env-file-if-exists=.env scripts/proof.ts",
     "agent:demo": "tsx --env-file-if-exists=.env scripts/agent-demo.ts",
     "build:web": "npm --prefix web ci --include=dev --no-audit --no-fund && npm --prefix web run build",
     "dev:web": "npm --prefix web run dev",

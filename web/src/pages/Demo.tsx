@@ -9,7 +9,6 @@ import { useAction } from "@/lib/useAction";
 import { Button } from "@/components/ui/button";
 import { PublicShell } from "@/components/public-shell";
 import { ErrorBlock, LoadingBlock, SectionTitle, Spinner, Stamp, StatusStamp } from "@/components/brand";
-import { startTour } from "@/tour/tours";
 
 interface DemoData {
   demo: boolean;
@@ -53,7 +52,7 @@ export default function Demo() {
       <h1 className="text-4xl">Demo controls</h1>
       <p className="mt-2 text-muted-foreground">Everything here is the sandbox. {d.scope === "showcase" ? "The figures below come from the read-only sample demo until you start your own." : "The figures below are read from your demo's order, not typed in."}</p>
       <div className="mt-5 flex flex-wrap gap-2">
-        <Button size="lg" onClick={() => startTour("judge")}><BookOpenCheck aria-hidden="true" /> Start the guided tour</Button>
+        <Button asChild size="lg"><Link to="/judge"><BookOpenCheck aria-hidden="true" /> Judge paths</Link></Button>
         {mine || local ? <Button asChild size="lg" variant="outline"><Link to="/login">Choose a person</Link></Button> : <Button asChild size="lg" variant="outline"><Link to="/start">Start your own demo</Link></Button>}
       </div>
 

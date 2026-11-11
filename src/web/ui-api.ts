@@ -24,6 +24,7 @@ import { demoIds } from "../services/seed.js";
 import { negotiationsFor } from "../agents/runtime.js";
 import { runsFor } from "../trace.js";
 import { scanText } from "../safety/rules.js";
+import type { MessageCheck } from "../safety/check.js";
 import { catalog, docsOf, fundingOf, getPo, latestReceipt, latestResolution, linesOf, opsOfRoot, orgById, poFor, treeOf, type Person, type PO, type PoLine, type Product } from "../store.js";
 import { me } from "./auth.js";
 
@@ -238,8 +239,13 @@ async function poModel(q: Queryable, po: PO, p: Person) {
     docs,
     ops,
     messages: msgs.map((m) => {
+      // Spec A6: supplier messages carry the stored three-reader check; anything else shows the rules, labelled so.
+      const c = (typeof m.scam_check === "string" ? JSON.parse(m.scam_check) : m.scam_check) as MessageCheck | null;
       const s = scanText(m.body);
-      return { id: m.id, line_id: m.po_line_id ?? null, author: m.author, role: m.author_role, kind: m.kind, body: m.body, document_id: m.document_id, created_at: m.created_at, scan: s.level === "clear" ? null : { level: s.level, words: s.words } };
+      const scan = c?.version === 2
+        ? c.green ? null : { level: c.level, words: c.reasons.slice(0, 3), advice: c.advice, readers: { rules: c.readers.rules.level, decisions: c.readers.decisions.answered ? c.readers.decisions.level : "didn't answer", code: c.readers.code.level }, source: "three readers" }
+        : s.level === "clear" ? null : { level: s.level, words: s.words, advice: null, readers: null, source: "rules only" };
+      return { id: m.id, line_id: m.po_line_id ?? null, author: m.author, role: m.author_role, kind: m.kind, body: m.body, document_id: m.document_id, created_at: m.created_at, scan };
     }),
     can_post: po.status !== "closed",
     // A replacement that stopped fitting (stock or price moved) is re-planned by the owner; the accepted goods stay charged.

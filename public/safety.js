@@ -37,19 +37,27 @@ form?.addEventListener("submit", async (e) => {
     const g = await guard(); const t0 = performance.now(); model = await g.score(t); ms = performance.now() - t0;
   } catch (err) { modelErr = err.message; }
   btn.disabled = false; status.textContent = "";
-  // The text model alone, below its hold line, with no tactic it is sure of and no rule fired, is a weak signal: show clear with a note.
-  const modelOnly = model?.level === "caution" && (!rules?.level || rules.level === "clear") && !Object.values(model?.tactics ?? {}).some((p) => p >= 0.5);
-  const level = [rules?.level, model?.level].includes("hold") ? "hold" : modelOnly ? "clear" : [rules?.level, model?.level].includes("caution") ? "caution" : "clear";
-  const [cls, title] = LEVEL[level];
-  const tactics = new Set([...(rules?.tactics ?? []), ...Object.entries(model?.tactics ?? {}).filter(([, p]) => p >= 0.5).map(([k]) => k)]);
-  const top = Object.entries(model?.tactics ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
-  out.innerHTML = `<div class="banner ${cls}" role="status"><b>${title}</b></div>
+  // Spec A6.1/A6.2: strictest of the server's readers (rules, Decisions, destinations in code) and this device's model.
+  // Green only when every reader answered clear and the message names no payment destination.
+  const server = rules && !rules.error ? rules : null;
+  const lv = [server?.level ?? "caution", model?.level ?? "caution"];
+  const level = lv.includes("hold") ? "hold" : lv.includes("caution") ? "caution" : "clear";
+  const green = level === "clear" && !!server?.green && !!model;
+  const shown = green ? "clear" : level === "clear" ? "caution" : level;
+  const [cls, title] = LEVEL[shown];
+  const advice = server?.advice || (!model ? "The on-device check didn't run, so this isn't marked safe." : !server ? "The server checks didn't answer, so this isn't marked safe." : "");
+  const r = server?.readers;
+  const pct = (p) => (typeof p === "number" ? Math.round(p * 100) + "%" : "—");
+  const card = (label, value, hint) => `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="hint">${hint}</div></div>`;
+  const tactics = new Set([...(server?.tactics ?? []), ...Object.entries(model?.tactics ?? {}).filter(([, p]) => p >= 0.5).map(([k]) => k)]);
+  out.innerHTML = `<div class="banner ${cls}" role="status"><b>${title}</b>${advice ? ` ${esc(advice)}` : ""}</div>
   <div class="stat-grid">
-    <div class="kpi"><div class="label">Text model (this browser)</div><div class="value">${model ? Math.round(model.p_scam * 100) + "%" : "—"}</div><div class="hint">${model ? `scam probability · ${ms.toFixed(0)} ms · level ${model.level}` : esc(modelErr || "not run")}</div></div>
-    <div class="kpi"><div class="label">Rules (server)</div><div class="value">${rules?.level ? esc(rules.level) : "—"}</div><div class="hint">${rules?.reasons?.length ? esc(rules.reasons.length + " reason" + (rules.reasons.length > 1 ? "s" : "")) : esc(rules?.error || "no rule fired")}</div></div>
-    <div class="kpi"><div class="label">Risk model</div><div class="value">${rules?.risk !== undefined ? Math.round(rules.risk * 100) + "%" : "—"}</div><div class="hint">synthetic training data</div></div>
+    ${card("On this device", model ? pct(model.p_scam) : "—", model ? `text model · ${ms.toFixed(0)} ms · ${model.level} · nothing left your browser` : esc(modelErr || "not run"))}
+    ${card("Rules (server)", r ? esc(r.rules.level) : "—", r ? `${r.rules.reasons.length} reason${r.rules.reasons.length === 1 ? "" : "s"} · risk ${pct(r.rules.risk)} (synthetic data)` : esc(rules?.error || rules?.message || "not run"))}
+    ${card("Decisions (OpenAI)", r ? (r.decisions.answered ? esc(r.decisions.level) : "didn't answer") : "—", r?.decisions.answered ? `${esc(r.decisions.model || "")} · ${r.decisions.ms} ms · changed details ${pct(r.decisions.probabilities.changed_payment_details)} · names a destination ${pct(r.decisions.probabilities.names_a_payment_destination)}` : "not marked safe without it")}
+    ${card("Destinations (code)", r ? esc(r.code.level) : "—", r ? (r.code.destinations.filter((d) => !d.on_file).length ? esc(r.code.destinations.filter((d) => !d.on_file).map((d) => d.value).join(", ")) : `none named${server?.contact_on_file ? ` · on file: ${esc(server.contact_on_file)}` : ""}`) : "")}
   </div>
-  ${tactics.size || top.length ? `<h3>What this message does</h3><ul>${[...tactics].map((k) => `<li>${esc(WORDS[k] || k)}</li>`).join("")}${top.filter(([k]) => !tactics.has(k) && k in WORDS).map(([k, p]) => `<li class="muted">${esc(WORDS[k])} (model ${Math.round(p * 100)}%)</li>`).join("")}</ul>` : ""}
-  ${rules?.reasons?.length ? `<h3>Why</h3><ul>${rules.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
-  <p class="small muted">What to do: pay only to details you confirmed by phone with a number you already had. Never share codes. If in doubt, put the payment on hold and ask a second person. ${modelOnly ? `The text model was a little unsure (${Math.round(model.p_scam * 100)}%) but found no scam tactic, and no rule fired, so this is not flagged. ` : ""}${level === "clear" ? "A clear result is not a guarantee: the model catches about three quarters of scams at this setting." : ""}</p>`;
+  ${tactics.size ? `<h3>What this message does</h3><ul>${[...tactics].map((k) => `<li>${esc(WORDS[k] || k)}</li>`).join("")}</ul>` : ""}
+  ${server?.reasons?.length ? `<h3>Why</h3><ul>${server.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+  <p class="small muted">What to do: pay only to details you confirmed by phone with a number you already had. Never share codes. ${shown === "clear" ? "A clear result is not a guarantee." : ""}</p>`;
 });

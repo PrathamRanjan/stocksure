@@ -1,3 +1,4 @@
+import { ensureChecked } from "../safety/check.js";
 import { getDb, type Queryable } from "../db.js";
 import { extractDelivery, observePhoto, PHOTO_FAILED, type DamageHint, type DeliveryExtraction } from "../ai/extract.js";
 import { AI_FAILED_MESSAGE } from "../ai/provider.js";
@@ -234,7 +235,9 @@ export async function postLineMessage(person: Person, poId: string, lineId: stri
   const db = await getDb();
   const po = await poFor(db, person, poId);
   if (lineId && !(await linesOf(db, po.id)).some((l) => l.id === lineId)) throw new GtError("Line not found", "not_found", 404);
-  await postMessage(db, po.id, lineId, who(person), person.role, body.trim());
+  const id = await postMessage(db, po.id, lineId, who(person), person.role, body.trim());
+  // Spec A6.6: a supplier's message is checked as it arrives, so the owner sees the result on the thread.
+  if (person.role === "supplier") await ensureChecked(db, { id, po_id: po.id, body: body.trim() });
 }
 
 /** When every line of the latest receipt is agreed, the resolution is generated (or the clean order settles). */

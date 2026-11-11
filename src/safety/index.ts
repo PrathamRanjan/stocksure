@@ -13,6 +13,7 @@ import { getDb } from "../db.js";
 import { putSetting, setting } from "../store.js";
 import { maxLevel, payeeRules, scanText, TACTIC_WORDS, type Level, type RuleResult, type Tactic } from "./rules.js";
 import { riskLevel, riskScore } from "./risk.js";
+import { checkSupplierMessages } from "./check.js";
 
 export interface Assessment {
   level: Level;
@@ -28,7 +29,8 @@ export async function assessSettlement(poId: string, action: string, cents: numb
   const db = q ?? (await getDb());
   const po = (await db.query<any>("SELECT id, buyer_id, supplier_id, spend_limit_cents FROM purchase_orders WHERE id = $1", [poId])).rows[0];
   if (!po) return { level: "clear", rule: null, reasons: [], risk: 0, tactics: [], summary: "no order found; nothing to check" };
-  const supplierText = (await db.query<{ body: string }>("SELECT body FROM messages WHERE po_id = $1 AND author_role = 'supplier' ORDER BY created_at DESC LIMIT 20", [poId])).rows.map((r) => r.body).join("\n");
+  // Spec A6: every supplier message on the order gets the three-reader check (stored on the message, run once).
+  const checks = await checkSupplierMessages(db, poId);
   const invoiced = (await db.query<{ s: string }>("SELECT coalesce(sum(il.line_cents),0) AS s FROM invoice_lines il JOIN documents d ON d.id = il.document_id WHERE d.po_id = $1 AND d.kind = 'invoice'", [poId])).rows[0]?.s ?? "0";
   const flagged = (await db.query<{ n: string }>("SELECT count(*) AS n FROM extractions e JOIN documents d ON d.id = e.document_id WHERE d.po_id = $1 AND jsonb_array_length(e.flags) > 0", [poId])).rows[0]?.n ?? "0";
   const history = (await db.query<{ c: string }>("SELECT amount_cents AS c FROM payment_ops o JOIN purchase_orders p ON p.id = o.po_id WHERE p.buyer_id = $1 AND p.supplier_id = $2 AND o.kind = 'capture' AND o.status = 'succeeded'", [po.buyer_id, po.supplier_id])).rows.map((r) => Number(r.c));
@@ -43,17 +45,26 @@ export async function assessSettlement(poId: string, action: string, cents: numb
     velocity24hSumRatio: 1,
     requestChannelUntrusted: false,
     hourLocal: 12,
-    text: supplierText || null,
+    text: null,
   });
   const out = combine(res);
   out.reasons = out.reasons.map((r) => r.replace("this payee's usual payment", "the usual settlement with this supplier"));
   // Amount against the buyer's own history is a caution: the capture amount is code-derived from accepted quantities.
   if (out.level === "hold" && out.rule === "amount_vs_history") out.level = "caution";
-  // A supplier message that asks to be paid elsewhere, or to new details, holds settlement until the owner has read it.
-  if (res.scan.fired.includes("changed_details") || res.scan.fired.includes("off_platform")) {
+  // A supplier message that holds on any reader (rules, Decisions, or a payment destination not on file) holds
+  // settlement until the owner has read it. Amber messages are listed as reasons.
+  const held = checks.find((c) => c.check.level === "hold");
+  const tactics = new Set(out.tactics);
+  for (const c of checks) for (const t of c.check.readers.rules.tactics) tactics.add(t as Tactic);
+  out.tactics = [...tactics];
+  if (held) {
+    const r = held.check.readers;
     out.level = "hold";
-    out.rule = res.scan.fired.includes("changed_details") ? "supplier_details_changed_in_message" : "supplier_asks_off_platform";
-    out.reasons.unshift(`A supplier message on this order ${TACTIC_WORDS[res.scan.fired.includes("changed_details") ? "changed_details" : "off_platform"]}. StockSure pays only through PayPal under the agreed order; read the thread before settling.`);
+    out.rule = r.rules.tactics.includes("changed_details") ? "supplier_details_changed_in_message" : r.rules.tactics.includes("off_platform") ? "supplier_asks_off_platform" : r.code.level === "hold" ? "supplier_message_destination" : r.rules.level === "hold" ? "supplier_message_rules" : "supplier_message_decisions";
+    out.reasons.unshift(`A supplier message on this order was held by the scam check: ${held.check.reasons[0] ?? "it asks you to pay somewhere else"} StockSure pays only through PayPal under the agreed order; read the thread before settling.`);
+  } else {
+    const amber = checks.find((c) => c.check.level === "caution");
+    if (amber) out.reasons.push(`A supplier message on this order is amber: ${amber.check.advice}`);
   }
   const inv = Number(invoiced);
   if (inv > 0 && cents > 0 && inv > cents * 1.1) {

@@ -11,6 +11,23 @@ StockSure is a shared receiving and resolution workspace for a wholesaler and th
 
 Spec: https://claude.ai/artifact/MLTy7wTFHfEFKDuVjhk85W
 
+## For judges: try it in 60 seconds
+
+1. Open **https://pph-stocksure.onrender.com/judge** and press **Start your own demo**. You get a private demo in under a minute (35 s when last measured), with real PayPal sandbox holds already placed from a saved sandbox wallet. No PayPal login is needed.
+2. Pick a path. Each step has a button that signs you in as the right person (Sam, Ana or Jordan) and opens the exact screen. The tick appears when the server records that the step happened.
+    - **A short delivery, paid for exactly** (about 3 minutes): count, agree, approve the fix, then watch PayPal capture what arrived and release the rest.
+    - **Catch a bank-change scam** (about 1 minute): post the 10 Nov review's "we've moved banks" message as Ana, then check it as Jordan. Three readers check it on the server and one more runs in the browser. Nothing can show green for a message that names somewhere to pay.
+    - **Ask the AI, and watch it work** (about 1 minute): every tool call shows on the AI work rail as it runs. The answer's sentences link to the calls they rest on. No tool can move money.
+3. Pages that need no sign-in:
+    - [`/proof`](https://pph-stocksure.onrender.com/proof): every evaluation case, with pass or fail, date and model ids
+    - [`/ai`](https://pph-stocksure.onrender.com/ai): recent model calls
+    - [`/paypal`](https://pph-stocksure.onrender.com/paypal): every PayPal API used, with live ids
+    - [`/who-can-move-money`](https://pph-stocksure.onrender.com/who-can-move-money)
+    - [`/accessibility`](https://pph-stocksure.onrender.com/accessibility)
+    - [`/agents`](https://pph-stocksure.onrender.com/agents): connect your own assistant over MCP
+
+There is no dedicated judge buyer login yet; the paths above cover every PayPal step without one. The landing page also has a scam check that runs entirely in your browser.
+
 ## The scenario
 
 Laneway Café orders 20 cases of oat milk at $10 a case, with a $210 spending limit. Barista Oat and a mill-direct oat milk are approved as substitutes.

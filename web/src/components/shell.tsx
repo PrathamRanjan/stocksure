@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import {
-  BadgeCheck, BookOpenCheck, Boxes, CalendarClock, ChartNoAxesColumn, ClipboardList, Contrast, FileWarning, Gauge, Handshake, LogOut, Menu, MessageSquare, Moon,
+  BadgeCheck, BookOpenCheck, Bot, Boxes, CalendarClock, ChartNoAxesColumn, ClipboardList, Contrast, FileWarning, Gauge, Handshake, LogOut, Menu, MessageSquare, Moon,
   PackageCheck, Search, ShieldCheck, Sun, Table2, Truck, UserRound, UsersRound, WifiOff, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ export function navFor(who: Who | null, counts: { needs: number; approvals: numb
         { to: "/home", label: "Orders", icon: ClipboardList, badge: counts.needs, tour: "nav-orders" },
         { to: "/catalog", label: "Catalog", icon: Boxes },
         { to: "/performance", label: "Performance", icon: ChartNoAxesColumn },
+        { to: "/ask", label: "Ask", icon: Bot },
         { to: "/deliveries", label: "Deliveries", icon: CalendarClock, server: true },
       ],
       tools: [
@@ -62,6 +63,7 @@ export function navFor(who: Who | null, counts: { needs: number; approvals: numb
       { to: "/approvals", label: "Approvals", icon: BadgeCheck, badge: counts.approvals, tour: "nav-approvals" },
       { to: "/stock", label: "Stock", icon: PackageCheck },
       { to: "/performance", label: "Record", icon: ChartNoAxesColumn },
+      { to: "/ask", label: "Ask", icon: Bot, tour: "nav-ask" },
     ],
     tools: [
       { to: "/guard", label: "Spending rules", icon: Gauge, server: true },
@@ -129,9 +131,9 @@ export function DemoRibbon() {
         </span>
         <span className="text-muted-foreground sm:hidden">Sandbox · no real money</span>
         <span className="ml-auto flex items-center gap-3">
-          <button type="button" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8" onClick={() => startTour("judge")} data-tour="take-tour">
-            Take the tour
-          </button>
+          <Link to="/judge" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8" data-tour="take-tour">
+            Judge paths
+          </Link>
           <Link to="/demo" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8">
             Reset & setup
           </Link>
@@ -215,8 +217,11 @@ function Palette({ open, setOpen, items }: { open: boolean; setOpen: (b: boolean
               <n.icon aria-hidden="true" /> {n.label}
             </CommandItem>
           ))}
-          <CommandItem value="Take the guided tour" onSelect={() => { setOpen(false); startTour("judge"); }}>
-            <BookOpenCheck aria-hidden="true" /> Take the guided tour
+          <CommandItem value="Tour this page" onSelect={() => { setOpen(false); setTimeout(startTour, 50); }}>
+            <BookOpenCheck aria-hidden="true" /> Tour this page
+          </CommandItem>
+          <CommandItem value="Judge paths" onSelect={() => { setOpen(false); nav("/judge"); }}>
+            <BookOpenCheck aria-hidden="true" /> Judge paths
           </CommandItem>
         </CommandGroup>
       </CommandList>
@@ -282,7 +287,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Logo className="text-lg" />
               </Link>
               <div className="ml-auto flex items-center gap-1">
-                <Button variant="ghost" size="sm" className="hidden lg:inline-flex" onClick={() => startTour("product")} data-tour="tour-btn">
+                <Button variant="ghost" size="sm" className="hidden lg:inline-flex" onClick={() => startTour()} data-tour="tour-btn">
                   <BookOpenCheck aria-hidden="true" /> Take the tour
                 </Button>
                 <DisplayButton />
@@ -325,7 +330,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </SheetHeader>
           <nav aria-label="More" className="flex flex-col gap-0.5 px-4 pb-6">
             {[...main.slice(4), ...tools].map((n) => <NavEntry key={n.to} n={n} onClick={() => setSheet(false)} />)}
-            <button type="button" className="flex min-h-11 items-center gap-3 rounded-md px-3 font-semibold hover:bg-accent" onClick={() => { setSheet(false); startTour("product"); }}>
+            <button type="button" className="flex min-h-11 items-center gap-3 rounded-md px-3 font-semibold hover:bg-accent" onClick={() => { setSheet(false); setTimeout(startTour, 300); }}>
               <BookOpenCheck className="size-[18px]" aria-hidden="true" /> Take the tour
             </button>
           </nav>

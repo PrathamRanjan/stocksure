@@ -1,0 +1,428 @@
+{
+  "question": "changed_payment_details",
+  "threshold": {
+    "name": "changed_payment_details",
+    "clear_below": 0.25,
+    "hold_above": 0.5,
+    "calibrated_on": "scam-cases tune half (33 cases), 2026-11-11",
+    "n": 33,
+    "precision_at_hold": 0.9444444444444444,
+    "recall_at_hold": 1
+  },
+  "tune": {
+    "n": 33,
+    "positives": 17
+  },
+  "held_out": {
+    "n": 33,
+    "positives": 17,
+    "tp": 17,
+    "fp": 1,
+    "fn": 0,
+    "tn": 15,
+    "precision": 0.9444444444444444,
+    "recall": 1,
+    "clear_recall": 1
+  },
+  "rows": [
+    {
+      "id": "ten-nov",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-1",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-2",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-3",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-4",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-5",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-6",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-7",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-8",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-9",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-10",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-11",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-12",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-13",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-14",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-15",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-16",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-17",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-18",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-19",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-20",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-21",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-22",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-23",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-24",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-25",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-26",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-27",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-28",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-29",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "bank-change-30",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "genuine-1",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-2",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-3",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-4",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-5",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-6",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-7",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-8",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-9",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-10",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-11",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-12",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-13",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-14",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-15",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-16",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-17",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-18",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-19",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-20",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-21",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-22",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-23",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-24",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "genuine-25",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "other-1",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "other-2",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "other-3",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "other-4",
+      "split": "held_out",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "other-5",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "other-6",
+      "split": "held_out",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "other-7",
+      "split": "tune",
+      "label": false,
+      "p": 0
+    },
+    {
+      "id": "other-8",
+      "split": "held_out",
+      "label": false,
+      "p": 0.89
+    },
+    {
+      "id": "other-9",
+      "split": "tune",
+      "label": true,
+      "p": 1
+    },
+    {
+      "id": "other-10",
+      "split": "held_out",
+      "label": false,
+      "p": 0.01
+    }
+  ],
+  "model": "gpt-6-luna",
+  "cost_usd": 0.0125869,
+  "at": "2026-11-11T00:49:48.501Z"
+}

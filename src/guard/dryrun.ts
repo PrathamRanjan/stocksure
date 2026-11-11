@@ -4,6 +4,7 @@
  * moves at or above the owner's threshold are held for approval (a click, or a passkey countersign over the exact
  * payload hash above SS_COUNTERSIGN_ABOVE_CENTS).
  */
+import { tick } from "../demo/checklist.js";
 import { fmt } from "../core/money.js";
 import { createHash } from "node:crypto";
 import { assessSettlement } from "../safety/index.js";
@@ -122,6 +123,7 @@ export async function dryRun(m: MoneyMove, run?: Run | null, q?: Queryable): Pro
     if (!existing) await db.query("INSERT INTO approvals (id, owner_id, action, payload_hash, payload) VALUES ($1,$2,$3,$4,$5)", [approvalId, m.ownerId, m.action, hash, JSON.stringify(payload)]);
     await run?.step({ actor: "guard", tool: `dry_run:${m.action}`, args: payload, gate: "held", result: { approval_id: approvalId, checks } });
     if (!existing) {
+      if (safetyHold) await tick(db, "scam_held");
       await appendAudit("money.held", m.entity, m.entityId, { ...payload, approval_id: approvalId }, db);
       const big = m.cents > config.guard.countersignAboveCents;
       await notifyParty("buyer", m.ownerId, `StockSure wants to ${m.action} ${fmt(m.cents)} on ${m.entity} ${m.entityId}. ${safetyHold ? `The scam check paused it: ${safety!.reasons[0]}` : "It is at or above your approval threshold."}${big ? ` Above ${fmt(config.guard.countersignAboveCents)} it needs your passkey in the guard console.` : ""}`, big ? [{ id: `decline:${approvalId}`, label: "Decline" }] : [{ id: `approve:${approvalId}`, label: "Approve" }, { id: `decline:${approvalId}`, label: "Decline" }], "approval", approvalId, db).catch(() => undefined);

@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 
-export type Purpose = "extract_delivery" | "extract_invoice" | "observe_photo" | "compile_policy" | "negotiate" | "classify" | "owner_question" | "eval";
+export type Purpose = "extract_delivery" | "extract_invoice" | "observe_photo" | "compile_policy" | "negotiate" | "classify" | "owner_question" | "eval" | "agent";
 
 export interface ImagePart {
   type: "image";
@@ -75,6 +75,9 @@ let fetchImpl: typeof fetch = (i, init) => fetch(i, init);
 export function setProviderFetch(f: typeof fetch | null) {
   fetchImpl = f ?? ((i, init) => fetch(i, init));
 }
+
+/** The fetch every model call goes through (Decisions and the agent loop use it too, so tests intercept all of them). */
+export const providerFetch = (): typeof fetch => fetchImpl;
 
 export const hasOpenAI = () => config.ai.provider === "openai" && Boolean(config.ai.openaiKey);
 /**
@@ -247,7 +250,7 @@ async function openaiStructured(model: string, call: StructuredCall<unknown>, sc
   }
 }
 
-async function audit(row: {
+export async function audit(row: {
   purpose: string;
   model: string;
   via: string;

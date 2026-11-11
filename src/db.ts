@@ -674,6 +674,25 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS reservation_cents INTEGER;
 -- Spec A2.1 / 0.2.4: where a buyer's saved PayPal came from, and which rows are samples rather than real PayPal activity.
 ALTER TABLE orgs ADD COLUMN IF NOT EXISTS vault_source TEXT;
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS is_sample BOOLEAN NOT NULL DEFAULT false;
+-- Spec A6.1 step 3: the supplier's contact on file, so a payment destination named in a message can be compared.
+ALTER TABLE orgs ADD COLUMN IF NOT EXISTS contact_email TEXT;
+-- Spec A6: the stored result of the three-reader scam check on a message (rules, Decisions, destinations in code).
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS scam_check JSONB;
+-- Spec A5.3: an owner's question to the agent, with its answer; the steps are agent_trace rows of the same run.
+CREATE TABLE IF NOT EXISTS agent_questions (
+  id TEXT PRIMARY KEY,
+  person_id TEXT NOT NULL,
+  org_id TEXT NOT NULL,
+  question TEXT NOT NULL,
+  run_id TEXT,
+  status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running','done','failed','refused')),
+  answer JSONB,
+  error TEXT,
+  cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS agent_questions_org ON agent_questions(org_id, created_at DESC);
 `;
 
 /** Tables shared by every workspace. They live in the base schema only. */
@@ -724,6 +743,31 @@ CREATE TABLE IF NOT EXISTS paypal_refs (
   kind TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Spec A5.2: thresholds for Decisions questions live in data, set by scripts/calibrate.ts, never by the model.
+CREATE TABLE IF NOT EXISTS decision_thresholds (
+  name TEXT PRIMARY KEY,
+  clear_below DOUBLE PRECISION NOT NULL,
+  hold_above DOUBLE PRECISION NOT NULL,
+  calibrated_on TEXT,
+  n INTEGER NOT NULL DEFAULT 0,
+  precision_at_hold DOUBLE PRECISION,
+  recall_at_hold DOUBLE PRECISION,
+  set_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Spec A5.6: published evaluation results, one row per case per run, read by /proof from every workspace.
+CREATE TABLE IF NOT EXISTS proof_runs (
+  id TEXT PRIMARY KEY,
+  suite TEXT NOT NULL,
+  split TEXT NOT NULL DEFAULT 'held_out',
+  models TEXT NOT NULL DEFAULT '',
+  cases INTEGER NOT NULL DEFAULT 0,
+  passed INTEGER NOT NULL DEFAULT 0,
+  cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  trigger TEXT NOT NULL DEFAULT 'manual',
+  results JSONB NOT NULL DEFAULT '[]',
+  at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS proof_runs_suite ON proof_runs(suite, at DESC);
 -- Spec A2.1: the saved sandbox buyer wallet every demo workspace pays from. One row.
 CREATE TABLE IF NOT EXISTS demo_wallet (
   id TEXT PRIMARY KEY DEFAULT 'main',

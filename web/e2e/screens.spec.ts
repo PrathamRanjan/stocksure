@@ -33,16 +33,16 @@ test("screenshots", async ({ browser }) => {
 
   for (const c of combos) {
     const vp = { width: c.w, height: c.h };
-    // Signed out: landing, sign-in, the judge tour's first step, the demo page.
+    // Signed out: landing, sign-in, the judge page, the demo page.
     const ctx = await quietContext(browser, { viewport: vp, theme: c.t });
     const p = await ctx.newPage();
     await p.goto("/");
     await shot(p, "01-landing", c.w, c.t, c.w === 1440 && c.t === "light");
     await p.goto("/login");
     await shot(p, "02-sign-in", c.w, c.t);
-    await p.goto("/?tour=judge");
-    await expect(p.locator(".driver-popover")).toBeVisible();
-    await shot(p, "08-judge-tour", c.w, c.t);
+    await p.goto("/judge");
+    await expect(p.getByRole("heading", { name: "For judges" })).toBeVisible();
+    await shot(p, "08-judge", c.w, c.t);
     await ctx.close();
     // Sam counting the delivery.
     const sam = await as(browser, "Sam", { viewport: vp, theme: c.t });

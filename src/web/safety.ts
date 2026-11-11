@@ -4,10 +4,13 @@
  * open orders with their scan, see the holds the safety layer created and why, and switch protected mode on so every
  * capture and refund waits for the owner.
  */
+import { TEN_NOV } from "../eval/scam-cases.js";
 import { Router, type Request, type Response } from "express";
 import { getDb } from "../db.js";
 import { GtError } from "../lib/util.js";
 import { assessMessage, protectedMode, safetyHolds, setProtectedMode } from "../safety/index.js";
+import { checkMessage, type MessageCheck } from "../safety/check.js";
+import { tick } from "../demo/checklist.js";
 import { scanText, TACTIC_WORDS, TACTICS } from "../safety/rules.js";
 import type { Person } from "../store.js";
 import { me, whoOf } from "./auth.js";
@@ -25,6 +28,16 @@ async function needOwner(req: Request, res: Response): Promise<Person | null> {
   }
   if (p.org_kind !== "buyer" || p.role !== "owner") throw new GtError("Scam and fraud protection is the buyer owner's page.", "forbidden", 403);
   return p;
+}
+
+/** Each scan makes one model call: 20 a minute per address keeps a pasted loop from spending the key (spec C3). */
+const SCANS = new Map<string, number[]>();
+function limitScans(ip: string) {
+  const now = Date.now();
+  const hits = (SCANS.get(ip) ?? []).filter((t) => now - t < 60_000);
+  if (hits.length >= 20) throw new GtError("That's a lot of checks in a minute. Wait a moment and try again.", "rate_limited", 429);
+  hits.push(now);
+  SCANS.set(ip, hits);
 }
 
 export function safetyRouter() {
@@ -47,11 +60,11 @@ export function safetyRouter() {
 <li><b>Documents.</b> Instruction-like lines in delivery notes and invoices are removed before reading and counted here.</li></ul></div>
 <div class="card" id="protected"><h3>Protected mode ${prot.on ? pill("paid") : pill("void")}</h3><p class="small muted">Every capture and refund waits for you, holds are explained calmly with no timers, and a trusted contact is told about every hold.</p>
 <form method="post" action="/safety/protected" class="stack"><label for="pc1">Trusted contact (Telegram chat id, optional)</label><input id="pc1" name="contact1" value="${prot.contacts[0] ?? ""}" placeholder="telegram:123456789"><label for="pc2">Second contact</label><input id="pc2" name="contact2" value="${prot.contacts[1] ?? ""}"><button class="btn primary" type="submit" name="on" value="${prot.on ? "0" : "1"}">${prot.on ? "Turn protected mode off" : "Turn protected mode on"}</button></form></div></div>
-<div class="card" id="check"><h3>Check a message or invoice text</h3><p class="small muted">Paste a supplier email, a thread message or the text of an invoice. The model scores it on this device; the words never leave your browser for the score.</p>
+<div class="card" id="check"><h3>Check a message or invoice text</h3><p class="small muted">Paste a supplier email, a thread message or the text of an invoice. A small model scores it in your browser; the text is also sent to StockSure for the rules, the payment-destination check and OpenAI Decisions. Only a fingerprint of the text is logged.</p>
 <form id="scan-form" class="stack"><label for="scan-text" class="sr">Text to check</label><textarea id="scan-text" name="text" rows="6" placeholder="Paste the text here" style="width:100%"></textarea>
 <div class="row"><button class="btn primary" type="submit" id="scan-btn">Check this text</button><button class="btn" type="button" id="scan-demo">Paste the demo scam</button><span class="small muted" id="scan-status" aria-live="polite"></span></div></form>
-<div id="scan-result" aria-live="polite"></div>${jsonBlock("demo-bec", { text: DEMO_SUPPLIER_CHANGE })}</div>
-<div class="card" id="messages"><h3>Supplier messages on your orders</h3>${msgs.length ? html`<ul class="feed">${msgs.map((m) => { const s = scanText(m.body); return html`<li>${s.level !== "clear" ? html`<div class="banner ${s.level === "hold" ? "bad" : "warn"}" role="alert"><b>Scam check:</b> this message ${s.words.join(", and ")}.</div>` : ""}<span class="small muted">${m.number} · ${m.author} · ${fmtDate(m.created_at)}</span><br>${m.body}</li>`; })}</ul>` : html`<p class="muted">No supplier messages yet.</p>`}</div>
+<div id="scan-result" aria-live="polite"></div>${jsonBlock("demo-bec", { text: TEN_NOV })}</div>
+<div class="card" id="messages"><h3>Supplier messages on your orders</h3>${msgs.length ? html`<ul class="feed">${msgs.map((m) => { const c = (typeof m.scam_check === "string" ? JSON.parse(m.scam_check) : m.scam_check) as MessageCheck | null; const s = scanText(m.body); const lv = c?.version === 2 ? c.level : s.level; const words = c?.version === 2 ? c.reasons.slice(0, 2).join(" ") : `this message ${s.words.join(", and ")} (rules only; not yet fully checked).`; return html`<li>${lv !== "clear" ? html`<div class="banner ${lv === "hold" ? "bad" : "warn"}" role="alert"><b>Scam check:</b> ${words} ${c?.advice ?? ""}</div>` : ""}<span class="small muted">${m.number} · ${m.author} · ${fmtDate(m.created_at)}</span><br>${m.body}</li>`; })}</ul>` : html`<p class="muted">No supplier messages yet.</p>`}</div>
 <div class="card" id="holds"><h3>Holds the safety layer created</h3>${holds.length ? html`<ul class="feed">${holds.map((h) => html`<li><b>${h.action} $${(Number(h.payload.cents ?? 0) / 100).toFixed(2)}</b> ${pill(h.status)}${h.payload.safety_reasons?.length ? html`<details class="small"><summary>Why we paused this</summary><ul>${h.payload.safety_reasons.map((x: string) => html`<li>${x}</li>`)}</ul></details>` : ""}</li>`)}</ul>` : html`<p class="muted">None yet.</p>`}</div>
 <div class="card" id="a11y"><h3>Accessibility</h3><p class="small muted">Text size, contrast, a clearer font, read-aloud, voice input, plain words, bigger buttons and more time: open <button class="btn small" type="button" data-a11y-open>Display and help</button> on any page. Choices stay on this device.</p></div>`));
   }));
@@ -72,10 +85,17 @@ export function safetyRouter() {
 <div class="card"><h3>Tactics the model names</h3><ul>${TACTICS.map((t) => html`<li><b>${t.replace(/_/g, " ")}</b>: ${TACTIC_WORDS[t]}</li>`)}</ul></div>`));
   }));
 
+  // Spec A6.1: rules, Decisions and the destination check on the server; the page adds the on-device model.
   r.post("/safety/scan", json(async (req) => {
     const text = String(req.body?.text ?? "").slice(0, 4000);
     if (!text.trim()) throw new GtError("Paste a message first.", "bad_request", 400);
-    return assessMessage(text);
+    limitScans(req.ip ?? "anon");
+    const db = await getDb();
+    const contact = (await db.query<{ contact_email: string | null }>("SELECT contact_email FROM orgs WHERE kind = 'supplier' AND contact_email IS NOT NULL ORDER BY created_at LIMIT 1")).rows[0]?.contact_email ?? null;
+    const c = await checkMessage(text, { contactEmail: contact });
+    if (c.level === "hold") await tick(db, "scam_checked");
+    const legacy = assessMessage(text);
+    return { ...c, risk: legacy.risk, tactics: legacy.tactics, contact_on_file: contact };
   }));
 
   r.post("/safety/protected", page(async (req, res) => {

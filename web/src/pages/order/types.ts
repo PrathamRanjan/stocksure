@@ -113,7 +113,7 @@ export interface PoModel {
   defects: { can_report: boolean; can_decide: boolean; claims: { id: string; po_line_id: string; line_no: number; sku: string; units: number; amount_cents: number; note: string; status: string; decision_note: string; created_at: string }[] } | null;
   docs: { id: string; kind: string; filename: string; size: number; sha256: string; uploaded_by: string; created_at: string; flags: { line?: number; text?: string; kind?: string; code?: string; message?: string }[] }[];
   ops: Op[];
-  messages: { id: number; line_id: string | null; author: string; role: string; kind: string; body: string; document_id: string | null; created_at: string; scan: { level: string; words: string[] } | null }[];
+  messages: { id: number; line_id: string | null; author: string; role: string; kind: string; body: string; document_id: string | null; created_at: string; scan: { level: string; words: string[]; advice: string | null; readers: { rules: string; decisions: string; code: string } | null; source: string } | null }[];
   can_post: boolean;
   can_replan: boolean;
   events: { id: number; at: string; type: string; summary: string; actor: string | null }[];

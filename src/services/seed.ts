@@ -1,3 +1,4 @@
+import { SUPPLIER_CONTACT } from "../eval/scam-cases.js";
 import { currentWs, type Queryable } from "../db.js";
 import { newId } from "../lib/ids.js";
 import { hashKey, newSecret } from "../lib/util.js";
@@ -42,6 +43,8 @@ export async function seedDemo(q: Queryable, opts: { keepPayPal?: boolean; walle
     return id;
   };
   const supplier = await org("supplier", "Harbour Wholesale Co.");
+  // The supplier's contact on file (synthetic): the scam check compares any payment destination in a message with it.
+  await q.query("UPDATE orgs SET contact_email = $2 WHERE id = $1", [supplier, SUPPLIER_CONTACT]);
   const laneway = await org("buyer", "Laneway Café");
   const bayside = await org("buyer", "Bayside Bakery");
   const corner = await org("buyer", "Corner Deli");

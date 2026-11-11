@@ -51,7 +51,17 @@ export const config = {
       /** Small wording jobs and short answers. */
       classify: process.env.AI_MODEL_CLASSIFY || "gpt-6-luna",
       classifyBackup: process.env.AI_MODEL_CLASSIFY_BACKUP || "gpt-6.1-sol",
+      /** Spec A5.2: yes/no, routing and scoring on the Decisions API. */
+      decide: process.env.AI_MODEL_DECIDE || "gpt-6-luna",
+      /** Spec A5.3: the agent loop. */
+      agent: process.env.AI_MODEL_AGENT || "gpt-6.1-sol",
     },
+    /** Spec A5.3 / C3: caps on the agent loop and a daily allowance per workspace. */
+    agentMaxSteps: num(process.env.AI_AGENT_MAX_STEPS, 8),
+    agentMaxMs: num(process.env.AI_AGENT_MAX_MS, 45_000),
+    agentDailyQuestions: num(process.env.AI_AGENT_DAILY_QUESTIONS, 25),
+    /** PayPal's hosted MCP server (read tools only are offered to the agent). Empty disables it. */
+    paypalMcpUrl: process.env.PAYPAL_MCP_URL ?? (process.env.NODE_ENV === "test" ? "" : "https://mcp.sandbox.paypal.com/sse"),
     /** Spec A5.4: extraction gets room to finish its JSON. */
     extractMaxTokens: num(process.env.AI_EXTRACT_MAX_TOKENS, 4000),
   },

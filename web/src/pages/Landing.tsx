@@ -5,8 +5,8 @@ import { money } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { PublicShell } from "@/components/public-shell";
+import { TryScam } from "@/components/try-scam";
 import { SettlementBar, StatusStamp, Tally, TallyLegend, TrustRow, type TallyNums } from "@/components/brand";
-import { startTour } from "@/tour/tours";
 
 interface Preview {
   po: { number: string; status: string; buyer: string; supplier: string; limit_cents: number } | null;
@@ -125,8 +125,8 @@ export default function Landing() {
                 {who ? "Open your orders" : "Try the live demo"} <ArrowRight aria-hidden="true" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" onClick={() => startTour("judge")}>
-              <BookOpenCheck aria-hidden="true" /> 3-minute guided tour
+            <Button asChild size="lg" variant="outline">
+              <Link to="/judge"><BookOpenCheck aria-hidden="true" /> Judge paths, 3 minutes</Link>
             </Button>
           </div>
           <div className="a11y-quick mt-6 flex flex-wrap items-center gap-2 text-sm" role="group" aria-label="Make this easier to use">
@@ -158,6 +158,8 @@ export default function Landing() {
           ))}
         </ol>
       </section>
+
+      <div className="mt-14 sm:mt-20"><TryScam /></div>
 
       <section className="mt-14 sm:mt-20" aria-labelledby="stops-title">
         <h2 id="stops-title" className="mb-5 text-2xl sm:text-3xl">What it stops</h2>
@@ -197,8 +199,8 @@ export default function Landing() {
           <Button asChild size="lg" variant="secondary">
             <Link to="/start">Start your own demo <ArrowRight aria-hidden="true" /></Link>
           </Button>
-          <Button size="lg" variant="outline" className="border-background/40 bg-transparent text-background hover:bg-background/10 hover:text-background" onClick={() => startTour("judge")}>
-            Take the tour
+          <Button asChild size="lg" variant="outline" className="border-background/40 bg-transparent text-background hover:bg-background/10 hover:text-background">
+            <Link to="/judge">Judge paths</Link>
           </Button>
         </div>
       </section>
