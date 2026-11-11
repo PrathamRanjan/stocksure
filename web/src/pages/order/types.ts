@@ -58,7 +58,7 @@ export interface Resolution {
   flags: { code: string; line_id: string | null; message: string }[];
   needed_by: string;
   plan: { chosen_index: number | null; chosen: Plan | null; alternatives: Plan[]; blocked: { sku: string; reason: string }[]; budget_cents: number };
-  totals: { quoted_cents: number; accepted_cents: number; not_charged_cents: number; invoice_cents: number | null; invoice_delta_cents: number | null; replacement_cents: number; other_spend_cents: number; final_cents: number; limit_cents: number; headroom_cents: number };
+  totals: { quoted_cents: number; accepted_cents: number; payable_cents?: number; early_discount_cents?: number; not_charged_cents: number; invoice_cents: number | null; invoice_delta_cents: number | null; replacement_cents: number; other_spend_cents: number; final_cents: number; limit_cents: number; headroom_cents: number };
   funding: { spendable_now_cents: number; hold_cents: number; release_expected_cents: number };
   buyer_approved_by: string | null;
   supplier_approved_by: string | null;
@@ -67,6 +67,7 @@ export interface Resolution {
   can_approve: boolean;
   can_revise: boolean;
   part_charged_cents: number;
+  negotiated: { negotiation_id: string; replacement_price_pct: number } | null;
 }
 export interface Op {
   id: string;
@@ -111,7 +112,8 @@ export interface PoModel {
     risk: { id: string; status: string; eta: string; deliver_by: string; slack_minutes: number; decision: string | null; on_hand: { line_no: number; sku: string; ordered: string; on_hand: string; alternatives: unknown[] }[]; evidence: unknown[]; unknowns: string[]; can_decide: boolean } | null;
   } | null;
   defects: { can_report: boolean; can_decide: boolean; claims: { id: string; po_line_id: string; line_no: number; sku: string; units: number; amount_cents: number; note: string; status: string; decision_note: string; created_at: string }[] } | null;
-  docs: { id: string; kind: string; filename: string; size: number; sha256: string; uploaded_by: string; created_at: string; flags: { line?: number; text?: string; kind?: string; code?: string; message?: string }[] }[];
+  docs: { id: string; kind: string; filename: string; size: number; sha256: string; uploaded_by: string; created_at: string; flags: { line?: number; text?: string; kind?: string; code?: string; message?: string }[]; checks: { number: string | null; flags: { code: string; message: string; by: string }[]; early: { pct: number; days: number; by: string } | null; decisions_model: string | null; checked_at: string } | null }[];
+  can_send_invoice: boolean;
   ops: Op[];
   messages: { id: number; line_id: string | null; author: string; role: string; kind: string; body: string; document_id: string | null; created_at: string; scan: { level: string; words: string[]; advice: string | null; readers: { rules: string; decisions: string; code: string } | null; source: string } | null }[];
   can_post: boolean;

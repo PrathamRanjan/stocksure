@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 
-export type Purpose = "extract_delivery" | "extract_invoice" | "observe_photo" | "compile_policy" | "negotiate" | "classify" | "owner_question" | "eval" | "agent";
+export type Purpose = "extract_delivery" | "extract_invoice" | "observe_photo" | "compile_policy" | "negotiate" | "classify" | "owner_question" | "eval" | "agent" | "shortfall_buyer" | "shortfall_supplier" | "observe_door_photo";
 
 export interface ImagePart {
   type: "image";

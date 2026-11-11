@@ -4,6 +4,7 @@ import { fmt } from "../core/money.js";
 import { plan as planReplacements, type CatItem } from "../core/planner.js";
 import { canonical, isClean, match, type RInvoiceLine, type Remedy } from "../core/resolve.js";
 import { newId } from "../lib/ids.js";
+import { tick } from "../demo/checklist.js";
 import { GtError, sha256Hex } from "../lib/util.js";
 import { catalog, fundingOf, getPo, heldPacks, latestReceipt, latestResolution, linesOf, logEvent, poFor, postMessage, setPo, who, type Person, type PO } from "../store.js";
 
@@ -11,6 +12,9 @@ export interface ResolutionOpts {
   choices?: Record<string, Remedy>;
   needed_by?: string; // ISO
   plan_index?: number;
+  /** Agreed by the agents (src/agents/shortfall.ts): replacements at this whole percentage of the quote. */
+  replacement_price_pct?: number;
+  negotiation_id?: string;
 }
 
 /** Default replacement deadline: 07:00 UTC the day after the delivery deadline, or tomorrow, whichever is later. */
@@ -53,9 +57,22 @@ export async function buildBody(q: Queryable, po: PO, opts: ResolutionOpts, now 
   const cat: CatItem[] = (await catalog(q, po.supplier_id, po.id)).map((p) => ({ ...p }));
   const planned = m.needs.length ? planReplacements(m.needs.map((n) => ({ ...n, needed_by: neededBy })), cat, Math.max(0, budget), now) : { plans: [], blocked: [], budget_cents: Math.max(0, budget) };
   const idx = Math.min(Math.max(0, opts.plan_index ?? 0), Math.max(0, planned.plans.length - 1));
-  const chosen = planned.plans[idx] ?? null;
+  let chosen = planned.plans[idx] ?? null;
+  // A price the agents agreed applies to the chosen replacement only; the list price is kept beside it.
+  const pricePct = opts.replacement_price_pct ?? 100;
+  if (!Number.isInteger(pricePct) || pricePct < 1 || pricePct > 100) throw new GtError("A replacement price must be a whole percentage of the quote, 1 to 100.", "invalid");
+  if (chosen && pricePct < 100) {
+    const picks = chosen.picks.map((p) => ({ ...p, list_price_cents: p.pack_price_cents, pack_price_cents: Math.round((p.pack_price_cents * pricePct) / 100), cents: p.packs * Math.round((p.pack_price_cents * pricePct) / 100) }));
+    chosen = { ...chosen, picks, cost_cents: picks.reduce((a, p) => a + p.cents, 0) };
+  }
   const replacement = chosen?.cost_cents ?? 0;
-  const final = otherSpend + m.totals.accepted_cents + replacement;
+  // Early-payment terms read by code from the latest invoice: taken off the capture when settlement is in time.
+  const invDoc = inv.docId ? (await q.query<{ checks: any }>("SELECT checks FROM documents WHERE id = $1", [inv.docId])).rows[0] : null;
+  const invChecks = invDoc ? (typeof invDoc.checks === "string" ? JSON.parse(invDoc.checks) : invDoc.checks) : null;
+  const early = invChecks?.early && now.getTime() <= new Date(invChecks.early.by).getTime() ? invChecks.early : null;
+  const discount = early ? Math.round((m.totals.accepted_cents * early.pct) / 100) : 0;
+  const payable = m.totals.accepted_cents - discount;
+  const final = otherSpend + payable + replacement;
   return {
     po_id: po.id,
     po_number: po.number,
@@ -68,9 +85,11 @@ export async function buildBody(q: Queryable, po: PO, opts: ResolutionOpts, now 
     needs: m.needs,
     needed_by: neededBy.toISOString(),
     plan: { chosen_index: chosen ? idx : null, chosen, alternatives: planned.plans, blocked: planned.blocked, budget_cents: planned.budget_cents },
-    totals: { ...m.totals, replacement_cents: replacement, other_spend_cents: otherSpend, final_cents: final, limit_cents: root.spend_limit_cents, headroom_cents: root.spend_limit_cents - final },
-    funding: { spendable_now_cents: f.spendable_cents, hold_cents: thisHold?.amount_cents ?? 0, release_expected_cents: Math.max(0, thisLive - m.totals.accepted_cents) },
+    early_payment: early ? { pct: early.pct, days: early.days, by: early.by, discount_cents: discount } : null,
+    totals: { ...m.totals, early_discount_cents: discount, payable_cents: payable, replacement_cents: replacement, other_spend_cents: otherSpend, final_cents: final, limit_cents: root.spend_limit_cents, headroom_cents: root.spend_limit_cents - final },
+    funding: { spendable_now_cents: f.spendable_cents, hold_cents: thisHold?.amount_cents ?? 0, release_expected_cents: Math.max(0, thisLive - payable) },
     auto: isClean(m),
+    negotiated: opts.negotiation_id ? { negotiation_id: opts.negotiation_id, replacement_price_pct: pricePct } : null,
   };
 }
 
@@ -94,12 +113,12 @@ export async function proposeResolution(q: Queryable, poId: string, opts: Resolu
   );
   if (auto) {
     await setPo(q, po.id, { status: "settling" });
-    await postMessage(q, po.id, null, "StockSure", "system", `Delivery matches the order. Settling ${fmt(body.totals.accepted_cents)} on the hold.${body.flags.length ? ` Invoice notes: ${body.flags.map((f) => f.message).join(" ")}` : ""}`, "system");
-    await logEvent(q, po, "resolution.auto", `Resolution v${version}: clean delivery, settling ${fmt(body.totals.accepted_cents)}`, { hash }, actor);
+    await postMessage(q, po.id, null, "StockSure", "system", `Delivery matches the order. Settling ${fmt(body.totals.payable_cents)} on the hold${body.totals.early_discount_cents ? ` (${fmt(body.totals.early_discount_cents)} early-payment discount taken off)` : ""}.${body.flags.length ? ` Invoice notes: ${body.flags.map((f) => f.message).join(" ")}` : ""}`, "system");
+    await logEvent(q, po, "resolution.auto", `Resolution v${version}: clean delivery, settling ${fmt(body.totals.payable_cents)}`, { hash }, actor);
     await enqueue(q, "settle", { poId: po.id, version }, new Date(), `settle:${po.id}:${version}`);
   } else {
     await setPo(q, po.id, { status: "resolving" });
-    await logEvent(q, po, "resolution.proposed", `Resolution v${version}: pay ${fmt(body.totals.accepted_cents)}${body.totals.replacement_cents ? ` + replacement ${fmt(body.totals.replacement_cents)}` : ""} = ${fmt(body.totals.final_cents)} of ${fmt(body.totals.limit_cents)}`, { hash }, actor);
+    await logEvent(q, po, "resolution.proposed", `Resolution v${version}: pay ${fmt(body.totals.payable_cents)}${body.totals.replacement_cents ? ` + replacement ${fmt(body.totals.replacement_cents)}` : ""} = ${fmt(body.totals.final_cents)} of ${fmt(body.totals.limit_cents)}`, { hash }, actor);
   }
   return version;
 }
@@ -145,8 +164,9 @@ export async function approveResolution(person: Person, poId: string, version: n
     if (cur.body.totals.final_cents > cur.body.totals.limit_cents) throw new GtError(`Final spend ${fmt(cur.body.totals.final_cents)} is above the ${fmt(cur.body.totals.limit_cents)} limit.`, "over_limit", 409);
     if ((side === "buyer" ? cur.buyer_approved_hash : cur.supplier_approved_hash) === hash) return "already";
     await q.query(`UPDATE resolutions SET ${side}_approved_by = $2, ${side}_approved_hash = $3, ${side}_approved_at = now() WHERE id = $1`, [cur.id, who(person), hash]);
-    await postMessage(q, po.id, null, who(person), person.role, `Approved resolution v${version}: pay ${fmt(cur.body.totals.accepted_cents)}${cur.body.totals.replacement_cents ? `, replacement ${fmt(cur.body.totals.replacement_cents)}` : ""}.`, "system");
+    await postMessage(q, po.id, null, who(person), person.role, `Approved resolution v${version}: pay ${fmt(cur.body.totals.payable_cents ?? cur.body.totals.accepted_cents)}${cur.body.totals.replacement_cents ? `, replacement ${fmt(cur.body.totals.replacement_cents)}` : ""}.`, "system");
     await logEvent(q, po, "resolution.approved", `${who(person)} approved v${version}`, { hash }, who(person));
+    if (cur.body.negotiated && side === "supplier") await tick(q, "agents_supplier_ok");
     const other = side === "buyer" ? cur.supplier_approved_hash : cur.buyer_approved_hash;
     if (other !== hash) return "waiting";
     // Hold the replacement stock now, so another order cannot take it while the money settles.
@@ -161,7 +181,8 @@ export async function approveResolution(person: Person, poId: string, version: n
     }
     await q.query("UPDATE resolutions SET status = 'agreed' WHERE id = $1", [cur.id]);
     await setPo(q, po.id, { status: "settling" });
-    await logEvent(q, po, "resolution.agreed", `Both sides agreed resolution v${version}`, { hash });
+    // Terms the agents agreed tick their own judge step, not the hand-approved one.
+    await logEvent(q, po, cur.body.negotiated ? "resolution.agreed_agents" : "resolution.agreed", `Both sides agreed resolution v${version}${cur.body.negotiated ? ` (terms from the agents' negotiation ${cur.body.negotiated.negotiation_id})` : ""}`, { hash });
     await enqueue(q, "settle", { poId: po.id, version }, new Date(), `settle:${po.id}:${version}`);
     return "agreed";
   });

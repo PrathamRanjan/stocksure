@@ -149,7 +149,9 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
       <div className="flex flex-wrap gap-2">
         {r.status === "agreed" || r.status === "settled" ? <Stamp tone="paid">Agreed by both</Stamp> : r.status === "proposed" ? <Stamp tone="held">Proposed</Stamp> : <Stamp tone="quiet">{r.status}</Stamp>}
         {r.auto && <Stamp tone="carbon">Clean delivery: agreed automatically</Stamp>}
+        {r.negotiated && <Stamp tone="carbon">Terms from the agents: replacement at {r.negotiated.replacement_price_pct}% of the quote</Stamp>}
       </div>
+      {r.negotiated && r.open && <p className="mt-2 text-sm">The two agents agreed these terms (<a className="underline underline-offset-2" href={`/negotiations/${r.negotiated.negotiation_id}`}>see every move</a>). They are only a proposal: nothing is paid until both of you approve this version.</p>}
 
       <div className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} role="region" aria-label="Line by line, scrolls sideways">
         <table className="w-full min-w-[30rem] text-sm">
@@ -206,7 +208,7 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
       <div className="mt-4 rounded-md bg-foreground p-4 text-background" aria-label="What PayPal will do">
         <p className="font-heading font-bold">What moves when both approve</p>
         <ul className="mt-2 space-y-1 text-[0.95rem]">
-          <li>Capture <span className="num font-bold">{money(t.accepted_cents - (r.part_charged_cents || 0))}</span> from the hold to {m.po.supplier_name}{r.part_charged_cents ? ` (part 1 already charged ${money(r.part_charged_cents)})` : ""}</li>
+          <li>Capture <span className="num font-bold">{money((t.payable_cents ?? t.accepted_cents) - (r.part_charged_cents || 0))}</span> from the hold to {m.po.supplier_name}{r.part_charged_cents ? ` (part 1 already charged ${money(r.part_charged_cents)})` : ""}{t.early_discount_cents ? ` (${money(t.early_discount_cents)} early-payment discount taken off, per the invoice's terms)` : ""}</li>
           {release > 0 && <li>Release <span className="num font-bold">{money(release)}</span> back to {m.po.buyer_name}'s PayPal (the rest of the hold)</li>}
           {t.replacement_cents > 0 && <li>Place a new hold of <span className="num font-bold">{money(t.replacement_cents)}</span> for the replacement</li>}
           <li className="opacity-85">Total committed <span className="num">{money(t.final_cents)}</span> of the <span className="num">{money(t.limit_cents)}</span> limit · <span className="num">{money(t.headroom_cents)}</span> left</li>
@@ -342,9 +344,11 @@ export function PayPalPanel({ m, reload }: { m: PoModel; reload: () => void }) {
 
 /* ---------------- Documents ---------------- */
 const FLAG: Record<string, string> = { agent_instruction: "Instruction to an assistant", payment_redirect: "Tries to change who gets paid", amount_override: "Tries to change the amount", hidden_characters: "Hidden characters" };
-export function DocsPanel({ m }: { m: PoModel }) {
+const CHECK: Record<string, string> = { duplicate_of_earlier_invoice: "Duplicate of an earlier invoice", price_above_recent: "Price above the last deliveries", asks_to_change_payee: "Asks to pay somewhere new", contains_instruction: "Written to an AI reader", early_payment_terms: "Early-payment discount" };
+export function DocsPanel({ m, reload }: { m: PoModel; reload?: () => void }) {
+  const { run, busy } = useAction(reload);
   return (
-    <Panel tour="docs" label="docs-title" id="docs">
+    <Panel tour="docs" label="docs-title" id="documents">
       <SectionTitle id="docs-title" aside={m.docs.length ? plural(m.docs.length, "file") : undefined}>Paperwork</SectionTitle>
       {m.docs.length ? (
         <ul className="divide-y divide-border">
@@ -357,6 +361,17 @@ export function DocsPanel({ m }: { m: PoModel }) {
                 <span className="text-sm text-muted-foreground">by {d.uploaded_by} · {ago(d.created_at)}</span>
               </div>
               <p className="mono mt-0.5 text-xs text-muted-foreground">sha256 {d.sha256.slice(0, 16)}…</p>
+              {d.checks && (
+                <div className={cn("mt-2 rounded-md border p-3 text-sm", d.checks.flags.some((f) => f.code !== "early_payment_terms") ? "border-stop/40 bg-stop-soft" : "border-border")} data-invoice-checks={d.checks.flags.map((f) => f.code).join(" ")}>
+                  <p className="font-semibold">Invoice checks{d.checks.number ? ` · ${d.checks.number}` : ""}: {d.checks.flags.length ? `${plural(d.checks.flags.length, "finding")}` : "nothing found"}</p>
+                  <ul className="mt-1 space-y-1">
+                    {d.checks.flags.map((f, i) => (
+                      <li key={i}><span className={cn("font-semibold", f.code !== "early_payment_terms" && "text-stop")}>{CHECK[f.code] ?? f.code}</span>: {f.message} <span className="text-xs text-muted-foreground">({f.by === "decisions" ? `OpenAI Decisions${d.checks!.decisions_model ? `, ${d.checks!.decisions_model}` : ""}` : "code"})</span></li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-muted-foreground">Checked in code against your past deliveries and the supplier's details on file{d.checks.decisions_model ? `, with ${d.checks.decisions_model} as a second reader` : ""}. The payment is always the agreed counts at the quoted price.</p>
+                </div>
+              )}
               {d.flags.length > 0 && (
                 <div className="mt-2 rounded-md border border-stop/40 bg-stop-soft p-3 text-sm">
                   <p className="flex items-center gap-2 font-semibold text-stop"><ShieldAlert className="size-4" aria-hidden="true" /> Removed before anything read it</p>
@@ -378,6 +393,22 @@ export function DocsPanel({ m }: { m: PoModel }) {
         <Empty title="No paperwork yet" art={<FileText className="mx-auto mb-2 size-8 opacity-50" aria-hidden="true" />}>
           The supplier's invoice arrives with dispatch; the café adds the delivery docket and photos when counting.
         </Empty>
+      )}
+      {m.can_send_invoice && (
+        <div className="mt-4 rounded-md border border-dashed border-input p-3 text-sm" id="send-invoice">
+          <p className="font-semibold">Send an invoice for {m.po.number}</p>
+          <p className="text-muted-foreground">StockSure checks every invoice: duplicates, prices above your last three deliveries, a new payee, lines written to an AI. Sample invoices for the demo:</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("inv-bad", `/po/${m.po.id}/invoice`, { sample: "bad" })}>{busy === "inv-bad" && <Spinner />} Send a bad invoice</Button>
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("inv-dup", `/po/${m.po.id}/invoice`, { sample: "duplicate" })}>{busy === "inv-dup" && <Spinner />} Send the last invoice again, new number</Button>
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("inv-early", `/po/${m.po.id}/invoice`, { sample: "discount" })}>{busy === "inv-early" && <Spinner />} Send one with a 2% early-payment discount</Button>
+          </div>
+          <form className="mt-2 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); run("inv-file", `/po/${m.po.id}/invoice`, f); }}>
+            <label className="text-sm" htmlFor="inv-file">Or upload your own</label>
+            <input id="inv-file" name="invoice" type="file" accept=".txt,.pdf,image/*" className="text-sm" required />
+            <Button size="sm" type="submit" variant="outline" disabled={!!busy}>Send</Button>
+          </form>
+        </div>
       )}
     </Panel>
   );
@@ -594,7 +625,7 @@ export function AgentPanel({ m }: { m: PoModel }) {
   const a = m.agent;
   if (!a.agreement && !a.negotiations.length && !a.can_negotiate && !a.runs.length) return null;
   return (
-    <Panel label="ag-title" id="agents">
+    <Panel label="ag-title" id="agent-runs">
       <SectionTitle id="ag-title">Agents on this order</SectionTitle>
       {a.agreement && (
         <p className="flex flex-wrap items-center gap-2 text-sm">

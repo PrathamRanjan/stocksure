@@ -23,6 +23,7 @@ import { ask } from "../ai/agent.js";
 import { match, type RLine } from "../core/resolve.js";
 import { checkMessage } from "../safety/check.js";
 import { findDestinations } from "../safety/destinations.js";
+import { duplicateOf, invoiceNumber } from "../services/invoice-checks.js";
 import { demoIds, sampleInvoice } from "../services/seed.js";
 import { personById } from "../store.js";
 import { SCAM_CASES, SUPPLIER_CONTACT, TEN_NOV, type ScamCase } from "./scam-cases.js";
@@ -175,7 +176,17 @@ async function regressionSuite(): Promise<ProofCase[]> {
 
   // Not built yet: listed so the gap is visible.
   out.push({ id: "delivery-note-handwriting", group: "receiving", input: "A photo of a delivery note with handwritten corrections", expected: "counts read; handwritten changes flagged for the receiver", actual: "No handwriting photo is in the labelled set yet.", pass: null, state: "not run" });
-  out.push({ id: "invoice-duplicate-new-number", group: "invoice", input: "The same invoice sent again with a different number", expected: "flagged as a duplicate of the earlier invoice", actual: "Duplicate-invoice detection is not built yet (spec B4, Wave 4).", pass: null, state: "not built" });
+  // The same invoice again under a new number: both read by the production invoice reader, compared by code.
+  const resent = inv240.replace(/(INV-[A-Z0-9-]+)/, "$1-B");
+  const exR = ex240.failed ? null : await extractInvoice({ mime: "text/plain", body: Buffer.from(resent), text: resent }, cs);
+  if (!exR || exR.failed) out.push({ id: "invoice-duplicate-new-number", group: "invoice", input: resent, expected: "flagged as a duplicate of the earlier invoice", actual: "the invoice reader did not answer", pass: false, state: "run" });
+  else {
+    const skuOf = (id: string | null) => cs.find((c) => c.line_id === id)?.product.sku ?? null;
+    const asLines = (ls: typeof exR.lines) => ls.map((l) => ({ sku: skuOf(l.line_id), billed_units: l.units, unit_price_cents: l.unit_price_cents, line_cents: l.line_cents }));
+    const dup = duplicateOf(resent, asLines(exR.lines), [{ id: "doc-earlier", po_number: poNumber, text: inv240, lines: asLines(ex240.lines) }]);
+    const fresh = duplicateOf(sampleInvoice(poNumber, buyer, [{ ...sl[0], qty_packs: 18 }], { number: "INV-FRESH-1" }), asLines(exR.lines).map((l) => ({ ...l, billed_units: 216, line_cents: 216 * (l.unit_price_cents ?? 0) })), [{ id: "doc-earlier", po_number: poNumber, text: inv240, lines: asLines(ex240.lines) }]);
+    out.push({ id: "invoice-duplicate-new-number", group: "invoice", input: resent, expected: "flagged as a duplicate of the earlier invoice; a different invoice is not", actual: `${dup ? "duplicate flagged" : "not flagged"}; a different invoice ${fresh ? "was also flagged (false alarm)" : "was not flagged"}`, pass: !!dup && !fresh, state: "run", detail: { flag: dup?.message ?? null, number_read: invoiceNumber(resent) } });
+  }
   out.push({ id: "photo-of-a-screen", group: "photo", input: "A photo of a screen showing a delivery note", expected: "flagged as a photo of a screen; not used as evidence", actual: "The photo_is_of_a_screen check is not built yet (spec B4, Wave 3).", pass: null, state: "not built" });
   return out;
 }
@@ -215,7 +226,7 @@ export async function ensureFreshProof(wsId: string | null): Promise<{ ran: numb
 const NOT_MEASURED = [
   "Real supplier messages: every scam case is author-written and synthetic. Precision on real traffic is unknown.",
   "Photos and handwriting: the receiving suite is typed delivery notes; no photographed or handwritten note is scored yet.",
-  "Duplicate invoices and photos of screens: the checks are not built, so the regression cases are listed but not run.",
+  "Duplicate invoices: one labelled pair (the same invoice under a new number) and one different invoice; that is a rule check, not a rate.",
   "The on-device scam model in the browser is not part of these runs; its training summary is on the safety page.",
   "The payment-risk model is trained on synthetic payments; no fraud rate is claimed.",
   "Ask answers are checked for tool use and citations, not graded for correctness by a person.",

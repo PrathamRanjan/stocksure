@@ -32,6 +32,8 @@ const PayPalApis = lazy(() => import("@/pages/Public").then((m) => ({ default: m
 const WhoCanMoveMoney = lazy(() => import("@/pages/Public").then((m) => ({ default: m.WhoCanMoveMoney })));
 const Accessibility = lazy(() => import("@/pages/Public").then((m) => ({ default: m.Accessibility })));
 const Agents = lazy(() => import("@/pages/Public").then((m) => ({ default: m.Agents })));
+const NegotiationList = lazy(() => import("@/pages/Negotiations").then((m) => ({ default: m.NegotiationList })));
+const NegotiationDetail = lazy(() => import("@/pages/Negotiations").then((m) => ({ default: m.NegotiationDetail })));
 
 declare global {
   interface Window {
@@ -110,6 +112,8 @@ function App() {
         <Route path="/who-can-move-money" element={<Lazy><WhoCanMoveMoney /></Lazy>} />
         <Route path="/accessibility" element={<Lazy><Accessibility /></Lazy>} />
         <Route path="/agents" element={<Lazy><Agents /></Lazy>} />
+        <Route path="/negotiations" element={<Authed><NegotiationList /></Authed>} />
+        <Route path="/negotiations/:id" element={<Authed><NegotiationDetail /></Authed>} />
         <Route path="*" element={<Lazy><NotFound /></Lazy>} />
       </Routes>
     </>

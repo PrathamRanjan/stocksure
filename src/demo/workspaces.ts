@@ -17,7 +17,7 @@ import { acceptQuote, createPo, dispatchPo, quotePo, submitPo } from "../service
 import { confirmReceipt, lineFingerprint, supplierReview } from "../services/receiving.js";
 import { approveResolution } from "../services/resolution.js";
 import { seedDemo, type DemoIds } from "../services/seed.js";
-import { getPo, latestReceipt, latestResolution, linesOf, personById, type Person } from "../store.js";
+import { getPo, latestReceipt, latestResolution, linesOf, personById, putSetting, type Person } from "../store.js";
 import { GtError } from "../lib/util.js";
 import { usableWallet } from "./wallet.js";
 
@@ -43,7 +43,7 @@ export interface SeedProgress {
 }
 
 /** How many real PayPal operations the seeded scenarios make: A hold+capture, B hold+capture+replacement hold, C hold. */
-export const SEED_PAYMENTS = 6;
+export const SEED_PAYMENTS = 7;
 
 const ALPHA = "abcdefghijkmnpqrstuvwxyz23456789";
 const newWsId = () => Array.from(randomBytes(12), (b) => ALPHA[b % ALPHA.length]).join("");
@@ -142,6 +142,7 @@ async function handlers() {
  *   B. Cups, one carton crushed: held, the accepted carton captured, the rest released, a replacement held and
  *      dispatched. In transit.
  *   C. Almond milk: held and dispatched. Waiting for the receiver to count it in.
+ *   D. Barista oat, two cases crushed: held, counted, the supplier agreed the count. Waiting for the fix.
  * Without the saved wallet nothing is paid: the drafts stay as drafts and the page offers PayPal's own approval.
  */
 async function seedPayments(id: string, ids: DemoIds, withWallet: boolean) {
@@ -196,6 +197,16 @@ async function seedPayments(id: string, ids: DemoIds, withWallet: boolean) {
     await settleNow();
     const repl = (await db.query<{ id: string; status: string }>("SELECT id, status FROM purchase_orders WHERE parent_id = $1", [b])).rows[0];
     if (repl?.status === "funded") await dispatchPo(ana, repl.id, null);
+
+    // D. Barista oat, two cases crushed: held, counted and agreed by the supplier, waiting for the fix. The judge's
+    //    "let the agents settle it" path starts here.
+    await progress(id, { step: "Counting the barista oat order with two crushed cases" });
+    const d = await order("OAT-B12", 6, 9000, "Barista oat for the week");
+    await putSetting(db, "judge_agents_po", d);
+    await dispatchPo(ana, d, null);
+    await counts(d, (n) => ({ delivered: n, damaged: 2, note: "Two cases crushed under the pallet strap" }));
+    const recD = await latestReceipt(db, d);
+    for (const l of recD?.lines ?? []) if (l.supplier_status !== "agreed") await supplierReview(ana, d, l.po_line_id, "agree", "Driver photographed the two crushed cases.", lineFingerprint(recD!.receipt.version, l));
     await progress(id, { done: true, step: "All seeded payments placed" });
   } catch (e) {
     await progress(id, { done: true, stopped: (e as Error).message.slice(0, 300), step: "Seeding stopped" });

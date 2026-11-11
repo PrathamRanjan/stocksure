@@ -15,7 +15,7 @@ import { formatUnits } from "../core/units.js";
 import { GtError } from "../lib/util.js";
 import { armFault, FAULTABLE, type FaultKind } from "../paypal/index.js";
 import { recordCsv, recordJson, supplierPerformance } from "../services/records.js";
-import { acceptQuote, completeConnect, createPo, dispatchPo, quotePo, quoteTotal, retryHold, startConnect, submitPo, type UploadFile } from "../services/orders.js";
+import { acceptQuote, completeConnect, createPo, dispatchPo, quotePo, quoteTotal, retryHold, sendInvoice, startConnect, submitPo, type UploadFile } from "../services/orders.js";
 import { confirmReceipt, postLineMessage, supplierReview, uploadReceivingDoc, type CountInput, rereadReceivingDoc } from "../services/receiving.js";
 import { approveResolution, reviseResolution } from "../services/resolution.js";
 import { demoIds, keyWorkspace, sampleDeliveryNote, sampleInvoice } from "../services/seed.js";
@@ -142,6 +142,32 @@ export function routes() {
     }
     await dispatchPo(p, req.params.id, invoice);
     back(res, `/po/${req.params.id}`, "Marked dispatched.");
+  }));
+
+  // Spec B4 item 2: the supplier sends an invoice after dispatch. Demo samples: a bad one (bills one case extra,
+  // carries a line written to an AI and a new payee), the same invoice again under a new number, and one with
+  // early-payment terms.
+  r.post("/po/:id/invoice", act(async (req, res, p) => {
+    const { fields, files } = await readForm(req);
+    const db = await getDb();
+    const po = await poFor(db, p, req.params.id);
+    let invoice: UploadFile | null = files.invoice?.[0] ?? null;
+    if (!invoice && fields.sample && config.demoMode) {
+      const sl = await samplesFor(po);
+      if (fields.sample === "duplicate") {
+        const prev = (await db.query<{ text_content: string | null; filename: string }>("SELECT d.text_content, d.filename FROM documents d JOIN purchase_orders o ON o.id = d.po_id WHERE d.kind = 'invoice' AND o.supplier_id = $1 AND o.buyer_id = $2 AND d.text_content IS NOT NULL ORDER BY (d.po_id = $3) DESC, d.created_at DESC LIMIT 1", [po.supplier_id, po.buyer_id, po.id])).rows[0];
+        if (!prev?.text_content) throw new GtError("There's no earlier invoice from this supplier to send again. Send the bad invoice first.", "bad_state", 409);
+        invoice = textFile(`invoice-${po.number}-resent.txt`, prev.text_content.replace(/(INV-[A-Z0-9-]+)/, "$1-B"));
+      } else if (fields.sample === "discount") {
+        invoice = textFile(`invoice-${po.number}-terms.txt`, sampleInvoice(po.number, po.buyer_name ?? "", sl, { terms: "Payment terms: 2% discount if paid within 10 days, otherwise net 30. Pay via PayPal in StockSure." }));
+      } else {
+        invoice = textFile(`invoice-${po.number}.txt`, sampleInvoice(po.number, po.buyer_name ?? "", sl, { inject: true, overbill: { [sl[0].sku]: 1 } }));
+      }
+    }
+    if (!invoice) throw new GtError("Attach an invoice.", "invalid", 400);
+    const c = await sendInvoice(p, req.params.id, invoice);
+    const serious = c.flags.filter((f) => f.code !== "early_payment_terms");
+    back(res, `/po/${req.params.id}#documents`, serious.length ? `Invoice sent. StockSure flagged ${serious.length} problem${serious.length === 1 ? "" : "s"}: ${serious.map((f) => f.code.replace(/_/g, " ")).join(", ")}.` : c.early ? `Invoice sent with early-payment terms (${c.early.pct}% within ${c.early.days} days).` : "Invoice sent. Nothing flagged.");
   }));
 
   r.post("/po/:id/reorder", act(async (req, res, p) => {

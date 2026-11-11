@@ -1,13 +1,16 @@
 import { config } from "../config.js";
 import { getDb, type Queryable, currentWs } from "../db.js";
 import { shipmentsOf } from "./parts.js";
-import { extractInvoice, type Candidate } from "../ai/extract.js";
+import { extractInvoice, type Candidate, type InvoiceExtraction } from "../ai/extract.js";
+import { checkInvoice, type InvoiceChecks } from "./invoice-checks.js";
+import { tick } from "../demo/checklist.js";
+import { proposeResolution } from "./resolution.js";
 import { fmt } from "../core/money.js";
 import { newId } from "../lib/ids.js";
 import { enqueue } from "../jobs.js";
 import { GtError, sha256Hex } from "../lib/util.js";
 import { authOf, paypal, PayPalError, UnknownOutcomeError } from "../paypal/index.js";
-import { catalog, fundingOf, getPo, heldPacks, linesOf, logEvent, orgById, poFor, postMessage, putSetting, setPo, setting, who, type Person, type PO, type PoLine } from "../store.js";
+import { catalog, fundingOf, getPo, heldPacks, latestResolution, linesOf, logEvent, orgById, poFor, postMessage, putSetting, setPo, setting, who, type Person, type PO, type PoLine } from "../store.js";
 import { dryRun } from "../guard/dryrun.js";
 import { startRun, type Run } from "../trace.js";
 import { countersignAsSupplier, signAsBuyer } from "./agreements.js";
@@ -321,6 +324,7 @@ export async function dispatchPo(person: Person, poId: string, invoice: UploadFi
   if (po0.status === "dispatched") return;
   needState(po0, ["funded", "part_delivered"], "dispatch");
   const ex = invoice ? await extractInvoice({ mime: invoice.mime, body: invoice.body, text: isText(invoice.mime, invoice.filename) ? invoice.body.toString("utf8") : null }, await candidates(db, po0)) : null;
+  let invoiceDoc: string | null = null;
   await db.tx(async (q) => {
     const po = await poFor(q, person, poId, true);
     if (po.status === "dispatched") return;
@@ -346,20 +350,67 @@ export async function dispatchPo(person: Person, poId: string, invoice: UploadFi
     }
     if (part?.status === "charged") await q.query("INSERT INTO shipments (id, po_id, seq, kind, packs, status, dispatched_by) VALUES ($1,$2,2,'rest',$3,'dispatched',$4) ON CONFLICT (po_id, seq) DO NOTHING", [newId("shp"), po.id, JSON.stringify(rest), who(person)]);
     await q.query("UPDATE stock_holds SET status = 'shipped' WHERE for_po = $1 AND status = 'held'", [po.id]);
-    if (invoice && ex) {
-      const d = await storeDoc(q, po.id, "invoice", invoice, who(person), ex.instructions);
-      await q.query("INSERT INTO extractions (id, document_id, source, lines, flags) VALUES ($1,$2,$3,$4,$5)", [newId("ex"), d.id, ex.source, JSON.stringify(ex.lines), JSON.stringify(ex.instructions)]);
-      let i = 0;
-      for (const l of ex.lines) await q.query("INSERT INTO invoice_lines (document_id, idx, po_line_id, description, billed_units, unit_price_cents, line_cents) VALUES ($1,$2,$3,$4,$5,$6,$7)", [d.id, i++, l.line_id, l.description, l.units, l.unit_price_cents, l.line_cents]);
-      if (ex.instructions.length)
-        await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename} contains ${ex.instructions.length} instruction-like line(s) (${[...new Set(ex.instructions.map((f) => f.kind.replace(/_/g, " ")))].join(", ")}). They were removed before reading and cannot change who is paid or how much.`, "system", d.id);
-      // Spec A5.5: an unread invoice is said out loud, not shown as an invoice with no lines.
-      if (ex.failed) await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename}: ${ex.notes[0] ?? "I couldn't read this invoice."} The settlement doesn't depend on it: code pays the agreed counts at the quoted price.`, "system", d.id);
-    }
+    if (invoice && ex) invoiceDoc = await attachInvoice(q, po, invoice, ex, who(person));
     await setPo(q, po.id, { status: "dispatched", dispatched_at: new Date() });
     await notifyOrder("buyer", po.buyer_id, `${po.number} is on its way from ${po.supplier_name}. Open the dock when it arrives.`, po.id, q).catch(() => undefined);
     await logEvent(q, po, "po.dispatched", `${who(person)} dispatched ${part?.status === "charged" ? `the rest of ${po.number}` : po.number}${invoice ? ` with invoice ${invoice.filename}` : ""}`, ex ? { invoice_lines: ex.lines.length, instruction_flags: ex.instructions.length } : null, who(person));
   });
+  if (invoiceDoc) await runInvoiceChecks(poId, invoiceDoc);
+}
+
+/** Stores an invoice, its reading and its lines on an order. It is compared, never paid from. */
+export async function attachInvoice(q: Queryable, po: PO, invoice: UploadFile, ex: InvoiceExtraction, by: string): Promise<string> {
+  const d = await storeDoc(q, po.id, "invoice", invoice, by, ex.instructions);
+  await q.query("INSERT INTO extractions (id, document_id, source, lines, flags) VALUES ($1,$2,$3,$4,$5)", [newId("ex"), d.id, ex.source, JSON.stringify(ex.lines), JSON.stringify(ex.instructions)]);
+  let i = 0;
+  for (const l of ex.lines) await q.query("INSERT INTO invoice_lines (document_id, idx, po_line_id, description, billed_units, unit_price_cents, line_cents) VALUES ($1,$2,$3,$4,$5,$6,$7)", [d.id, i++, l.line_id, l.description, l.units, l.unit_price_cents, l.line_cents]);
+  if (ex.instructions.length)
+    await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename} contains ${ex.instructions.length} instruction-like line(s) (${[...new Set(ex.instructions.map((f) => f.kind.replace(/_/g, " ")))].join(", ")}). They were removed before reading and cannot change who is paid or how much.`, "system", d.id);
+  // Spec A5.5: an unread invoice is said out loud, not shown as an invoice with no lines.
+  if (ex.failed) await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${invoice.filename}: ${ex.notes[0] ?? "I couldn't read this invoice."} The settlement doesn't depend on it: code pays the agreed counts at the quoted price.`, "system", d.id);
+  return d.id;
+}
+
+/** Spec B4 item 2: duplicate, price history, payee and instruction checks on a stored invoice; a fix still open is re-proposed with it. */
+export async function runInvoiceChecks(poId: string, docId: string): Promise<InvoiceChecks> {
+  const db = await getDb();
+  const po = await getPo(db, poId);
+  const doc = (await db.query<any>("SELECT id, filename, text_content, flags FROM documents WHERE id = $1", [docId])).rows[0];
+  const lines = (await db.query<any>("SELECT il.po_line_id, il.description, il.billed_units, il.unit_price_cents, il.line_cents, pr.sku FROM invoice_lines il LEFT JOIN po_lines l ON l.id = il.po_line_id LEFT JOIN products pr ON pr.id = l.product_id WHERE il.document_id = $1 ORDER BY il.idx", [docId])).rows;
+  const contact = (await db.query<{ contact_email: string | null }>("SELECT contact_email FROM orgs WHERE id = $1", [po.supplier_id])).rows[0]?.contact_email ?? null;
+  const instr = typeof doc.flags === "string" ? JSON.parse(doc.flags) : doc.flags ?? [];
+  const text = doc.text_content ?? lines.map((l: any) => `${l.sku ?? ""} ${l.description} ${l.billed_units ?? ""} ${l.unit_price_cents ?? ""}`).join("\n");
+  const checks = await checkInvoice(db, po, docId, text, lines, instr, contact);
+  await db.tx(async (q) => {
+    await q.query("UPDATE documents SET checks = $2 WHERE id = $1", [docId, JSON.stringify(checks)]);
+    const serious = checks.flags.filter((f) => f.code !== "early_payment_terms");
+    if (serious.length) await postMessage(q, po.id, null, "StockSure", "system", `Invoice ${doc.filename}: ${serious.map((f) => f.message).join(" ")}`, "system", docId);
+    if (serious.some((f) => ["duplicate_of_earlier_invoice", "asks_to_change_payee", "contains_instruction"].includes(f.code))) await tick(q, "invoice_caught");
+    if (serious.some((f) => f.code === "duplicate_of_earlier_invoice")) await tick(q, "duplicate_caught");
+    await logEvent(q, po, "invoice.checked", `Invoice ${doc.filename} checked: ${checks.flags.length ? checks.flags.map((f) => f.code.replace(/_/g, " ")).join(", ") : "nothing found"}`, { flags: checks.flags.map((f) => f.code) });
+    // A fix still open is proposed again with the invoice in it; earlier approvals go stale.
+    const cur = await latestResolution(q, po.id);
+    const fresh = await getPo(q, po.id);
+    if (cur && cur.status === "proposed" && fresh.status === "resolving") await proposeResolution(q, po.id, { choices: cur.body.choices, needed_by: cur.body.needed_by, plan_index: cur.body.plan?.chosen_index ?? 0, replacement_price_pct: cur.body.negotiated?.replacement_price_pct, negotiation_id: cur.body.negotiated?.negotiation_id }, "invoice check");
+  });
+  return checks;
+}
+
+/** The supplier sends an invoice after dispatch, before the fix is agreed. */
+export async function sendInvoice(person: Person, poId: string, invoice: UploadFile): Promise<InvoiceChecks> {
+  need(person, ["supplier"], "send an invoice");
+  const db = await getDb();
+  const po0 = await poFor(db, person, poId);
+  needState(po0, ["dispatched", "in_review", "resolving"], "send an invoice for");
+  const ex = await extractInvoice({ mime: invoice.mime, body: invoice.body, text: isText(invoice.mime, invoice.filename) ? invoice.body.toString("utf8") : null }, await candidates(db, po0));
+  const docId = await db.tx(async (q) => {
+    const po = await poFor(q, person, poId, true);
+    needState(po, ["dispatched", "in_review", "resolving"], "send an invoice for");
+    const id = await attachInvoice(q, po, invoice, ex, who(person));
+    await logEvent(q, po, "invoice.sent", `${who(person)} sent invoice ${invoice.filename}`, { invoice_lines: ex.lines.length }, who(person));
+    return id;
+  });
+  return runInvoiceChecks(poId, docId);
 }
 
 // ---------- PayPal connect (Vault) ----------

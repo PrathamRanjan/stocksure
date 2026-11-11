@@ -173,6 +173,7 @@ async function poModel(q: Queryable, po: PO, p: Person) {
       can_approve: open && (supplier || owner) && mySide !== res.hash,
       can_revise: open && owner,
       part_charged_cents: await partCharged(q, po.id),
+      negotiated: b.negotiated ?? null,
     };
   }
 
@@ -206,7 +207,8 @@ async function poModel(q: Queryable, po: PO, p: Person) {
   const claims = await claimsOf(q, po.id);
   const defects = cap || claims.length ? { can_report: buyer && !!cap, can_decide: supplier, claims } : null;
 
-  const docs = (await docsOf(q, po.id)).map((d) => ({ id: d.id, kind: d.kind, filename: d.filename, size: d.size, sha256: d.sha256, uploaded_by: d.uploaded_by, created_at: d.created_at, flags: d.flags }));
+  const docs = (await docsOf(q, po.id)).map((d: any) => ({ id: d.id, kind: d.kind, filename: d.filename, size: d.size, sha256: d.sha256, uploaded_by: d.uploaded_by, created_at: d.created_at, flags: d.flags, checks: d.checks ? { number: d.checks.number, flags: d.checks.flags, early: d.checks.early, decisions_model: d.checks.decisions?.model ?? null, checked_at: d.checks.checked_at } : null }));
+  const canSendInvoice = supplier && ["dispatched", "in_review", "resolving"].includes(po.status);
   const ops = (await opsOfRoot(q, po.root_id)).map((o) => ({ id: o.id, po_number: o.po_number, kind: o.kind, status: o.status, paypal_status: o.paypal_status, amount_cents: o.amount_cents, final_capture: o.final_capture, paypal_id: o.paypal_id, request_id: o.request_id, attempts: o.attempts, error: o.error, created_at: o.created_at, updated_at: o.updated_at }));
   const events = (await q.query<any>("SELECT id, at, type, summary, actor FROM events WHERE root_id = $1 ORDER BY id DESC LIMIT 80", [po.root_id])).rows;
   const tree = (await treeOf(q, po.root_id)).map((t) => ({ id: t.id, number: t.number, status: t.status, kind: t.kind, parent_id: t.parent_id }));
@@ -237,6 +239,7 @@ async function poModel(q: Queryable, po: PO, p: Person) {
     supply,
     defects,
     docs,
+    can_send_invoice: canSendInvoice,
     ops,
     messages: msgs.map((m) => {
       // Spec A6: supplier messages carry the stored three-reader check; anything else shows the rules, labelled so.

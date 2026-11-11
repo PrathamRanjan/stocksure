@@ -12,6 +12,7 @@ import { ErrorBlock, LoadingBlock, PageHeader, Spinner, Stamp, StatusStamp, Trus
 import { ApprovalCard } from "@/components/approval";
 import { Activity, AgentPanel, DefectsPanel, DocsPanel, Lines, Messages, MoneyPanel, PayPalPanel, Related, ResolutionPanel, SupplyPanel } from "./order/sections";
 import type { PoModel } from "./order/types";
+import { ShortfallAgents } from "@/components/talk";
 
 const MOVING = ["funding", "settling", "part_settling"];
 
@@ -251,6 +252,7 @@ export default function Order() {
           {m.approvals.map((a) => <ApprovalCard key={a.id} a={a} onDone={reload} showOrder={false} />)}
           <Lines m={m} reload={reload} />
           <ResolutionPanel m={m} reload={reload} />
+          <ShortfallAgents poId={m.po.id} onSettled={reload} />
           <SupplyPanel m={m} reload={reload} />
           <DefectsPanel m={m} reload={reload} />
           <Messages m={m} reload={reload} />
@@ -258,7 +260,7 @@ export default function Order() {
         <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5" aria-label="Money and records">
           <MoneyPanel m={m} />
           <PayPalPanel m={m} reload={reload} />
-          <DocsPanel m={m} />
+          <DocsPanel m={m} reload={reload} />
           <AgentPanel m={m} />
           <TrustRow dense />
           <Activity m={m} />

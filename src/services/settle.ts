@@ -62,7 +62,7 @@ export async function settle(poId: string, version: number, attempt = 0) {
   try {
     // After a charged part delivery, the final capture is the total less what the part already captured.
     const already = await partCharged(db, poId);
-    await captureOriginal(po, version, Math.max(0, body.totals.accepted_cents - already), already);
+    await captureOriginal(po, version, Math.max(0, (body.totals.payable_cents ?? body.totals.accepted_cents) - already), already);
     await confirmRelease(po, version);
     const repl = await orderReplacement(po, version, body);
     if (repl) await authorizeReplacement(po, version, repl);
@@ -220,7 +220,7 @@ async function orderReplacement(po: PO, v: number, body: any): Promise<string | 
     if (!prod?.active) problems.push(`${p.sku} is no longer sold`);
     else if (held < p.packs) problems.push(`${p.sku} is no longer held (${held} of ${p.packs} packs)`);
     else if (prod.stock_packs < p.packs) problems.push(`only ${prod.stock_packs} pack(s) of ${p.sku} are left in stock`);
-    if (prod && prod.price_cents !== p.pack_price_cents) problems.push(`${p.sku} price changed from ${fmt(p.pack_price_cents)} to ${fmt(prod.price_cents)}`);
+    if (prod && prod.price_cents !== (p.list_price_cents ?? p.pack_price_cents)) problems.push(`${p.sku} price changed from ${fmt(p.list_price_cents ?? p.pack_price_cents)} to ${fmt(prod.price_cents)}`);
     if (prod && body.needed_by && Date.now() + prod.lead_hours * 3_600_000 > new Date(body.needed_by).getTime()) problems.push(`${p.sku} can no longer arrive by ${new Date(body.needed_by).toISOString().slice(0, 16).replace("T", " ")}`);
   }
   if (problems.length) {

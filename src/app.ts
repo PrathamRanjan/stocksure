@@ -23,6 +23,8 @@ import { buildServer } from "./mcp/tools.js";
 import { installChannelHandlers } from "./channels/handlers.js";
 import { uiRouter } from "./web/ui-api.js";
 import { askRouter } from "./web/ask.js";
+import { protectedRouter } from "./web/protected.js";
+import { talksRouter } from "./web/talks.js";
 import { publicRouter } from "./web/public.js";
 import { config } from "./config.js";
 import { demoRouter, refuseShowcaseWrites, workspaceMiddleware } from "./demo/routes.js";
@@ -31,7 +33,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const spaDir = join(root, "web", "dist");
 
 /** Pages the React front end owns. Everything else (guard, ledger, deliveries, dock, safety, evidence…) stays server-rendered in the same identity. */
-export const SPA_PATHS = ["/", "/start", "/login", "/home", "/approvals", "/po/new", "/po/:id", "/po/:id/receive", "/stock", "/catalog", "/performance", "/demo", "/judge", "/about", "/ask", "/proof", "/ai", "/paypal", "/who-can-move-money", "/accessibility", "/agents"];
+export const SPA_PATHS = ["/", "/start", "/login", "/home", "/approvals", "/po/new", "/po/:id", "/po/:id/receive", "/stock", "/catalog", "/performance", "/demo", "/judge", "/about", "/ask", "/proof", "/ai", "/paypal", "/who-can-move-money", "/accessibility", "/agents", "/negotiations", "/negotiations/:id"];
 
 /**
  * The front end posts to the same handlers as the old forms, with `X-StockSure-UI: 1`. For those requests a redirect
@@ -115,6 +117,8 @@ export function createApp() {
   app.use(demoRouter());
   app.use(publicRouter());
   app.use(askRouter());
+  app.use(talksRouter());
+  app.use(protectedRouter());
   app.use(uiRouter());
   app.use(merchantRouter());
   app.use(guardRouter());

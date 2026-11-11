@@ -38,7 +38,7 @@ export function navFor(who: Who | null, counts: { needs: number; approvals: numb
       ],
       tools: [
         { to: "/disputes", label: "PayPal disputes", icon: FileWarning, server: true },
-        { to: "/negotiations", label: "Negotiations", icon: Handshake, server: true },
+        { to: "/negotiations", label: "Negotiations", icon: Handshake },
         { to: "/ledger", label: "Ledger", icon: Table2, server: true },
         { to: "/channels", label: "Phone alerts", icon: MessageSquare, server: true },
         { to: "/evidence", label: "Evidence", icon: BookOpenCheck, server: true },
@@ -71,7 +71,7 @@ export function navFor(who: Who | null, counts: { needs: number; approvals: numb
       { to: "/catalog", label: "Catalog", icon: Boxes },
       { to: "/ledger", label: "Ledger", icon: Table2, server: true },
       { to: "/deliveries", label: "Deliveries board", icon: CalendarClock, server: true },
-      { to: "/negotiations", label: "Agent negotiations", icon: Handshake, server: true },
+      { to: "/negotiations", label: "Agent negotiations", icon: Handshake },
       { to: "/channels", label: "Phone alerts", icon: MessageSquare, server: true },
       { to: "/evidence", label: "Evidence", icon: BookOpenCheck, server: true },
     ],

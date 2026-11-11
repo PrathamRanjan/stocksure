@@ -5,6 +5,7 @@ import { day, money, plural } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { useAction } from "@/lib/useAction";
 import { Button } from "@/components/ui/button";
+import { ProtectedThisMonth } from "@/components/protected";
 import { Empty, ErrorBlock, LoadingBlock, PageHeader, SectionTitle, Spinner, Stamp, StatusStamp, Tally, TallyLegend, type TallyNums } from "@/components/brand";
 
 export interface OrderCardData {
@@ -135,6 +136,8 @@ export default function Home() {
           <span className="min-w-0 break-all">{d.org.demo_wallet ? `Paid from the demo's saved sandbox wallet${d.org.payer ? ` (${d.org.payer})` : ""} · no PayPal login needed` : `${d.org.payer ? `as ${d.org.payer} · ` : ""}sandbox`}</span>
         </p>
       )}
+
+      {!supplierView && role === "owner" && <ProtectedThisMonth />}
 
       {d.approvals.length > 0 && (
         <Link to="/approvals" className="mb-6 flex items-center gap-3 rounded-lg border-2 border-foreground bg-card p-4 hover:bg-accent">

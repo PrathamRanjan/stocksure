@@ -228,7 +228,7 @@ export async function resolutionsOf(q: Queryable, poId: string): Promise<Resolut
 }
 
 export async function docsOf(q: Queryable, poId: string): Promise<Doc[]> {
-  return (await q.query<Doc>("SELECT id, po_id, kind, filename, mime, size, sha256, text_content, flags, uploaded_by, created_at FROM documents WHERE po_id = $1 ORDER BY created_at", [poId])).rows.map((d) => ({ ...d, flags: parse(d.flags) }));
+  return (await q.query<Doc>("SELECT id, po_id, kind, filename, mime, size, sha256, text_content, flags, checks, uploaded_by, created_at FROM documents WHERE po_id = $1 ORDER BY created_at", [poId])).rows.map((d: any) => ({ ...d, flags: parse(d.flags), checks: d.checks ? parse(d.checks) : null }));
 }
 
 export async function opsOfRoot(q: Queryable, rootId: string): Promise<(PaymentOp & { po_number: string })[]> {

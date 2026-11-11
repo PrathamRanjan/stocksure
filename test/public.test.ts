@@ -64,7 +64,7 @@ describe("judge page", () => {
     const ws = (await c.get("/api/ui/workspace")).json.workspace.id;
     await settled(ws);
     const j = (await c.get("/api/public/judge")).json;
-    expect(j.paths.map((p: any) => p.id)).toEqual(["short", "scam", "ask"]);
+    expect(j.paths.map((p: any) => p.id)).toEqual(["short", "scam", "agents", "invoice", "ask"]);
     for (const p of j.paths) for (const s of p.steps) expect(s.done).toBe(false);
     const count = j.paths[0].steps[0];
     expect(count).toMatchObject({ key: "counted", as: "sam" });
@@ -132,7 +132,7 @@ describe("proof suites (spec A5.6)", () => {
     expect(byId["ten-nov-message"]).toMatchObject({ pass: true });
     expect(byId["invoice-240-for-216"].pass).toBe(true);
     expect(byId["invoice-planted-instruction-new-payee"].pass).toBe(true);
-    expect(byId["invoice-duplicate-new-number"]).toMatchObject({ pass: null, state: "not built" });
+    expect(byId["invoice-duplicate-new-number"]).toMatchObject({ pass: true, state: "run" });
     expect(byId["photo-of-a-screen"]).toMatchObject({ pass: null, state: "not built" });
     expect(byId["why-cant-i-spend-20"]).toMatchObject({ pass: null, state: "not run" });
     expect(reg.cases).toBe(reg.results.filter((c) => c.pass !== null).length);

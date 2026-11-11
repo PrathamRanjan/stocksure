@@ -4,3 +4,8 @@ export const WORKSPACE_ROUTES = ["GET /admin/paypal/wallet", "GET /admin/paypal/
 export const ASK_ROUTES = ["GET /api/ui/ask", "GET /api/ui/ask/:id", "GET /api/ui/ask/:id/events", "GET /ask", "POST /api/ui/ask"];
 /** Spec A3: the judge API and the pages that need no sign-in, walked in test/public.test.ts. */
 export const PUBLIC_ROUTES = ["GET /api/public/ai", "GET /api/public/judge", "GET /api/public/mcp", "GET /api/public/paypal", "GET /api/public/proof", "GET /accessibility", "GET /agents", "GET /ai", "GET /paypal", "GET /proof", "GET /who-can-move-money"];
+
+/** Spec B4 item 3: agents settling a shortfall, walked over HTTP in test/shortfall.test.ts. */
+/** Exercised over HTTP in test/invoice.test.ts. */
+export const INVOICE_ROUTES = ["GET /api/ui/protected", "POST /po/:id/invoice"];
+export const SHORTFALL_ROUTES = ["GET /api/ui/po/:id/agents", "GET /negotiations/:id", "POST /api/ui/po/:id/agents"];

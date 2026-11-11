@@ -84,9 +84,13 @@ export async function walkFoundation(c: FoundationCtx) {
   }
   const neg = await one("SELECT * FROM negotiations WHERE id = $1", [negId]);
   expect(["agreed", "held"], JSON.stringify(neg.outcome)).toContain(neg.status);
-  expect((await jordan.get("/negotiations")).text).toMatch(/Negotiations/);
-  expect((await jordan.get(`/negotiations/${negId}`)).text).toMatch(/Round 1/);
-  expect((await ana.get(`/negotiations/${negId}`)).status).toBe(200);
+  // The pages are in the React shell (S5); their views are JSON.
+  expect((await jordan.get("/negotiations")).status).toBe(200);
+  expect((await jordan.get("/api/ui/negotiations")).json.negotiations.map((n: any) => n.id)).toContain(negId);
+  const view = (await jordan.get(`/api/ui/negotiations/${negId}`)).json;
+  expect(view).toMatchObject({ id: negId, kind: "quote" });
+  expect(view.moves[0].round).toBe(1);
+  expect((await ana.get(`/api/ui/negotiations/${negId}`)).status).toBe(200);
   const agentPoRow = await one("SELECT status FROM purchase_orders WHERE id = $1", [agentPo]);
   expect(["funded", "funding", "quoted"]).toContain(agentPoRow.status);
 

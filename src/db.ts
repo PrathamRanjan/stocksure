@@ -693,6 +693,11 @@ CREATE TABLE IF NOT EXISTS agent_questions (
   ended_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS agent_questions_org ON agent_questions(org_id, created_at DESC);
+-- Spec B4 item 3: the same negotiation tables hold a shortfall settled by two agents (kind 'shortfall').
+ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'quote';
+ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS subject JSONB;
+-- Spec B4 item 2: duplicate, price-history, payee and instruction checks on each invoice.
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS checks JSONB;
 `;
 
 /** Tables shared by every workspace. They live in the base schema only. */
@@ -790,6 +795,9 @@ export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
     await db.exec(SCHEMA);
     await db.exec(SHARED_SCHEMA);
   });
+  // Live workspaces made by an older build get the same idempotent schema, so new columns and tables exist there too.
+  const live = await withWorkspace(null, async () => (await db.query<{ id: string }>("SELECT id FROM workspaces WHERE seed_state IN ('seeding','ready')")).rows);
+  for (const w of live) await withWorkspace(w.id, () => db.exec(SCHEMA)).catch((e) => console.error("[stocksure] schema upgrade", w.id, (e as Error).message));
   return db;
 }
 

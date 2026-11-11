@@ -80,6 +80,9 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
   const people = ids?.people ?? {};
   const s = (key: string, title: string, as: string | null, to: string, help: string, done: string[] = [key]) => ({ key, title, as, person_id: as ? people[as] ?? null : null, to, help, done: done.some((k) => !!checklist[k]), done_at: done.map((k) => checklist[k]).find(Boolean) ?? null });
   const po = order ? `/po/${order.id}` : "/home";
+  const agentsId = await setting(db, "judge_agents_po");
+  const agentsPo = agentsId ? await pick("SELECT id, number FROM purchase_orders WHERE id = $1", [agentsId]) : null;
+  const ap = agentsPo ? `/po/${agentsPo.id}` : "/home";
   return [
     {
       id: "short",
@@ -103,6 +106,29 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
       steps: [
         s("scam_flagged", "Post the bank-change message on an order as Ana", "ana", order ? `${po}?say=${encodeURIComponent(TEN_NOV)}#messages` : "/home", "The message is checked as it arrives: rules, OpenAI Decisions, and the payment destination compared with the supplier's details on file."),
         s("scam_checked", "Paste it into the scam check as Jordan and see all four readers", "jordan", `/safety?demo=1#check`, "Nothing can show green for a message that names somewhere to pay."),
+      ],
+    },
+    {
+      id: "agents",
+      title: "Let the agents settle it",
+      minutes: 2,
+      paypal_login: false,
+      note: agentsPo ? `Uses ${agentsPo.number}: two cases of barista oat arrived crushed, the wholesaler agreed the count, the fix is open.` : "This demo has no open shortfall for the agents.",
+      steps: [
+        s("agents_agreed", "As Jordan, send the agents in: the café's agent and the wholesaler's agent trade offers on the two crushed cases", "jordan", `${ap}#agents`, "Each agent sees only its own side's limit. A referee in code refuses any offer outside either limit or any new line, and shows why."),
+        s("agents_supplier_ok", "As Ana, approve the terms the agents agreed", "ana", `${ap}#resolution`, "The agents' terms become a new fingerprinted version of the fix. Nothing is paid on the agents' word."),
+        s("agents_settled", "As Jordan, approve the same version and watch PayPal settle it", "jordan", `${ap}#resolution`, "PayPal captures the accepted cases, releases the rest and holds the replacement at the agreed price."),
+      ],
+    },
+    {
+      id: "invoice",
+      title: "Catch a bad invoice",
+      minutes: 1,
+      paypal_login: false,
+      note: order ? `Uses ${order.number}. StockSure pays the agreed counts at the quoted price, never an invoice, so these checks are for your books.` : "This demo has no open order for an invoice. Reset your demo on the demo page.",
+      steps: [
+        s("invoice_caught", "As Ana, send the sample bad invoice: one case billed extra, a new payee, and a line written to an AI", "ana", order ? `${po}#send-invoice` : "/home", "Code checks the invoice against the quote, the last three deliveries and the supplier's details on file; OpenAI Decisions reads it as a second opinion and can only add a flag."),
+        s("duplicate_caught", "As Ana, send the same invoice again under a new number", "ana", order ? `${po}#send-invoice` : "/home", "Same lines and total under a new number is flagged as a duplicate. Jordan sees both on Protected this month."),
       ],
     },
     {

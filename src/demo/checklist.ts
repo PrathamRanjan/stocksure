@@ -11,7 +11,9 @@ import { currentWs, type Queryable } from "../db.js";
 export type CheckKey =
   | "counted" | "doc_read" | "supplier_agreed" | "resolution_approved" | "captured" | "released" | "replacement_held"
   | "scam_flagged" | "scam_checked" | "scam_held"
-  | "ai_asked" | "ai_paypal" | "ai_drafted";
+  | "ai_asked" | "ai_paypal" | "ai_drafted"
+  | "agents_agreed" | "agents_supplier_ok" | "agents_settled"
+  | "invoice_caught" | "duplicate_caught";
 
 /** Event types (store.logEvent) that stand for a checklist step. */
 export const EVENT_KEYS: Record<string, CheckKey> = {
@@ -19,6 +21,7 @@ export const EVENT_KEYS: Record<string, CheckKey> = {
   "receipt.agreed": "supplier_agreed",
   // Both sides approve the fix; the step is done when the second one does.
   "resolution.agreed": "resolution_approved",
+  "resolution.agreed_agents": "agents_settled",
   "paypal.capture": "captured",
   "paypal.release": "released",
   "paypal.void": "released",
