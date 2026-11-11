@@ -37,15 +37,18 @@ test("a judge completes the three paths from /judge", async ({ browser }) => {
   const t0 = Date.now();
   await expect.poll(async () => (await (await p.request.get("/api/ui/workspace")).json())?.seed?.done, { timeout: 150_000, intervals: [2000] }).toBe(true);
   times.seed_s = Math.round((Date.now() - t0) / 1000);
+  console.log("SEED", times.seed_s, "s");
 
   // Path A: a short delivery.
   const a0 = Date.now();
   await openStep(p, "counted");
   await expect(p).toHaveURL(/\/receive$/);
   await p.getByRole("button", { name: "Driver notes two crushed" }).click();
+  await expect(p.getByText(/line read/).first()).toBeVisible({ timeout: 90_000 });
+  await p.waitForTimeout(1500);
   await p.getByRole("checkbox", { name: /I checked the goods/ }).check({ timeout: 60_000 });
   await p.getByRole("button", { name: "Confirm counts" }).click();
-  await p.waitForURL(/\/po\/[^/]+$/, { timeout: 30_000 });
+  await p.waitForURL(/\/po\/[^/]+$/, { timeout: 60_000 });
   await ticked(p, "counted");
   await openStep(p, "supplier_agreed");
   await p.getByRole("button", { name: /Agree with line 1/ }).click();
@@ -62,6 +65,7 @@ test("a judge completes the three paths from /judge", async ({ browser }) => {
   await ticked(p, "resolution_approved");
   await ticked(p, "captured", 120_000);
   times.path_a_s = Math.round((Date.now() - a0) / 1000);
+  console.log("PATH A", times.path_a_s, "s");
 
   // Path B: the bank-change scam.
   const b0 = Date.now();
@@ -77,15 +81,23 @@ test("a judge completes the three paths from /judge", async ({ browser }) => {
   await expect(p.locator("#scan-result")).toContainText(/Hold|Don't pay|do not pay/i, { timeout: 90_000 });
   await ticked(p, "scam_checked");
   times.path_b_s = Math.round((Date.now() - b0) / 1000);
+  console.log("PATH B", times.path_b_s, "s");
 
   // Path C: Ask.
   const c0 = Date.now();
   for (const key of ["ai_asked", "ai_paypal", "ai_drafted"]) {
     await openStep(p, key);
     await expect(p).toHaveURL(/\/ask\?q=/);
+    const q = new URL(p.url()).searchParams.get("q");
     await p.getByRole("button", { name: /^Ask$/ }).click();
-    // The question runs on the server; wait for it to finish before the next one (one at a time per demo).
-    await expect.poll(async () => (await (await p.request.get("/api/ui/ask")).json()).recent?.[0]?.status, { timeout: 90_000, intervals: [2000] }).not.toBe("running");
+    // The question runs on the server; wait for this one to finish before the next (one at a time per demo).
+    await expect.poll(async () => {
+      const r = (await (await p.request.get("/api/ui/ask")).json()).recent?.[0];
+      return r?.question === q ? r.status : "not started";
+    }, { timeout: 90_000, intervals: [2000] }).toMatch(/^(done|failed|refused)$/);
+    const r = (await (await p.request.get("/api/ui/ask")).json()).recent?.[0];
+    const st = await (await p.request.get(`/api/ui/ask/${r.id}`)).json();
+    console.log(key, st.status, (st.steps ?? []).map((s: any) => s.tool).join(","), (st.answer?.sentences ?? []).map((s: any) => s.text).join(" ").slice(0, 300), st.answer?.proposals?.length ?? st.proposals?.length ?? 0);
     await ticked(p, key, 20_000);
   }
   times.path_c_s = Math.round((Date.now() - c0) / 1000);

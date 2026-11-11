@@ -112,7 +112,7 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
       steps: [
         s("ai_asked", "Ask which supplier short-delivers most, as Jordan", "jordan", `/ask?q=${encodeURIComponent("Which supplier short-delivers most, and what did it cost?")}`, "The answer's sentences link to the tool calls they rest on."),
         s("ai_paypal", "Ask what you've been charged, with PayPal ids", "jordan", `/ask?q=${encodeURIComponent("What have I been charged so far, with the PayPal ids?")}`, "Reads come from StockSure's records and PayPal's own MCP server (read tools only)."),
-        s("ai_drafted", "Ask it to draft a note to the supplier", "jordan", `/ask?q=${encodeURIComponent("Draft a short note to Harbour asking when the replacement arrives.")}`, "A draft only: you send it yourself, or don't."),
+        s("ai_drafted", "Ask it to draft a note to the supplier", "jordan", `/ask?q=${encodeURIComponent(order ? `Draft a short note to Harbour about ${order.number} asking when the missing cases will arrive.` : "Draft a short note to Harbour asking when my next delivery arrives.")}`, "A draft only: you send it yourself, or don't."),
       ],
     },
   ];
