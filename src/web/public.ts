@@ -86,9 +86,9 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
       paypal_login: false,
       note: order ? `Uses ${order.number}, already held on PayPal from the demo's saved sandbox wallet.` : "This demo has no order left to count. Reset your demo on the demo page.",
       steps: [
-        s("counted", "Count it in as Sam: use the sample photo or note, then confirm (say one case is crushed)", "sam", order ? `${po}/receive` : "/home", "The model proposes counts from the paperwork; Sam confirms them. Nothing is paid from the paper."),
-        s("supplier_agreed", "Agree the count as Ana, the wholesaler", "ana", po, "Both sides sign the same fingerprinted version."),
-        s("resolution_approved", "Approve the fix as Jordan (credit or replacement)", "jordan", `${po}#resolution`, "Code works out the money from the quote and the confirmed counts."),
+        s("counted", "Count it in as Sam: load a sample delivery note (one has two crushed cases), tick that you checked the goods, confirm", "sam", order ? `${po}/receive` : "/home", "The model proposes counts from the paperwork; Sam confirms them. Nothing is paid from the paper."),
+        s("supplier_agreed", "As Ana, the wholesaler: agree the count, then approve the fix", "ana", po, "Code works out the fix from the quote and the confirmed counts: credit what's missing, or a replacement inside the limit."),
+        s("resolution_approved", "As Jordan: approve the same fix", "jordan", `${po}#resolution`, "Both sides sign the same fingerprinted version; then PayPal is asked to capture."),
         s("captured", "Watch PayPal capture what arrived and release the rest", "jordan", `${po}#paypal-ops`, "Each PayPal id on the page can be looked up in the sandbox.", ["captured", "released"]),
       ],
     },

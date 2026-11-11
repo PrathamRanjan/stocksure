@@ -17,7 +17,8 @@ export type CheckKey =
 export const EVENT_KEYS: Record<string, CheckKey> = {
   "receipt.confirmed": "counted",
   "receipt.agreed": "supplier_agreed",
-  "resolution.approved": "resolution_approved",
+  // Both sides approve the fix; the step is done when the second one does.
+  "resolution.agreed": "resolution_approved",
   "paypal.capture": "captured",
   "paypal.release": "released",
   "paypal.void": "released",

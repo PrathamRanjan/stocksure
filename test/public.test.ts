@@ -129,8 +129,13 @@ describe("proof suites (spec A5.6)", () => {
 
     const c = new Client(srv.base);
     const view = (await c.get("/api/public/proof")).json;
-    expect(view.source).toBe("database");
-    expect(view.runs.map((r: any) => r.suite)).toEqual(["regression", "scam"]);
+    // This server ran two suites; the third comes from the committed file and says so.
+    expect(view.runs.map((r: any) => [r.suite, r.source])).toEqual([
+      ["regression", "this server's run"],
+      ["scam", "this server's run"],
+      ["receiving", "committed file eval/proof/latest.json"],
+    ]);
+    expect(view.source).toMatch(/^database, with suites not yet run/);
     expect(view.runs[1].results).toHaveLength(SCAM_CASES.length);
     expect(new Date(view.runs[0].at).toDateString()).toBe(new Date().toDateString());
   });

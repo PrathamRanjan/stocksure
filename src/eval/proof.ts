@@ -53,6 +53,8 @@ export interface ProofRun {
   trigger: string;
   at: string;
   results: ProofCase[];
+  /** Where /proof read this run from. */
+  source?: string;
 }
 
 const clip = (s: string, n = 1200) => (s.length > n ? s.slice(0, n) + "…" : s);
@@ -202,9 +204,11 @@ export function writeProofFile(runs: ProofRun[], dir = "eval/proof") {
 export async function ensureFreshProof(wsId: string | null): Promise<{ ran: number }> {
   if (!hasOpenAI()) return { ran: 0 };
   const db = await getDb();
-  const last = (await db.query<{ at: Date | null }>("SELECT max(at) AS at FROM proof_runs WHERE trigger = 'nightly'")).rows[0]?.at;
-  if (last && Date.now() - new Date(last).getTime() < 20 * 3600_000) return { ran: 0 };
-  const runs = await withWorkspace(wsId, () => runProof({ trigger: "nightly" }));
+  // Per suite, so a run cut short by a restart finishes the suites it had not reached.
+  const last = new Map((await db.query<{ suite: Suite; at: Date }>("SELECT suite, max(at) AS at FROM proof_runs WHERE trigger = 'nightly' GROUP BY suite")).rows.map((r) => [r.suite, new Date(r.at).getTime()]));
+  const due = (["scam", "receiving", "regression"] as Suite[]).filter((s) => !last.has(s) || Date.now() - last.get(s)! >= 20 * 3600_000);
+  if (!due.length) return { ran: 0 };
+  const runs = await withWorkspace(wsId, () => runProof({ suites: due, trigger: "nightly" }));
   return { ran: runs.length };
 }
 
@@ -233,11 +237,18 @@ export async function proofView() {
   const db = await getDb();
   const fromDb = await withWorkspace(null, async () => (await db.query<any>("SELECT DISTINCT ON (suite) id, suite, models, cases, passed, cost_usd, trigger, results, at FROM proof_runs ORDER BY suite, at DESC")).rows);
   let runs: ProofRun[] = fromDb.map((r) => ({ ...r, cost_usd: Number(r.cost_usd), at: new Date(r.at).toISOString(), results: typeof r.results === "string" ? JSON.parse(r.results) : r.results }));
-  let source = "database";
-  if (!runs.length && existsSync("eval/proof/latest.json")) {
-    runs = JSON.parse(readFileSync("eval/proof/latest.json", "utf8")).runs;
-    source = "committed file eval/proof/latest.json";
+  // A suite the server has not run yet comes from the committed file, labelled as such.
+  const sources = new Map(runs.map((r) => [r.suite, "this server's run"]));
+  if (existsSync("eval/proof/latest.json")) {
+    for (const r of JSON.parse(readFileSync("eval/proof/latest.json", "utf8")).runs as ProofRun[]) {
+      if (sources.has(r.suite)) continue;
+      runs.push(r);
+      sources.set(r.suite, "committed file eval/proof/latest.json");
+    }
   }
+  const all = [...new Set(sources.values())];
+  const source = !all.length ? "none" : all.length === 1 ? (all[0] === "this server's run" ? "database" : all[0]) : "database, with suites not yet run on this server from the committed file eval/proof/latest.json";
+  runs = runs.map((r) => ({ ...r, source: sources.get(r.suite) }));
   const order: Suite[] = ["regression", "scam", "receiving"];
   runs.sort((a, b) => order.indexOf(a.suite) - order.indexOf(b.suite));
   const th = await thresholds();

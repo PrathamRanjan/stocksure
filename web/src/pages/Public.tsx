@@ -42,7 +42,7 @@ const Td = ({ children, className = "" }: { children?: ReactNode; className?: st
 
 /* ---------------- /proof ---------------- */
 interface ProofCase { id: string; group: string; split?: string; input: string; expected: string; actual: string; pass: boolean | null; state?: string; detail?: any }
-interface ProofRun { id: string; suite: string; models: string; cases: number; passed: number; cost_usd: number; trigger: string; at: string; results: ProofCase[] }
+interface ProofRun { id: string; suite: string; models: string; cases: number; passed: number; cost_usd: number; trigger: string; at: string; source?: string; results: ProofCase[] }
 interface ProofData { source: string; runs: ProofRun[]; calibration: any[]; thresholds: { name: string; clear_below: number; hold_above: number; source: string }[]; not_measured: string[]; data_note: string }
 
 const SUITE: Record<string, { title: string; what: string }> = {
@@ -66,7 +66,7 @@ function RunTable({ r }: { r: ProofRun }) {
       <h2 id={`suite-${r.suite}`} className="text-2xl">{s.title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{s.what}</p>
       <p className="mt-2 text-sm">
-        <b className="num">{r.passed} of {r.cases}</b> passed{held.length ? <> (held-out half: <span className="num">{held.filter((c) => c.pass).length} of {held.length}</span>)</> : null}. Run <b>{day(r.at)}</b> ({r.trigger}). Models: <span className="mono">{r.models}</span>. Model cost <span className="num">${r.cost_usd.toFixed(4)}</span>.
+        <b className="num">{r.passed} of {r.cases}</b> passed{held.length ? <> (held-out half: <span className="num">{held.filter((c) => c.pass).length} of {held.length}</span>)</> : null}. Run <b>{day(r.at)}</b> ({r.trigger}{r.source ? `; ${r.source}` : ""}). Models: <span className="mono">{r.models}</span>. Model cost <span className="num">${r.cost_usd.toFixed(4)}</span>.
       </p>
       <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filter cases">
         {(["all", "fail", ...(held.length ? ["held_out"] : [])] as const).map((k) => (
