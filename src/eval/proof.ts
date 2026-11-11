@@ -227,15 +227,28 @@ export function writeProofFile(runs: ProofRun[], dir = "eval/proof") {
   writeFileSync(join(dir, "latest.json"), JSON.stringify({ generated: new Date().toISOString(), runs }, null, 2) + "\n");
 }
 
+/** Bump a suite's number when its cases change, so the server reruns it after the deploy instead of the next night.
+ *  regression 2: Wave 4 added the duplicate-invoice, photo-of-a-screen and door-photo cases. */
+export const SUITE_VERSION: Record<Suite, number> = { scam: 1, receiving: 1, regression: 2 };
+
 /** Spec A5.6: run nightly; also right after a deploy when the last run is older than 20 hours. */
 export async function ensureFreshProof(wsId: string | null): Promise<{ ran: number }> {
   if (!hasOpenAI()) return { ran: 0 };
   const db = await getDb();
   // Per suite, so a run cut short by a restart finishes the suites it had not reached.
   const last = new Map((await db.query<{ suite: Suite; at: Date }>("SELECT suite, max(at) AS at FROM proof_runs WHERE trigger = 'nightly' GROUP BY suite")).rows.map((r) => [r.suite, new Date(r.at).getTime()]));
-  const due = (["scam", "receiving", "regression"] as Suite[]).filter((s) => !last.has(s) || Date.now() - last.get(s)! >= 20 * 3600_000);
+  // A suite whose cases changed since its last run (SUITE_VERSION bumped) is due at once, not the next night.
+  const seen = await withWorkspace(null, async () => {
+    const out = new Map<Suite, string | null>();
+    for (const s of ["scam", "receiving", "regression"] as Suite[]) out.set(s, await setting(db, `proof_version:${s}`));
+    return out;
+  });
+  const due = (["scam", "receiving", "regression"] as Suite[]).filter((s) => !last.has(s) || Date.now() - last.get(s)! >= 20 * 3600_000 || seen.get(s) !== String(SUITE_VERSION[s]));
   if (!due.length) return { ran: 0 };
   const runs = await withWorkspace(wsId, () => runProof({ suites: due, trigger: "nightly" }));
+  await withWorkspace(null, async () => {
+    for (const r of runs) await putSetting(db, `proof_version:${r.suite}`, String(SUITE_VERSION[r.suite]));
+  });
   return { ran: runs.length };
 }
 

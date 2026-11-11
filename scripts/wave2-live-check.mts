@@ -70,7 +70,8 @@ for (let i = 0; i < 45; i++) {
 }
 const tools = (st?.steps ?? []).map((s: any) => s.tool).filter((t: string) => t !== "paypal_mcp.connect" && t !== "answer");
 const mcp = (st?.steps ?? []).find((s: any) => s.tool === "paypal_mcp.connect");
-check("Ask answered with at least 2 tool calls", st?.status === "done" && tools.length >= 2, `${st?.status}; ${tools.join(", ")}`);
+const stoppedWhy = (st?.steps ?? []).find((s: any) => s.tool === "stopped")?.result?.error;
+check("Ask answered with at least 2 tool calls", st?.status === "done" && tools.length >= 2, `${st?.status}; ${tools.join(", ")}${stoppedWhy ? `; stopped: ${String(stoppedWhy).replace(/sk-[A-Za-z0-9_-]+/g, "[key]").slice(0, 200)}` : ""}`);
 check("PayPal's MCP server connected (read tools only)", Array.isArray(mcp?.detail?.read_tools) && mcp.detail.read_tools.length > 0, mcp?.detail?.read_tools ? `${mcp.detail.read_tools.length} read tools` : String(mcp?.detail?.error ?? "no connect step"));
 const sentences = st?.answer?.sentences ?? [];
 check("every sentence links to a tool call", sentences.length > 0 && sentences.every((s: any) => s.linked), `${sentences.filter((s: any) => s.linked).length} of ${sentences.length}`);
