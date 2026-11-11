@@ -74,7 +74,9 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
   const pick = async (sql: string, args: unknown[] = []) => (await db.query<{ id: string; number: string }>(sql, args)).rows[0] ?? null;
   const toCount = ids ? await pick("SELECT id, number FROM purchase_orders WHERE buyer_id = $1 AND status = 'dispatched' AND kind = 'original' AND NOT is_sample ORDER BY created_at LIMIT 1", [ids.laneway]) : null;
   const flow = ids ? await pick("SELECT id, number FROM purchase_orders WHERE buyer_id = $1 AND NOT is_sample AND kind = 'original' AND status NOT IN ('closed','cancelled') ORDER BY CASE status WHEN 'dispatched' THEN 0 WHEN 'in_review' THEN 1 WHEN 'resolving' THEN 2 ELSE 3 END, created_at LIMIT 1", [ids.laneway]) : null;
-  const order = toCount ?? flow;
+  // Once the visitor has counted an order, every path keeps pointing at that order (the seed's own counts come earlier).
+  const counted = ids && checklist.counted ? await pick("SELECT p.id, p.number FROM receipts r JOIN purchase_orders p ON p.id = r.po_id WHERE p.buyer_id = $1 AND p.kind = 'original' AND NOT p.is_sample AND r.created_at >= $2::timestamptz - interval '1 minute' ORDER BY r.created_at LIMIT 1", [ids.laneway, checklist.counted]) : null;
+  const order = counted ?? toCount ?? flow;
   const people = ids?.people ?? {};
   const s = (key: string, title: string, as: string | null, to: string, help: string, done: string[] = [key]) => ({ key, title, as, person_id: as ? people[as] ?? null : null, to, help, done: done.some((k) => !!checklist[k]), done_at: done.map((k) => checklist[k]).find(Boolean) ?? null });
   const po = order ? `/po/${order.id}` : "/home";
