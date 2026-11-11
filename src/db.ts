@@ -106,6 +106,10 @@ async function openPostgres(url: string): Promise<Db> {
   // 'error' event on the pool; with no listener Node ends the whole process (seen live 11 Nov 2026). Log it: the
   // pool has already dropped that client and opens a new one on the next query.
   pool.on("error", (e: Error) => console.error("[stocksure db] idle connection closed:", e.message));
+  // The same can happen to a client while a request holds it (ECONNRESET between two queries). Without a listener
+  // on the client itself that also ends the process; the request's next query fails instead and withClient throws
+  // the client away.
+  pool.on("connect", (c: any) => c.on("error", (e: Error) => console.error("[stocksure db] connection lost while in use:", e.message)));
   // The connection string chooses this app's schema (search_path option); that is the base schema.
   const base = String((await pool.query("SELECT current_schema() AS s")).rows[0].s);
   /** Checks out one client, points it at the current workspace, runs fn, and releases it. The path a client was
