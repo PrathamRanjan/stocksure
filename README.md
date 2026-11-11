@@ -17,6 +17,8 @@ Spec: https://claude.ai/artifact/MLTy7wTFHfEFKDuVjhk85W
 2. Pick a path. Each step has a button that signs you in as the right person (Sam, Ana or Jordan) and opens the exact screen. The tick appears when the server records that the step happened.
     - **A short delivery, paid for exactly** (about 3 minutes): count, agree, approve the fix, then watch PayPal capture what arrived and release the rest.
     - **Catch a bank-change scam** (about 1 minute): post the 10 Nov review's "we've moved banks" message as Ana, then check it as Jordan. Three readers check it on the server and one more runs in the browser. Nothing can show green for a message that names somewhere to pay.
+    - **Let the agents settle it** (about 1 minute): the café's agent and the wholesaler's agent trade offers on two crushed cases. A referee in code refuses any offer outside either side's limit; both people still approve, and PayPal settles only the agreed version.
+    - **Catch a bad invoice** (about 1 minute): Ana sends an invoice with one case billed extra, a new payee and a line written to an AI, then the same invoice under a new number. Code catches each; Jordan sees them on Protected this month.
     - **Ask the AI, and watch it work** (about 1 minute): every tool call shows on the AI work rail as it runs. The answer's sentences link to the calls they rest on. No tool can move money.
 3. Pages that need no sign-in:
     - [`/proof`](https://pph-stocksure.onrender.com/proof): every evaluation case, with pass or fail, date and model ids
@@ -115,7 +117,7 @@ npx tsx scripts/wave1-live-check.mts   # Wave 1 acceptance against the live site
 | Negotiation wording, mandate compile, ask-the-ledger | Model writes words only; prices, quantities and rules come from code and are checked verbatim |
 | Agents | Buyer and supplier agents are rule-driven; every offer passes a guard; the agreement is hashed and HMAC-signed by both sides |
 | Channels | Telegram and WhatsApp adapters with webhooks; live only with tokens. The simulator at `/channels` always works. Web push needs VAPID keys |
-| AG Grid, Bryntum | AG Grid Community ledger with cross-filtering widgets; AG Studio mounts when `AG_STUDIO_LICENSE` is set. Bryntum Scheduler trial build from jsDelivr |
+| AG Grid, Bryntum | AG Grid Enterprise 32.3.3 ledger (grouping, master-detail PayPal record, integrated chart, Excel export, saved view) with the licence from `AG_STUDIO_LICENSE` (a trial key, valid to 9 Dec 2026). Bryntum Scheduler trial build from jsDelivr for the deliveries board |
 
 ## Foundation and widening (9 and 10 Nov 2026)
 
@@ -344,3 +346,60 @@ The committed `eval/calibration/*.json` is applied by the server at start. The `
 - Making the repository public is the owner's call. It is private now, and `/judge` says so.
 - A dedicated judge buyer login is still not provided. `/judge` says "no dedicated judge buyer login yet".
 
+
+## Waves 4 and 5 (11 Nov 2026): agents, invoices, door photo, money panel, accessibility, voice, robot judge
+
+Done for `MASTER_IMPROVEMENT_SPEC.md` Part C, Wave 4 item 14 and Wave 5 items 19 and 20 (StockSure only; Wave 3 has no StockSure item). Deployed from `main` (last commit listed under "Live results"). Checked live with `scripts/wave45-live-check.mts` (HTTP, plus a spoken clip for voice), `scripts/wave2-live-check.mts` and `web/e2e/judge-live.spec.ts` (a browser walking every `/judge` path with the page's own buttons).
+
+**Wave 4 (B4).**
+- **Agents settle a shortfall.** The café's agent and the wholesaler's agent trade offers. Each sees only its own side's limit, and a referee in code refuses any offer outside either. When they agree, the terms become a new fingerprinted version of the fix. Both people still approve it, and only then does PayPal capture, release and hold the replacement at the agreed price. Judge path "Let the agents settle it".
+- **Invoice checks, code first.** Checks: duplicate under a new number, price above recent deliveries, new payee, a line written to an AI, and early-payment terms. OpenAI Decisions can only add a flag, never clear one. An early-payment discount comes off the capture. Judge path "Catch a bad invoice".
+- **Protected this month** on the owner's home. It shows what wasn't charged for goods that didn't arrive, overbilling refused and discounts taken, each with order numbers and PayPal ids. Scam holds and duplicate invoices are listed apart from the total. Sample history is never counted. The owner sees it; the supplier and the receiver are refused (403).
+- **Door photo count.** The vision model counts the cases in a photo taken at the door. Decisions answers three questions: does it show damage, does the label match, is it a photo of a screen. A photo of a screen counts nothing. A note that was read takes precedence over the photo; when they disagree, the line is marked `count_differs`. The demo's two sample photos are generated drawings, labelled as generated in the image and in the file name.
+- **Phone link.** The owner gets a QR code that signs a phone in as the receiver only. It works once and lasts 15 minutes.
+- **Money panel.** Each order shows its hold dates: best charged by day 3 (PayPal's honor period) and valid to day 29. A capture after day 3 reauthorizes first. "Check against PayPal" reads every PayPal id back from PayPal and lists matched, differs, missing, and anything PayPal has that StockSure has no record of. The receiver can't run it.
+
+**Wave 5.**
+- **A7 accessibility.**
+  - Display and help: the six switches have names and descriptions, and the close button is named.
+  - One live region announces payment changes on the order page.
+  - No sideways scroll at 200% text or at 320 px.
+  - `/accessibility` lists the recorded results of `web/e2e/a11y.spec.ts` (Playwright with axe-core, WCAG 2.2 AA) with their date, plus what was not tested.
+- **Voice input.** Push-to-talk on Ask and on the receive page's docket box. The browser streams audio to StockSure's server, which relays it to OpenAI `gpt-live-1`; the key never reaches the browser. The live transcript shows as you speak and the text lands in the box for you to read and send. The model's spoken reply is discarded. Each demo gets 10 minutes of voice a day and 30 seconds a turn, and every turn is audited at $0.05 a minute.
+- **A12 AG Grid Enterprise ledger** (`/ledger`). Row grouping by supplier, status or month, with sums. Each order row opens to its PayPal record (master-detail). An integrated chart draws supplier reliability. Excel export writes three sheets (orders, PayPal operations, receipts). A saved view is kept in this browser.
+- **Robot judge.** `.github/workflows/robot-judge.yml` walks every `/judge` path on production each night at 03:17 UTC with `judge-live.spec.ts`. It posts the result to `/api/robot-judge` (Bearer token, timing-safe compare; 404 while the token is unset), and `/proof` shows the last run.
+- **`/proof` reruns a suite after a deploy when its cases changed** (`SUITE_VERSION`), instead of waiting for the next night.
+
+**Live results (11 Nov 2026, `pph-stocksure.onrender.com`).**
+
+| Check | Result |
+|---|---|
+| Wave 4/5 live check, 20 checks (on `be9cf54`) | **20 of 20.** Door photo: ALM-12 8 cases, 2 damaged (24 units) seen. Screen photo: flagged, 0 lines. Phone link: signs in as Sam, second use 410. Hold dates: placed 11 Nov, best by 14 Nov, valid to 10 Dec. Check against PayPal: every id matched; receiver 403. Protected: $85.00 not charged; receiver 403. Ledger: Enterprise 32.3.3 with the licence. `/accessibility`: 5 dated checks, all pass. Robot-judge endpoint: 404 (token not set). Voice: "Which supplier short delivers most, and what did it cost" came back through `gpt-live-1` |
+| The same check, first run (on `b79f4a8`) | 19 of 20: the receiver could read Protected this month through the API. Fixed in `4d39784` |
+| Every `/judge` path in a browser (on `be9cf54`) | **14 of 14 steps.** Seed 29 s; short delivery 19 s; scam 7 s; invoice 19 s; agents 31 s; Ask 45 s. Automated clicks; a person reading each screen takes longer |
+| Wave 2 live check (24 checks) | 24 of 24 twice. One earlier run had 21 of 24: the Ask question stopped after one tool call. The cause wasn't captured; the check now prints the reason |
+| `/proof` rerun on the live server after the deploy (15:28 to 15:30 UTC) | Regression 7 of 7, now including the duplicate invoice, the photo of a screen and the door photo with two crushed cases. Scam 66 of 66 (`genuine-14` no longer falsely held). Receiving 27 of 27. Cost $0.07 + $0.01 + $0.03. The photos are generated drawings, and `/proof` says so |
+| Ledger in a browser (local, Playwright) | Pass: chart drawn, grouped by supplier, an order row opened to its PayPal record, Excel file downloaded, no console errors |
+
+**Fixed while checking live.**
+- **Server crashes.** The live server crashed twice: once at 14:46 UTC with "Connection terminated unexpectedly", once at 15:25 with ECONNRESET. Both times the database closed a connection and the `pg` pool, or a client a request was holding, had no error listener, so Node ended the process. The second crash looped, because the `/proof` rerun restarted with each boot. Both listeners now log the error instead. A client that died mid-request is thrown away, and connections use TCP keep-alive. The first crash had also cut short a live check (4 of 16).
+- **Grid defaults.** Every order's detail row opened at once, and the side bar covered the grid. Now groups open, details stay closed until asked for, and the side bar starts closed.
+- **Stale check.** The Wave 2 check expected three judge paths; it now expects five.
+
+**Not verified.**
+- The robot judge has not run from GitHub Actions. Its token is not set, because writing secrets was outside what this session was allowed to do (owner action below). The same spec was run by hand against production (row above).
+- No screen-reader session (VoiceOver or NVDA) and no recorded keyboard-only pass. `/accessibility` says so.
+- Voice was checked with a recorded clip sent over the relay, not a person speaking into a phone's microphone.
+- A stranger completing a path on a phone in under three minutes (quality gate item 4) has not been tried.
+- Why Postgres on Render dropped connections twice in an hour is not known. The server now survives it.
+
+**Not done.**
+- **A6.4:** retraining the on-device scam model and shipping it to all eight apps. This needs files outside this app's folder, and work here was limited to this folder. It also needs real scam messages from the owner.
+- **APIMatic portal and Channel3:** not used by StockSure.
+- **Robot judge on Render:** it runs on GitHub Actions instead of as a Render cron job.
+- **Plain words** on the device, and **other languages:** not done.
+
+**Owner actions.**
+- **Robot-judge token:** generate a random value. Run `gh secret set ROBOT_JUDGE_TOKEN --repo PrathamRanjan/stocksure` and paste it when asked, then set the same value as `ROBOT_JUDGE_TOKEN` on the Render service. Optional: the `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` secrets for failure alerts.
+- **AG Grid licence:** the key is a trial that expires on 9 Dec 2026. After that, the ledger shows AG Grid's watermark.
+- **Unchanged from Wave 2:** a public repository, a judge buyer login, an always-on Render plan, and an OpenAI budget.
