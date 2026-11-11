@@ -327,7 +327,7 @@ The committed `eval/calibration/*.json` is applied by the server at start. The `
 | Every sentence linked to a tool call | **Fail** once: 1 of 2 sentences had no valid citation, and the page showed it as "not linked to a fact". That is the check doing its job; it is not a full pass |
 | `/proof` lists every case with today's date | Pass: all three suites run on the server on 11 Nov |
 | Public pages load with no sign-in; `/paypal` has live ids and no token | Pass |
-| Judge paths, in a browser, with the page's own buttons | Pass: path A (short delivery) 16 s, path B (scam) 7 s, path C (Ask) 42 s, demo seeding 27 s. Every step ticked itself. These are automated clicks; a person reading each screen will take longer, but the waits are well inside 3 minutes |
+| Judge paths, in a browser, with the page's own buttons | Pass on ec62e4e: path A (short delivery) 18 s, path B (scam) 6 s, path C (Ask) 47 s, demo seeding 25 s. Every step ticked itself; path C confirmed three orders with PayPal's own `get_order` and drafted (not sent) a note for SS-1008. These are automated clicks; a person reading each screen will take longer, but the waits are well inside 3 minutes |
 
 **Fixed while checking live.**
 - The "approve the fix" step ticked on Ana's approval. It now ticks only when both sides have agreed.
@@ -337,7 +337,7 @@ The committed `eval/calibration/*.json` is applied by the server at start. The `
 
 **Not verified.**
 - `/accessibility` reports axe and the 360 px check for the new pages (the e2e suite passed), not a screen-reader session.
-- The landing try-it box was checked by type-check and build only; the model download and caching were not timed on a phone.
+- The landing try-it box was checked live on a desktop browser only (`web/e2e/try-live.spec.ts`). The 10 Nov message showed caution and named the payee: "Checked on this device in 50 ms; nothing left your browser." The model loaded in 2 s, a friendly message came back clear, and no request carried the text. The download and caching were not timed on a phone.
 - The nightly run has run once, after the deploy; the 24-hour repeat has not happened yet.
 
 **Owner actions.**
