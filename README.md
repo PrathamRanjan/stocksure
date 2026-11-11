@@ -278,3 +278,69 @@ Done for `MASTER_IMPROVEMENT_SPEC.md` Part C, Wave 1. Deployed from `main` at `3
 - Provide a dedicated sandbox buyer for judges who want to connect their own PayPal.
 - The GPT-6 per-token prices in the cost estimates come from secondary sources.
 
+## Wave 2 (11 Nov 2026): scam check v2, Ask, judge paths, /proof
+
+Done for `MASTER_IMPROVEMENT_SPEC.md` Part C, Wave 2 (items 6 to 9). Deployed from `main`; checked on the live site with `scripts/wave2-live-check.mts` (HTTP) and `web/e2e/judge-live.spec.ts` (a real browser following `/judge` with the page's own buttons).
+
+**A6 Scam check, version 2.** Three readers check every supplier message on the server as it arrives, and the strictest wins:
+- **Rules:** the tactic patterns plus the payment-risk model. The bank-change patterns were widened per A6.3.
+- **OpenAI Decisions** (`gpt-6-luna`): eleven yes/no questions. Code turns each probability into clear, caution or hold.
+- **Destination check, in code:** every payment destination in the message, compared with the supplier's contact on file.
+
+The browser adds the on-device model as a fourth reader on `/safety` and the landing page. A message that names somewhere to pay is never green. If Decisions doesn't answer, nothing is marked safe.
+
+Thresholds live in the `decision_thresholds` table. Two are calibrated on the tuning half of a 66-message labelled set, with a miss counted 10 times a false hold, and scored on the held-out half:
+- `changed_payment_details`: held-out precision 94%, recall 100%
+- `names_a_payment_destination`: never holds on its own; it only blocks green
+
+The committed `eval/calibration/*.json` is applied by the server at start. The `/safety` page used to say the pasted text never leaves the browser. That was no longer true, and it now says what is sent.
+
+**A5.3 Ask.** The agent runs on the Responses API (`gpt-6.1-sol`): at most 8 steps, 45 s and 25 questions a day per demo.
+- **Tools:** StockSure's read tools, PayPal's sandbox MCP server (`mcp.sandbox.paypal.com/sse`, 8 read tools on an allowlist), and one tool that drafts a message to the supplier.
+- **No money tools:** nothing the agent is offered can move money. A structural test checks the tool names and the agent's imports.
+- **Answers:** each sentence links to the tool calls it cites. Citations are checked against the calls that actually ran. An uncited sentence is stamped "not linked to a fact".
+- **AI work rail:** streams each step over SSE.
+
+**A3 Judge page and public pages.**
+- **`/judge`:** three paths through the visitor's own demo. Each step's button signs in as the right person and opens the exact screen. Steps tick from server events (`workspaces.checklist`), never during seeding.
+- **Live-or-simulated table:** built from the server's configuration.
+- **No-sign-in pages:** `/proof`, `/ai`, `/paypal`, `/who-can-move-money`, `/accessibility` and `/agents` (MCP connect command; `/mcp` itself is the endpoint).
+- **Tours (A3.3):** automatic tours are gone. A tour starts only from a button, covers one page, ends on any route change and never navigates. The cross-page judge tour was removed.
+
+**A6.6 Landing try-it box.** It runs the on-device model and a browser copy of the destination check; nothing is sent. The model downloads with a progress bar and the service worker caches it.
+
+**A5.6 `/proof`.** Every case is shown with its input, expected result, the answer, and pass or fail, plus the model ids and the date. The server runs the suites nightly in the showcase demo, per suite, so a run cut short by a deploy finishes later. `npm run eval:proof` writes `eval/proof/latest.json`. Suites not yet run on the server are filled from that file and labelled as such.
+
+| Suite (live nightly run, 11 Nov 2026) | Result | Failures |
+|---|---|---|
+| Regression set from the 10 Nov review | 4 of 4 run cases pass; 3 listed, not run | not run: handwriting photo (no image in the set); not built: duplicate invoice (Wave 4), photo of a screen (Wave 3) |
+| Scam check on supplier messages | 65 of 66 | `genuine-14` "Our payment details haven't changed…" was held: Decisions scored *impersonation* at 89%, and that threshold is still the default, not calibrated. A false hold, not a miss |
+| Reading delivery notes | 26 of 27 | `trap-invented-2`: an invented "premium" line still reached a proposal. Money impact $0, because only PO lines are paid at quote prices |
+
+**Live results (11 Nov 2026, `pph-stocksure.onrender.com`).**
+
+| Check | Result |
+|---|---|
+| The 10 Nov message, posted by Ana on an order | Pass: held; rules, Decisions and destinations each said hold |
+| The same message in the scam check as Jordan | Pass: held, Decisions answered (`gpt-6-luna`, 297 ms), never green; reason: a free-mail address while the supplier is on file at its own domain |
+| Ask: the AI work rail shows at least 2 tool calls | Pass: "Why can't I spend the $20 yet?" ran 6 tool calls, streamed over SSE; PayPal MCP connected with 8 read tools |
+| Every sentence linked to a tool call | **Fail** once: 1 of 2 sentences had no valid citation, and the page showed it as "not linked to a fact". That is the check doing its job; it is not a full pass |
+| `/proof` lists every case with today's date | Pass: all three suites run on the server on 11 Nov |
+| Public pages load with no sign-in; `/paypal` has live ids and no token | Pass |
+| Judge paths, in a browser, with the page's own buttons | Pass: path A (short delivery) 16 s, path B (scam) 7 s, path C (Ask) 42 s, demo seeding 27 s. Every step ticked itself. These are automated clicks; a person reading each screen will take longer, but the waits are well inside 3 minutes |
+
+**Fixed while checking live.**
+- The "approve the fix" step ticked on Ana's approval. It now ticks only when both sides have agreed.
+- The PayPal-ids question was answered from StockSure's own records of PayPal operations. The agent is now told to confirm ids with PayPal's own read tool, and it reads each order from PayPal's MCP server.
+- The draft prompt didn't name an order. With two replacements open, the agent rightly asked which one; the prompt now names the order.
+- After path A, the paths switched to a different (draft) order. They now stay on the order the visitor counted.
+
+**Not verified.**
+- `/accessibility` reports axe and the 360 px check for the new pages (the e2e suite passed), not a screen-reader session.
+- The landing try-it box was checked by type-check and build only; the model download and caching were not timed on a phone.
+- The nightly run has run once, after the deploy; the 24-hour repeat has not happened yet.
+
+**Owner actions.**
+- Making the repository public is the owner's call. It is private now, and `/judge` says so.
+- A dedicated judge buyer login is still not provided. `/judge` says "no dedicated judge buyer login yet".
+

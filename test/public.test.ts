@@ -13,6 +13,8 @@ import { getWorkspace, seedStatus } from "../src/demo/workspaces.js";
 import { runProof } from "../src/eval/proof.js";
 import { SCAM_CASES } from "../src/eval/scam-cases.js";
 import { tick } from "../src/demo/checklist.js";
+import { confirmReceipt } from "../src/services/receiving.js";
+import { linesOf, personById } from "../src/store.js";
 import { Client } from "./client.js";
 import { serveTracked } from "./journey-coverage.js";
 
@@ -72,12 +74,20 @@ describe("judge page", () => {
     expect(j.accounts.judge_buyer).toBeNull();
     expect(j.workspace.join_qr).toBe("/demo/join.svg");
 
-    // The seed's own events never tick; an event in the ready workspace does, once.
-    await withWorkspace(ws, () => tick(db, "counted"));
+    // The seed's own events never tick. Sam counting the target order (seconds after seeding) ticks it once, and
+    // every path keeps pointing at that order afterwards, not at an order the seed counted.
+    const poId = /\/po\/([^/]+)\/receive$/.exec(count.to)![1];
+    await withWorkspace(ws, async () => {
+      const sam = (await personById(db, count.person_id))!;
+      const lines = await linesOf(db, poId);
+      await confirmReceipt(sam, poId, Object.fromEntries(lines.map((l) => [l.id, { delivered: String(l.qty_packs * l.product.pack_units), damaged: "0", wrong: "0", note: "" }])));
+    });
     await withWorkspace(ws, () => tick(db, "counted"));
     const after = (await c.get("/api/public/judge")).json;
     expect(after.paths[0].steps[0].done).toBe(true);
     expect(after.paths[0].steps[1].done).toBe(false);
+    expect(after.paths[0].steps[1].to).toBe(`/po/${poId}`);
+    expect(after.paths[1].steps[0].to).toContain(`/po/${poId}?say=`);
     // Base data (no workspace) never ticks anything.
     await tick(db, "captured");
   });
