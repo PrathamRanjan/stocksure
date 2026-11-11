@@ -101,13 +101,18 @@ async function openPglite(path: string | null): Promise<Db> {
 async function openPostgres(url: string): Promise<Db> {
   const pgmod = await import("pg");
   const Pool = (pgmod as any).default?.Pool ?? (pgmod as any).Pool;
-  const pool = new Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: false }, max: 10 });
+  const pool = new Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: false }, max: 10, keepAlive: true, idleTimeoutMillis: 30_000 });
+  // The database can close an idle connection (maintenance, a restart, a network blip). pg reports that as an
+  // 'error' event on the pool; with no listener Node ends the whole process (seen live 11 Nov 2026). Log it: the
+  // pool has already dropped that client and opens a new one on the next query.
+  pool.on("error", (e: Error) => console.error("[stocksure db] idle connection closed:", e.message));
   // The connection string chooses this app's schema (search_path option); that is the base schema.
   const base = String((await pool.query("SELECT current_schema() AS s")).rows[0].s);
   /** Checks out one client, points it at the current workspace, runs fn, and releases it. The path a client was
    *  last set to is remembered, so the SET is only sent when a client moves between workspaces. */
   async function withClient<T>(fn: (c: any) => Promise<T>): Promise<T> {
     const client = await pool.connect();
+    let broken = false;
     try {
       const ws = currentWs();
       const want = pathFor(base, ws);
@@ -125,8 +130,12 @@ async function openPostgres(url: string): Promise<Db> {
         client.__ssPath = want;
       }
       return await fn(client);
+    } catch (e) {
+      // A dead connection is thrown away instead of going back to the pool for the next request to trip on.
+      if (/Connection terminated|ECONNRESET|connection error|not queryable/i.test(String((e as Error)?.message))) broken = true;
+      throw e;
     } finally {
-      client.release();
+      client.release(broken || undefined);
     }
   }
   return {
