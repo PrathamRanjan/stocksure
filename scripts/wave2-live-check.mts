@@ -36,9 +36,9 @@ check("demo seeded", ws?.seed?.done === true && !ws?.seed?.stopped, `${ws?.seed?
 const people = (await v.get("/api/ui/people")).json.people as any[];
 const id = (first: string) => people.find((p) => p.first === first)?.id;
 
-// Judge page: three paths, nothing ticked yet.
+// Judge page: five paths (Wave 4 added agents and invoice), nothing ticked yet.
 const j0 = (await v.get("/api/public/judge")).json;
-check("judge page has the three paths, none ticked", j0?.paths?.map((p: any) => p.id).join(",") === "short,scam,ask" && j0.paths.every((p: any) => p.steps.every((s: any) => !s.done)));
+check("judge page has the five paths, none ticked", j0?.paths?.map((p: any) => p.id).join(",") === "short,scam,agents,invoice,ask" && j0.paths.every((p: any) => p.steps.every((s: any) => !s.done)));
 const scamStep = j0.paths.find((p: any) => p.id === "scam").steps[0];
 const po = /\/po\/([^?#/]+)/.exec(scamStep.to)?.[1];
 

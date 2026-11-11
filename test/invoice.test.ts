@@ -93,6 +93,9 @@ describe("supplier invoices on an order", () => {
 
     // The café's home: the duplicate is listed apart from the money total (StockSure pays counts, not invoices).
     expect((await c.get("/api/ui/protected")).status).toBe(403);
+    // The receiver counts goods; the money figures are the owner's.
+    expect((await c.post("/login", { person_id: ids.people.sam, next: "/home" })).status).toBe(302);
+    expect((await c.get("/api/ui/protected")).status).toBe(403);
     expect((await c.post("/login", { person_id: ids.people.jordan, next: "/home" })).status).toBe(302);
     const prot = (await c.get("/api/ui/protected")).json;
     const dup = prot.rows.find((r: any) => r.key === "duplicates");

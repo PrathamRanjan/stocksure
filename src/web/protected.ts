@@ -79,6 +79,8 @@ export function protectedRouter() {
       const p = await me(req);
       if (!p) throw new GtError("Sign in first.", "unauthorized", 401);
       if (p.org_kind !== "buyer") throw new GtError("This is the café's view.", "forbidden", 403);
+      // Money figures are the owner's; the receiver counts goods (the same rule as "Check against PayPal").
+      if (p.role === "receiving") throw new GtError("The owner sees what was protected.", "forbidden", 403);
       res.setHeader("Cache-Control", "no-store").json(await protectedThisMonth(p));
     } catch (e) {
       const g = e instanceof GtError ? e : null;
