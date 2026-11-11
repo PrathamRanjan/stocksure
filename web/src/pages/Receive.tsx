@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { AlertTriangle, Bot, Camera, Check, FileText, QrCode, RotateCcw, Upload } from "lucide-react";
 import { PhoneLink } from "@/components/phone-link";
+import { PushToTalk } from "@/components/push-to-talk";
 import { useView } from "@/lib/api";
 import { ago, day, plural } from "@/lib/format";
 import { useAction } from "@/lib/useAction";
@@ -103,8 +104,9 @@ export default function Receive() {
                 <Input id="notes" ref={notes} type="file" accept="image/*,application/pdf,text/plain" multiple className="h-auto py-2" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="ntext">Or paste the docket text</Label>
+                <Label htmlFor="ntext">Or paste the docket text, or say what arrived</Label>
                 <Textarea id="ntext" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+                {m.reader.startsWith("OpenAI") && <PushToTalk label="Hold to say what arrived" onText={(t) => setText((x) => (x.trim() ? `${x.trim()}\n${t}` : t))} />}
               </div>
               <Button onClick={() => upload()} disabled={!!busy}>{busy === "upload" ? <Spinner /> : <Upload aria-hidden="true" />} Read these</Button>
               {m.demo.samples && (

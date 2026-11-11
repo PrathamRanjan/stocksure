@@ -27,7 +27,7 @@ import { duplicateOf, invoiceNumber } from "../services/invoice-checks.js";
 import { demoIds, sampleDeliveryNote, sampleInvoice } from "../services/seed.js";
 import { readDoorPhoto } from "../ai/door-photo.js";
 import { doorPhoto, screenPhoto } from "../demo/sample-photos.js";
-import { personById } from "../store.js";
+import { personById, putSetting, setting } from "../store.js";
 import { SCAM_CASES, SUPPLIER_CONTACT, TEN_NOV, type ScamCase } from "./scam-cases.js";
 import { demoCandidates, runSuite } from "./runner.js";
 
@@ -286,6 +286,24 @@ export async function proofView() {
     calibration: calibrationTables(),
     thresholds: [...th.values()].map((t) => ({ name: t.name, clear_below: t.clear_below, hold_above: t.hold_above, source: t.source })),
     not_measured: NOT_MEASURED,
+    robot_judge: await robotJudgeLast(),
     data_note: "Every case on this page is synthetic and written for the test. Nothing here comes from a real customer.",
   };
+}
+
+/**
+ * Spec A4/A12: the robot judge. A nightly GitHub Actions job walks every /judge path on production in a browser
+ * (web/e2e/judge-live.spec.ts) and posts its result here; /proof shows the last one. Stored in the shared schema.
+ */
+export interface RobotRun { ran_at: string; passed: boolean; base: string; times: Record<string, number>; steps: { path: string; key: string; done: boolean }[]; run_url: string | null; received_at: string }
+export async function recordRobotRun(r: Omit<RobotRun, "received_at">) {
+  const db = await getDb();
+  const row: RobotRun = { ...r, received_at: new Date().toISOString() };
+  await withWorkspace(null, () => putSetting(db, "robot_judge_last", JSON.stringify(row)));
+  return row;
+}
+export async function robotJudgeLast(): Promise<RobotRun | null> {
+  const db = await getDb();
+  const v = await withWorkspace(null, () => setting(db, "robot_judge_last"));
+  return v ? JSON.parse(v) : null;
 }

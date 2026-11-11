@@ -114,7 +114,16 @@ export function ledgerRouter() {
           { title: "Ledger", who: whoOf(p), flash: flashOf(req), head: AGGRID, scripts: raw(`<script src="/static/ledger.js" defer></script>`) },
           html`
 <h1>Ledger</h1>
-<p class="sub">Orders, PayPal operations, receipts and negotiations from the last ${d.days} days as related tables. Click an order to filter the others. ${studio ? "AG Studio licence present: the Studio dashboard mounts below." : "AG Grid Community; the same JSON endpoint feeds an AG Studio dashboard when AG_STUDIO_LICENSE is set."}</p>
+<p class="sub">Orders, PayPal operations, receipts and negotiations from the last ${d.days} days. Click an order to filter the others; open its row to see its PayPal record; drag a column to the bar to group by it. ${studio ? "AG Grid Enterprise, with the licence from the environment." : "AG Grid Enterprise without a licence key, so AG Grid shows its watermark."}</p>
+<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0">
+  <button class="btn small" type="button" id="xl-export">Export to Excel (orders, PayPal, receipts)</button>
+  <button class="btn small" type="button" id="view-supplier">Group by supplier</button>
+  <button class="btn small" type="button" id="view-month">Group by month</button>
+  <button class="btn small" type="button" id="view-save">Save this view</button>
+  <button class="btn small" type="button" id="view-load">Load my saved view</button>
+  <button class="btn small" type="button" id="view-reset">Reset view</button>
+  <span class="small muted" id="view-status" role="status" aria-live="polite"></span>
+</div>
 
 <div class="grid g3">
   <div class="card widget"><h3>Billed versus paid</h3>
@@ -136,9 +145,9 @@ ${asked ? html`<div class="answer"><p>${asked.answer}</p><p class="small muted">
   <div class="card"><h2>Receipts</h2><div id="grid-receipts" class="grid-md ag-theme-quartz"></div></div>
 </div>
 <div class="card"><h2>Negotiations</h2><div id="grid-negotiations" class="grid-sm ag-theme-quartz"></div></div>
-${studio ? html`<div class="card"><h2>AG Studio</h2><div id="ag-studio" data-license="present" data-src="/ledger/data.json"></div><p class="small muted">Studio mounts here with the licence from the environment; the three widgets above are registered as custom widgets.</p></div>` : ""}
+<div class="card"><h2>Supplier reliability chart</h2><div id="chart-reliability" style="height:320px"></div><p class="small muted">An AG Grid integrated chart drawn from the reliability table above; it redraws when that table changes.</p></div>
 <p class="small"><a href="/ledger/data.json">Data as JSON</a> · <a href="/ledger/export.csv">Orders CSV</a> · <a href="/deliveries">Deliveries over time</a></p>
-${jsonBlock("ledger-data", d)}`,
+${jsonBlock("ledger-data", { ...d, ag_license: config.agStudioLicense || null })}`,
         ),
       );
     }, () => "/home"),

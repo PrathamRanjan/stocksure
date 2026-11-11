@@ -37,7 +37,8 @@ export interface LayoutOpts {
   site?: boolean;
 }
 
-export const AGGRID = raw(`<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js" defer></script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">`);
+/** AG Grid Enterprise with integrated charts (row grouping, master-detail, charts, Excel export). */
+export const AGGRID = raw(`<script src="https://cdn.jsdelivr.net/npm/ag-grid-charts-enterprise@32.3.3/dist/ag-grid-charts-enterprise.min.js" defer></script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">`);
 
 export const BRAND: Brand = {
   name: "StockSure",

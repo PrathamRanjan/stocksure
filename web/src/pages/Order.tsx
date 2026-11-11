@@ -220,6 +220,35 @@ function DispatchForm({ m, reload }: { m: PoModel; reload: () => void }) {
   );
 }
 
+const OP_SAY: Record<string, string> = { authorize: "hold placed", capture: "captured", void: "hold released", refund: "refunded" };
+
+/**
+ * Spec A7: every payment status change is announced through the page's one polite live region (public/a11y.js).
+ * The first load is not announced; only changes while the page is open.
+ */
+function usePaymentAnnouncer(m: PoModel | null) {
+  const seen = useRef<Map<string, string> | null>(null);
+  const status = useRef<string | null>(null);
+  useEffect(() => {
+    if (!m) return;
+    const now = new Map(m.ops.map((o) => [o.id, `${o.status}:${o.paypal_status ?? ""}`]));
+    const say: string[] = [];
+    if (seen.current) {
+      for (const o of m.ops) {
+        const was = seen.current.get(o.id);
+        if (was === now.get(o.id)) continue;
+        if (o.status === "succeeded") say.push(`PayPal ${OP_SAY[o.kind] ?? o.kind} ${money(o.amount_cents)}.`);
+        else if (o.status === "failed") say.push(`PayPal ${OP_SAY[o.kind] ?? o.kind} of ${money(o.amount_cents)} failed.`);
+        else if (!was) say.push(`PayPal ${OP_SAY[o.kind] ?? o.kind} of ${money(o.amount_cents)} started.`);
+      }
+      if (status.current && status.current !== m.po.status) say.push(`${m.po.number} is now ${m.po.status.replace(/_/g, " ")}.`);
+    }
+    seen.current = now;
+    status.current = m.po.status;
+    if (say.length) window.a11yKit?.announce?.(say.join(" "));
+  }, [m]);
+}
+
 export default function Order() {
   const { id } = useParams();
   const [poll, setPoll] = useState<number | false>(false);
@@ -227,6 +256,7 @@ export default function Order() {
   const reload = () => v.reload(true);
   const moving = !!v.data && (MOVING.includes(v.data.po.status) || v.data.ops.some((o) => o.status === "pending"));
   useEffect(() => setPoll(moving ? 3000 : false), [moving]);
+  usePaymentAnnouncer(v.data);
   if (v.error && !v.data) return <ErrorBlock message={v.error.message} retry={() => v.reload()} status={v.error.status} />;
   if (!v.data) return <LoadingBlock label="Loading the order" />;
   const m = v.data;

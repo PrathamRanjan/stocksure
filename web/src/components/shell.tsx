@@ -169,7 +169,7 @@ function UserMenu({ who }: { who: Who }) {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="max-w-56 justify-start" aria-label={`Signed in as ${who.name}. Account menu`}>
           <UserRound aria-hidden="true" />
-          <span className="truncate">{who.first}</span>
+          <span className="truncate max-[359px]:hidden">{who.first}</span>
           <span className="hidden truncate text-muted-foreground lg:inline">· {who.org}</span>
         </Button>
       </DropdownMenuTrigger>

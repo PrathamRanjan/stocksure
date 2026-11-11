@@ -1,0 +1,75 @@
+# Spec A4/A12: the robot judge. Each night a browser walks every /judge path on production, the way a judge
+# would (its own private demo, the page's own buttons), and posts the result to /proof. A failed step fails the
+# run (red in Actions) and, when a Telegram bot is configured, messages the owner.
+#
+# Secrets: ROBOT_JUDGE_TOKEN (the same value as the Render env var; without it the result is only kept as an
+# artifact here). Optional: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID. Set the repository variable ROBOT_JUDGE to
+# "off" to stop the runs. Each run spends a few cents of model calls (receiving, invoice, agents, three questions).
+name: robot-judge
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  judge:
+    if: ${{ vars.ROBOT_JUDGE != 'off' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BASE: ${{ vars.ROBOT_JUDGE_BASE || 'https://pph-stocksure.onrender.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the browser tests
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Wake the site
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$BASE/healthz" || echo 000)
+            echo "healthz: $code"; [ "$code" = "200" ] && exit 0; sleep 20
+          done
+          exit 1
+      - name: Walk every judge path
+        id: walk
+        working-directory: web
+        env:
+          LIVE: "1"
+          E2E_BASE: ${{ env.BASE }}
+          ROBOT_OUT: ${{ runner.temp }}/robot-run.json
+        run: npx playwright test e2e/judge-live.spec.ts --reporter=list
+      - name: Report to /proof
+        if: always()
+        env:
+          TOKEN: ${{ secrets.ROBOT_JUDGE_TOKEN }}
+          OUTCOME: ${{ steps.walk.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FILE: ${{ runner.temp }}/robot-run.json
+        run: |
+          if [ ! -f "$FILE" ]; then echo '{"steps":[],"times":{}}' > "$FILE"; fi
+          body=$(jq --arg base "$BASE" --arg url "$RUN_URL" --argjson passed "$([ "$OUTCOME" = success ] && echo true || echo false)" '. + {base: $base, run_url: $url, passed: $passed, ran_at: (.ran_at // (now | todate))}' "$FILE")
+          if [ -z "$TOKEN" ]; then echo "::warning::ROBOT_JUDGE_TOKEN is not set; the result is kept as an artifact only."; exit 0; fi
+          curl -sS --fail-with-body -X POST "$BASE/api/robot-judge" -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' -d "$body"
+      - name: Tell the owner on Telegram
+        if: failure()
+        env:
+          BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$BOT" ] || [ -z "$CHAT" ]; then echo "Telegram is not configured; the red run is the alert."; exit 0; fi
+          curl -sS -X POST "https://api.telegram.org/bot$BOT/sendMessage" -d chat_id="$CHAT" --data-urlencode text="StockSure robot judge: a /judge path failed on $BASE. $RUN_URL"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: robot-judge-run
+          path: |
+            ${{ runner.temp }}/robot-run.json
+            web/test-results
+          if-no-files-found: ignore

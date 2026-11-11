@@ -135,6 +135,7 @@ export default function Landing() {
             <button type="button" className="min-h-10 rounded-md border border-input bg-card px-3 font-semibold aria-pressed:bg-foreground aria-pressed:text-background" data-q="contrast:high">High contrast</button>
             <button type="button" className="min-h-10 rounded-md border border-input bg-card px-3 font-semibold aria-pressed:bg-foreground aria-pressed:text-background" data-q="readAloud:true">Read aloud</button>
           </div>
+          <p className="mt-3 text-sm"><Link to="/accessibility" className="font-semibold underline underline-offset-4">Works with a screen reader, at 200% text, by voice</Link></p>
         </div>
         <Docket />
       </section>

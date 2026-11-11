@@ -4,6 +4,7 @@ import { getJSON, useView } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { PushToTalk } from "@/components/push-to-talk";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ErrorBlock, LoadingBlock, PageHeader, Spinner, Stamp } from "@/components/brand";
 
@@ -162,6 +163,7 @@ export default function Ask() {
           >
             <label htmlFor="ask-q" className="font-semibold">Question</label>
             <Textarea id="ask-q" rows={3} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Which supplier short-delivers most, and what did it cost?" maxLength={600} />
+            {d.ready && <PushToTalk label="Hold to ask by voice" onText={(t) => setQuestion((q) => (q.trim() ? `${q.trim()} ${t}` : t).slice(0, 600))} />}
             <div className="flex flex-wrap items-center gap-2">
               <Button type="submit" disabled={busy || !d.ready || d.left_today <= 0}>{busy ? <Spinner className="size-4" /> : <Send aria-hidden="true" />} Ask</Button>
               <span className="text-sm text-muted-foreground">{d.left_today} of {d.per_day} questions left today in this demo</span>
@@ -171,7 +173,7 @@ export default function Ask() {
           {err && <p className="mt-3 flex gap-2 rounded-md bg-stop-soft px-3 py-2 text-sm" role="alert"><CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{err}</p>}
           <div className="mt-3 flex flex-wrap gap-2" aria-label="Suggested questions">
             {d.suggested.map((s) => (
-              <Button key={s} type="button" size="sm" variant="outline" disabled={busy || !d.ready} onClick={() => { setQuestion(s); void ask(s); }}>{s}</Button>
+              <Button key={s} type="button" size="sm" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left" disabled={busy || !d.ready} onClick={() => { setQuestion(s); void ask(s); }}>{s}</Button>
             ))}
           </div>
 

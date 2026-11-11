@@ -95,6 +95,8 @@ export const config = {
     reauthorizeAfterDays: num(process.env.SS_REAUTHORIZE_AFTER_DAYS, 3),
   },
   agStudioLicense: process.env.AG_STUDIO_LICENSE || "",
+  /** Shared with the nightly robot judge (GitHub Actions); unset, the robot-judge endpoint answers 404. */
+  robotJudgeToken: process.env.ROBOT_JUDGE_TOKEN || "",
 };
 
 export function paypalBaseUrl(env: "sandbox" | "live" = config.paypal.env): string {

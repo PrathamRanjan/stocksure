@@ -53,6 +53,7 @@ export async function serveTracked(app: any) {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
     base,
+    server,
     hits,
     failures,
     /** Routes the journey never reached, minus any listed (with a reason) in `skip`. */

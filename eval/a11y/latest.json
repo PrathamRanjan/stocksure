@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-11T14:36:06.003Z",
+  "runner": "Playwright + axe-core (web/e2e/a11y.spec.ts)",
+  "results": [
+    {
+      "check": "Display and help: six named switches with descriptions; named close button",
+      "pass": true,
+      "detail": "Read pages aloud, Speak instead of typing, Plain words, Bigger buttons, More time, Stop all motion"
+    },
+    {
+      "check": "No sideways scroll at 200% text (1280 px) and at 320 px wide",
+      "pass": true,
+      "detail": "Jordan /home, Jordan /po/:id, Jordan /ask, Jordan /negotiations, Jordan /approvals, Sam /home, Sam /po/:id/receive"
+    },
+    {
+      "check": "axe (WCAG 2.2 AA): no serious or critical issue",
+      "pass": true,
+      "detail": "landing, Ask, negotiations, order, home, accessibility, judge (as the owner); receive (as the receiver)"
+    },
+    {
+      "check": "Reduced motion: no endless animation on the landing page",
+      "pass": true,
+      "detail": "prefers-reduced-motion: reduce"
+    },
+    {
+      "check": "Landing page names the accessibility support and links here",
+      "pass": true,
+      "detail": "first screen"
+    }
+  ]
+}

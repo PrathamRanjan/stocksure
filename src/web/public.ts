@@ -10,6 +10,8 @@
  *
  * Read-only. The showcase is a demo workspace rebuilt daily through the real order path.
  */
+import { existsSync, readFileSync } from "node:fs";
+import { timingSafeEqual } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { config } from "../config.js";
 import { currentWs, getDb, withWorkspace, type Queryable } from "../db.js";
@@ -17,6 +19,7 @@ import { showcase } from "../demo/workspaces.js";
 import { walletInfo } from "../demo/wallet.js";
 import { workspaceOf } from "../demo/routes.js";
 import { hasOpenAI } from "../ai/provider.js";
+import { recordRobotRun } from "../eval/proof.js";
 import { READ_TOOLS } from "../ai/paypal-mcp.js";
 import { AGENT_TOOLS } from "../ai/agent-tools.js";
 import { TEN_NOV } from "../eval/scam-cases.js";
@@ -83,6 +86,9 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
   const agentsId = await setting(db, "judge_agents_po");
   const agentsPo = agentsId ? await pick("SELECT id, number FROM purchase_orders WHERE id = $1", [agentsId]) : null;
   const ap = agentsPo ? `/po/${agentsPo.id}` : "/home";
+  // The invoice path needs an order the supplier can still invoice: one not yet settled, other than the agents' order.
+  const invPo = ids ? await pick("SELECT id, number FROM purchase_orders WHERE buyer_id = $1 AND NOT is_sample AND status IN ('dispatched','in_review','resolving') ORDER BY (id = $2) ASC, CASE status WHEN 'dispatched' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END, created_at LIMIT 1", [ids.laneway, agentsId ?? ""]) : null;
+  const ip = invPo ? `/po/${invPo.id}` : "/home";
   return [
     {
       id: "short",
@@ -125,10 +131,10 @@ async function paths(db: Queryable, checklist: Record<string, string>) {
       title: "Catch a bad invoice",
       minutes: 1,
       paypal_login: false,
-      note: order ? `Uses ${order.number}. StockSure pays the agreed counts at the quoted price, never an invoice, so these checks are for your books.` : "This demo has no open order for an invoice. Reset your demo on the demo page.",
+      note: invPo ? `Uses ${invPo.number}. StockSure pays the agreed counts at the quoted price, never an invoice, so these checks are for your books.` : "This demo has no open order left to invoice. Reset your demo on the demo page.",
       steps: [
-        s("invoice_caught", "As Ana, send the sample bad invoice: one case billed extra, a new payee, and a line written to an AI", "ana", order ? `${po}#send-invoice` : "/home", "Code checks the invoice against the quote, the last three deliveries and the supplier's details on file; OpenAI Decisions reads it as a second opinion and can only add a flag."),
-        s("duplicate_caught", "As Ana, send the same invoice again under a new number", "ana", order ? `${po}#send-invoice` : "/home", "Same lines and total under a new number is flagged as a duplicate. Jordan sees both on Protected this month."),
+        s("invoice_caught", "As Ana, send the sample bad invoice: one case billed extra, a new payee, and a line written to an AI", "ana", invPo ? `${ip}#send-invoice` : "/home", "Code checks the invoice against the quote, the last three deliveries and the supplier's details on file; OpenAI Decisions reads it as a second opinion and can only add a flag."),
+        s("duplicate_caught", "As Ana, send the same invoice again under a new number", "ana", invPo ? `${ip}#send-invoice` : "/home", "Same lines and total under a new number is flagged as a duplicate. Jordan sees both on Protected this month."),
       ],
     },
     {
@@ -246,6 +252,28 @@ export function publicRouter() {
   }));
 
   r.get("/api/public/proof", wrap(async () => proofView()));
+
+  /** The nightly robot judge posts its run here (bearer token shared with the GitHub Actions secret). */
+  r.post("/api/robot-judge", async (req, res) => {
+    const tok = config.robotJudgeToken;
+    if (!tok) return res.status(404).json({ error: "not_found" });
+    const given = /^Bearer\s+(\S+)$/.exec(req.header("authorization") ?? "")?.[1] ?? "";
+    const a = Buffer.from(given);
+    const b = Buffer.from(tok);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return res.status(401).json({ error: "unauthorized" });
+    const x = req.body ?? {};
+    const steps = Array.isArray(x.steps) ? x.steps.slice(0, 60).map((s: any) => ({ path: String(s.path).slice(0, 40), key: String(s.key).slice(0, 60), done: !!s.done })) : [];
+    const times = Object.fromEntries(Object.entries(x.times ?? {}).slice(0, 20).map(([k, v]) => [String(k).slice(0, 40), Number(v) || 0]));
+    const row = await recordRobotRun({ ran_at: String(x.ran_at ?? new Date().toISOString()).slice(0, 40), passed: !!x.passed && steps.length > 0 && steps.every((s: any) => s.done), base: String(x.base ?? "").slice(0, 200), times, steps, run_url: typeof x.run_url === "string" && /^https:\/\/github\.com\//.test(x.run_url) ? x.run_url.slice(0, 300) : null });
+    res.json({ ok: true, passed: row.passed });
+  });
+
+  /** Spec A7: the accessibility checks as last run (eval/a11y/latest.json, written by web/e2e/a11y.spec.ts). */
+  r.get("/api/public/accessibility", wrap(async () => {
+    const f = "eval/a11y/latest.json";
+    const last = existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null;
+    return { last, voice: { model: "gpt-live-1", ready: hasOpenAI(), where: ["Ask box", "Receive page: say what arrived"] } };
+  }));
 
   return r;
 }

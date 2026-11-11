@@ -37,7 +37,7 @@ const NegotiationDetail = lazy(() => import("@/pages/Negotiations").then((m) => 
 
 declare global {
   interface Window {
-    a11yKit?: { apply: () => void; firstVisit: () => void };
+    a11yKit?: { apply: () => void; firstVisit: () => void; announce?: (text: string) => void };
   }
 }
 

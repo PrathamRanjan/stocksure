@@ -43,7 +43,8 @@ const Td = ({ children, className = "" }: { children?: ReactNode; className?: st
 /* ---------------- /proof ---------------- */
 interface ProofCase { id: string; group: string; split?: string; input: string; expected: string; actual: string; pass: boolean | null; state?: string; detail?: any }
 interface ProofRun { id: string; suite: string; models: string; cases: number; passed: number; cost_usd: number; trigger: string; at: string; source?: string; results: ProofCase[] }
-interface ProofData { source: string; runs: ProofRun[]; calibration: any[]; thresholds: { name: string; clear_below: number; hold_above: number; source: string }[]; not_measured: string[]; data_note: string }
+interface RobotRun { ran_at: string; passed: boolean; base: string; times: Record<string, number>; steps: { path: string; key: string; done: boolean }[]; run_url: string | null }
+interface ProofData { source: string; runs: ProofRun[]; calibration: any[]; thresholds: { name: string; clear_below: number; hold_above: number; source: string }[]; not_measured: string[]; data_note: string; robot_judge: RobotRun | null }
 
 const SUITE: Record<string, { title: string; what: string }> = {
   regression: { title: "Regression set from the 10 Nov review", what: "Each off-script input a reviewer tried, kept as a permanent case." },
@@ -97,6 +98,16 @@ export function Proof() {
       {(d) => (
         <>
           <p className="rounded-md border border-border bg-card p-3 text-sm">{d.data_note} Shown from: {d.source}.</p>
+          <section className="mt-6 rounded-md border border-border bg-card p-3" aria-labelledby="robot-title" data-robot-judge>
+            <h2 id="robot-title" className="text-xl">Robot judge</h2>
+            {d.robot_judge ? (
+              <>
+                <p className="mt-1 text-sm"><span className={d.robot_judge.passed ? "font-semibold text-paid" : "font-semibold text-stop"}>{d.robot_judge.passed ? "Every path completed" : "Not every path completed"}</span> · {new Date(d.robot_judge.ran_at).toLocaleString()} on {d.robot_judge.base}{d.robot_judge.run_url && <> · <a className="underline" href={d.robot_judge.run_url}>the run</a></>}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{Object.entries(d.robot_judge.times).map(([k, v]) => `${k.replace(/_s$/, "").replace(/_/g, " ")} ${v} s`).join(" · ")}</p>
+                {d.robot_judge.steps.some((s) => !s.done) && <p className="mt-1 text-sm text-stop">Not ticked: {d.robot_judge.steps.filter((s) => !s.done).map((s) => `${s.path}/${s.key}`).join(", ")}</p>}
+              </>
+            ) : <p className="mt-1 text-sm">A browser walks every judge path on this site each night and reports here. No run has been reported yet.</p>}
+          </section>
           {!d.runs.length && <p className="mt-6">No run has been recorded yet.</p>}
           {d.runs.map((r) => <RunTable key={r.id} r={r} />)}
           <section className="mt-10" aria-labelledby="cal-title" id="calibration">
@@ -209,19 +220,51 @@ export function WhoCanMoveMoney() {
 }
 
 /* ---------------- /accessibility ---------------- */
+interface A11yData { last: { at: string; runner: string; results: { check: string; pass: boolean; detail: string }[] } | null; voice: { model: string; ready: boolean; where: string[] } }
 export function Accessibility() {
   return (
-    <Page title="Accessibility" sub="What StockSure offers, what was tested and how, and what was not tested.">
-      <section aria-labelledby="a-offer"><h2 id="a-offer" className="text-2xl">On every page</h2>
-        <ul className="mt-2 list-disc pl-6"><li>Display and help: bigger text, high contrast, a clearer font, read-aloud, voice typing, plain words, bigger buttons and more time (pauses automatic refreshes). Choices stay on the device.</li><li>Every action works from the keyboard; a skip link on every page; status changes are announced to screen readers.</li><li>Layouts work from 360 px wide; touch targets are at least 44 px on phones.</li><li>Tours start only from a button, cover one page, and end when you move to another page.</li></ul>
-      </section>
-      <section className="mt-8" aria-labelledby="a-tested"><h2 id="a-tested" className="text-2xl">Tested</h2>
-        <ul className="mt-2 list-disc pl-6"><li>Automated axe checks (WCAG 2.2 AA) and a no-sideways-scroll check at 360 px on each person's home and order pages, in light and dark, in the Playwright suite (<span className="mono">npm run e2e</span>).</li><li>Lighthouse 12.8.2 on the live site, 10 Nov 2026: accessibility 100 for the landing, sign-in and owner home pages, mobile and desktop. The order page was measured locally only (100). These pages have changed since; the run has not been repeated.</li><li>Keyboard paths for the tour controls (Escape closes, arrow keys move) in the end-to-end tests.</li></ul>
-      </section>
-      <section className="mt-8" aria-labelledby="a-not"><h2 id="a-not" className="text-2xl">Not tested</h2>
-        <ul className="mt-2 list-disc pl-6"><li>No session with screen-reader users, and no full manual pass with VoiceOver, TalkBack or NVDA.</li><li>The server-rendered control pages (Guard, Safety, Ledger) are covered by fewer automated checks than the React pages.</li><li>The phone app is a separate, unreleased branch and is not covered here.</li></ul>
-      </section>
-    </Page>
+    <Load<A11yData> path="/api/public/accessibility" title="Accessibility" sub="What StockSure offers, what was tested and how, and what was not tested.">
+      {(d) => (
+        <>
+          <section aria-labelledby="a-offer"><h2 id="a-offer" className="text-2xl">On every page</h2>
+            <ul className="mt-2 list-disc pl-6">
+              <li>Display and help: bigger text (up to 200%), high contrast, a clearer font, read-aloud, voice typing, plain words, bigger buttons and more time (pauses automatic refreshes). Choices stay on the device. Every switch is announced with its name and what it does.</li>
+              <li>Push-to-talk by voice on the Ask box and on the receive page ("say what arrived"): OpenAI {d.voice.model}, through StockSure's server, with the transcript shown as you speak. {d.voice.ready ? "On for this server." : "Off on this server: the AI isn't configured."} Typing always works.</li>
+              <li>Payment changes on an order (hold placed, captured, released, failed) are announced through one polite live region.</li>
+              <li>Every action works from the keyboard; a skip link on every page.</li>
+              <li>Layouts work from 320 px wide and at 200% text without sideways scrolling; touch targets are at least 44 px on phones.</li>
+              <li>Tours start only from a button, cover one page, and end when you move to another page.</li>
+            </ul>
+          </section>
+          <section className="mt-8" aria-labelledby="a-tested"><h2 id="a-tested" className="text-2xl">Tested</h2>
+            {d.last ? (
+              <>
+                <p className="mt-1 text-sm text-muted-foreground">Last run {new Date(d.last.at).toLocaleString()} · {d.last.runner}</p>
+                <ul className="mt-2 space-y-2" data-a11y-results>
+                  {d.last.results.map((r) => (
+                    <li key={r.check} className="rounded-md border border-border p-3"><span className={r.pass ? "font-semibold text-paid" : "font-semibold text-stop"}>{r.pass ? "Passed" : "Failed"}</span> · {r.check}<span className="block text-sm text-muted-foreground">{r.detail}</span></li>
+                  ))}
+                </ul>
+              </>
+            ) : <p className="mt-1">The automated accessibility checks have not been recorded on this server yet.</p>}
+            <ul className="mt-3 list-disc pl-6 text-sm">
+              <li>Also in the Playwright suite: axe (WCAG 2.2 AA) and no sideways scroll at 360 px on each person's home and order pages, light and dark, and on every public page.</li>
+              <li>Lighthouse 12.8.2 on the live site, 10 Nov 2026: accessibility 100 for the landing, sign-in and owner home pages. Not repeated since.</li>
+              <li>Push-to-talk: one live run with a synthetic voice clip (macOS speech) through gpt-live-1; the relay itself is covered by a test with a stand-in for OpenAI.</li>
+            </ul>
+          </section>
+          <section className="mt-8" aria-labelledby="a-not"><h2 id="a-not" className="text-2xl">Not tested</h2>
+            <ul className="mt-2 list-disc pl-6">
+              <li>No session with screen-reader users, and no full manual pass with VoiceOver, TalkBack or NVDA.</li>
+              <li>No recorded keyboard-only pass of the whole money flow; keyboard use is covered piece by piece in the tests.</li>
+              <li>Push-to-talk has not been tried by people with speech differences, or on Safari on a phone.</li>
+              <li>The server-rendered control pages (Guard, Safety, Ledger) are covered by fewer automated checks than the React pages; the ledger's grids and chart come from AG Grid and were not checked with a screen reader.</li>
+              <li>The phone app is a separate, unreleased branch and is not covered here.</li>
+            </ul>
+          </section>
+        </>
+      )}
+    </Load>
   );
 }
 

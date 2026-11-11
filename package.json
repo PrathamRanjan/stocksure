@@ -18,7 +18,8 @@
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "sandbox:check": "tsx --env-file-if-exists=.env scripts/sandbox-check.ts",
     "eval:three-arm": "tsx --env-file-if-exists=.env scripts/eval-three-arm.ts",
-    "eval:arena": "tsx --env-file-if-exists=.env scripts/eval-arena.ts", "eval:proof": "tsx --env-file-if-exists=.env scripts/proof.ts",
+    "eval:arena": "tsx --env-file-if-exists=.env scripts/eval-arena.ts",
+    "eval:proof": "tsx --env-file-if-exists=.env scripts/proof.ts",
     "agent:demo": "tsx --env-file-if-exists=.env scripts/agent-demo.ts",
     "build:web": "npm --prefix web ci --include=dev --no-audit --no-fund && npm --prefix web run build",
     "dev:web": "npm --prefix web run dev",
@@ -31,6 +32,7 @@
     "@types/compression": "^1.8.1",
     "@types/qrcode": "^1.5.5",
     "@types/web-push": "^3.6.4",
+    "@types/ws": "^8.18.2",
     "busboy": "^1.6.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
@@ -39,6 +41,7 @@
     "qrcode": "^1.5.4",
     "sharp": "^0.35.5",
     "web-push": "^4.0.0",
+    "ws": "^8.22.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
