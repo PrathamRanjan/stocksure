@@ -156,7 +156,7 @@ export function matchProduct(sku: string | null, description: string, cands: Can
   return { cand: best.c, score: Math.round(best.s * 100) / 100, runnerUp: second?.c ?? null };
 }
 
-function propose(sku: string | null, description: string, qtyText: string, cands: Candidate[], baseConfidence: number): ProposedLine {
+export function propose(sku: string | null, description: string, qtyText: string, cands: Candidate[], baseConfidence: number): ProposedLine {
   let confidenceHit = 0;
   const { cand, score, runnerUp } = matchProduct(sku, description, cands);
   const flags: LineFlag[] = [];

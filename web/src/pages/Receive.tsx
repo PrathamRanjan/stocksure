@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { AlertTriangle, Bot, Camera, Check, FileText, RotateCcw, Upload } from "lucide-react";
+import { AlertTriangle, Bot, Camera, Check, FileText, QrCode, RotateCcw, Upload } from "lucide-react";
+import { PhoneLink } from "@/components/phone-link";
 import { useView } from "@/lib/api";
 import { ago, day, plural } from "@/lib/format";
 import { useAction } from "@/lib/useAction";
@@ -31,10 +32,12 @@ interface RModel {
   demo: { samples: boolean };
   reader: string;
   lines: RLine[];
-  extractions: { id: string; document_id: string; filename: string; kind: string; source: string; created_at: string; flags: { kind: string; text: string }[]; lines: unknown[]; damage: unknown[]; notes: string[]; failed: boolean }[];
+  extractions: { id: string; document_id: string; filename: string; kind: string; source: string; created_at: string; flags: { kind: string; text: string }[]; lines: unknown[]; damage: unknown[]; notes: string[]; failed: boolean; door_photo?: boolean; screen?: boolean; description?: string | null; decisions?: { model: string | null; probabilities: Record<string, number | null>; count_clarity: string | null } | null; counted?: { sku: string | null; qty_text: string }[] }[];
 }
 
-const FLAG_TEXT: Record<string, string> = { possible_damage: "Photo may show damage", not_on_note: "Not on the delivery note", low_confidence: "Reader isn't sure", unit_mismatch: "Units don't match the order" };
+const pct = (n: number | null | undefined) => (typeof n === "number" ? `${Math.round(n * 100)}%` : "no answer");
+
+const FLAG_TEXT: Record<string, string> = { count_differs: "Photo and note disagree", identity_uncertain: "Label doesn't match the order", possible_damage: "Photo may show damage", not_on_note: "Not on the delivery note", low_confidence: "Reader isn't sure", unit_mismatch: "Units don't match the order" };
 
 export default function Receive() {
   const { id } = useParams();
@@ -111,8 +114,15 @@ export default function Receive() {
                     <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("clean")}>{busy === "s-clean" && <Spinner />} Everything arrived</Button>
                     <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("damaged")}>{busy === "s-damaged" && <Spinner />} Driver notes two crushed</Button>
                   </div>
+                  <p className="mt-3 text-sm font-semibold">Demo: count from a door photo</p>
+                  <p className="text-xs text-muted-foreground">Generated drawings, not camera photos. Or take a real one above.</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("photo")} data-sample="photo">{busy === "s-photo" ? <Spinner /> : <Camera aria-hidden="true" />} Cases, two crushed (generated)</Button>
+                    <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("screen")} data-sample="screen">{busy === "s-screen" ? <Spinner /> : <Camera aria-hidden="true" />} A photo of a screen (generated)</Button>
+                  </div>
                 </div>
               )}
+              {m.demo.samples && <PhoneLink poId={m.po.id} icon={<QrCode className="size-4" aria-hidden="true" />} />}
             </div>
             {read && (
               <div className="mt-5">
@@ -127,6 +137,15 @@ export default function Receive() {
                           <Button size="sm" variant="outline" className="mt-2" disabled={!!busy} onClick={() => run(`reread-${e.document_id}`, `/po/${m.po.id}/receive/reread/${e.document_id}`, {}, { stay: true })}>
                             {busy === `reread-${e.document_id}` ? <Spinner /> : <RotateCcw aria-hidden="true" />} Read it again
                           </Button>
+                        </div>
+                      ) : e.screen ? (
+                        <p className="mt-1 flex gap-1.5 text-stop" role="alert" data-screen-photo><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> {e.notes[0]}</p>
+                      ) : e.door_photo ? (
+                        <div className="mt-1" data-door-photo>
+                          <p>{e.counted?.length ? e.counted.map((c) => `${c.sku ?? "?"}: ${c.qty_text}`).join(" · ") : "No cases counted."}{e.damage.length ? ` · ${e.damage.length} damage note${e.damage.length > 1 ? "s" : ""}` : ""}</p>
+                          {e.decisions && <p className="text-xs text-muted-foreground">OpenAI Decisions on the photo: damage {pct(e.decisions.probabilities.shows_damage)} · label matches the order {pct(e.decisions.probabilities.label_matches_ordered_item)} · photo of a screen {pct(e.decisions.probabilities.photo_is_of_a_screen)} · countable: {e.decisions.count_clarity?.replace(/_/g, " ") ?? "no answer"}</p>}
+                          {e.notes.map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                          <p className="text-xs text-muted-foreground">A proposal only: you confirm every count in step 2.</p>
                         </div>
                       ) : (
                         <p className="text-muted-foreground">{plural(e.lines.length, "line")} read{e.damage.length ? ` · ${e.damage.length} damage note${e.damage.length > 1 ? "s" : ""}` : ""}</p>

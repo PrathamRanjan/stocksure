@@ -7,5 +7,5 @@ export const PUBLIC_ROUTES = ["GET /api/public/ai", "GET /api/public/judge", "GE
 
 /** Spec B4 item 3: agents settling a shortfall, walked over HTTP in test/shortfall.test.ts. */
 /** Exercised over HTTP in test/invoice.test.ts. */
-export const INVOICE_ROUTES = ["GET /api/ui/protected", "POST /po/:id/invoice"];
+export const INVOICE_ROUTES = ["GET /api/ui/protected", "POST /po/:id/invoice", "GET /api/ui/po/:id/phone-link", "GET /phone/:token", "POST /api/ui/po/:id/reconcile"];
 export const SHORTFALL_ROUTES = ["GET /api/ui/po/:id/agents", "GET /negotiations/:id", "POST /api/ui/po/:id/agents"];

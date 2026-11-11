@@ -133,7 +133,8 @@ describe("proof suites (spec A5.6)", () => {
     expect(byId["invoice-240-for-216"].pass).toBe(true);
     expect(byId["invoice-planted-instruction-new-payee"].pass).toBe(true);
     expect(byId["invoice-duplicate-new-number"]).toMatchObject({ pass: true, state: "run" });
-    expect(byId["photo-of-a-screen"]).toMatchObject({ pass: null, state: "not built" });
+    expect(byId["photo-of-a-screen"]).toMatchObject({ pass: null, state: "not run" });
+    expect(byId["door-photo-two-crushed"]).toMatchObject({ pass: null, state: "not run" });
     expect(byId["why-cant-i-spend-20"]).toMatchObject({ pass: null, state: "not run" });
     expect(reg.cases).toBe(reg.results.filter((c) => c.pass !== null).length);
 

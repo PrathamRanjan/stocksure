@@ -1,3 +1,5 @@
+import { config } from "../config.js";
+import { reauthorizeHold } from "./reauth.js";
 import { getDb, type Queryable } from "../db.js";
 import { enqueue } from "../jobs.js";
 import { ACTIVE_AUTH } from "../core/funding.js";
@@ -63,10 +65,12 @@ export async function settle(poId: string, version: number, attempt = 0) {
     // After a charged part delivery, the final capture is the total less what the part already captured.
     const already = await partCharged(db, poId);
     await captureOriginal(po, version, Math.max(0, (body.totals.payable_cents ?? body.totals.accepted_cents) - already), already);
-    await confirmRelease(po, version);
-    const repl = await orderReplacement(po, version, body);
-    if (repl) await authorizeReplacement(po, version, repl);
-    await finish(po, version, repl);
+    // The hold may have been refreshed just before the capture (honor period): carry on with the order as it is now.
+    const now = await getPo(db, poId);
+    await confirmRelease(now, version);
+    const repl = await orderReplacement(now, version, body);
+    if (repl) await authorizeReplacement(now, version, repl);
+    await finish(now, version, repl);
   } catch (e) {
     if (e instanceof Waiting) {
       await enqueue(db, "settle", { poId, version, attempt }, new Date(Date.now() + e.delayMs), `settle:${poId}:${version}`);
@@ -96,6 +100,14 @@ async function captureOriginal(po: PO, v: number, accepted: number, already = 0)
   if (earlier) {
     await record(db, po.id, v, "capture_original", { reused_from_version: earlier.version });
     return;
+  }
+  // A capture after PayPal's honor period: refresh the hold first so the full amount is still guaranteed.
+  if (accepted > 0 && po.auth_id) {
+    const placed = (await db.query<{ created_at: Date }>("SELECT created_at FROM payment_ops WHERE paypal_id = $1 AND kind = 'authorize'", [po.auth_id])).rows[0]?.created_at;
+    if (placed && !(po as any).reauthorized_at && Date.now() - new Date(placed).getTime() > config.guard.reauthorizeAfterDays * 864e5) {
+      await reauthorizeHold(po.id, { beforeCapture: true });
+      po = await getPo(db, po.id);
+    }
   }
   if (!po.auth_id) throw new GtError(`${po.number} has no PayPal hold.`, "exception");
   const tag = await instanceTag(db);

@@ -13,7 +13,7 @@ export type CheckKey =
   | "scam_flagged" | "scam_checked" | "scam_held"
   | "ai_asked" | "ai_paypal" | "ai_drafted"
   | "agents_agreed" | "agents_supplier_ok" | "agents_settled"
-  | "invoice_caught" | "duplicate_caught";
+  | "invoice_caught" | "duplicate_caught" | "reconciled";
 
 /** Event types (store.logEvent) that stand for a checklist step. */
 export const EVENT_KEYS: Record<string, CheckKey> = {

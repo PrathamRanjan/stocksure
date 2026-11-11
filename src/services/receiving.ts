@@ -1,5 +1,6 @@
 import { ensureChecked } from "../safety/check.js";
 import { getDb, type Queryable } from "../db.js";
+import { readDoorPhoto } from "../ai/door-photo.js";
 import { extractDelivery, observePhoto, PHOTO_FAILED, type DamageHint, type DeliveryExtraction } from "../ai/extract.js";
 import { AI_FAILED_MESSAGE } from "../ai/provider.js";
 import { formatUnits, parseQuantity, type UnitSpec } from "../core/units.js";
@@ -37,7 +38,12 @@ async function readDoc(kind: "delivery_note" | "photo", f: { mime: string; body:
   let hint: DamageHint | null = null;
   let photoFailed = false;
   if (kind === "delivery_note") ex = await extractDelivery({ mime: f.mime, body: f.body, text }, cands);
-  else {
+  else if (/^image\/(png|jpe?g|webp)$/.test(f.mime)) {
+    // Spec B4 item 4: a door photo proposes counts and damage; Decisions checks it is of the goods, not a screen.
+    const d = await readDoorPhoto({ mime: f.mime, body: f.body }, cands);
+    const body = { lines: d.lines, damage: d.damage, notes: d.notes, failed: d.failed, screen: d.screen, description: d.description, decisions: d.decisions, door_photo: true };
+    return { ex: null, hint: null, body, source: d.source, failed: d.failed };
+  } else {
     const h = await observePhoto({ mime: f.mime, body: f.body, text: null }, cands);
     if (h === PHOTO_FAILED) photoFailed = true;
     else hint = h;
@@ -82,7 +88,11 @@ export async function proposalFor(q: Queryable, po: PO): Promise<{ lines: Map<st
   const exs = (
     await q.query<any>("SELECT e.*, d.kind, d.filename FROM extractions e JOIN documents d ON d.id = e.document_id WHERE d.po_id = $1 AND d.kind IN ('delivery_note','photo') ORDER BY e.created_at", [po.id])
   ).rows.map((e) => ({ ...e, lines: typeof e.lines === "string" ? JSON.parse(e.lines) : e.lines, flags: typeof e.flags === "string" ? JSON.parse(e.flags) : e.flags }));
-  const note = [...exs].reverse().find((e) => e.kind === "delivery_note");
+  // The latest delivery note sets the proposed counts. Without one, the latest door photo that was counted does
+  // (spec B4 item 4); with one, a door photo that disagrees flags the line. A photo of a screen counts nothing.
+  const rev = [...exs].reverse();
+  const note = rev.find((e) => e.kind === "delivery_note" && !e.lines?.failed) ?? rev.find((e) => e.kind === "photo" && e.lines?.door_photo && !e.lines.screen && !e.lines.failed && (e.lines.lines ?? []).length) ?? rev.find((e) => e.kind === "delivery_note");
+  const photo = [...exs].reverse().find((e) => e.kind === "photo" && e.lines?.door_photo && !e.lines.screen && !e.lines.failed);
   const out = new Map<string, LineProposal>();
   for (const l of poLines) out.set(l.id, { line_id: l.id, delivered: null, damaged: 0, wrong: 0, flags: [], confidence: null, hints: [], source: null });
   const unmatched: any[] = [];
@@ -97,7 +107,18 @@ export async function proposalFor(q: Queryable, po: PO): Promise<{ lines: Map<st
       p.flags.push(...pl.flags);
       p.confidence = pl.confidence;
       p.source = `${note.filename} (${note.source})`;
-      p.hints.push(`Note says "${pl.qty_text}" for ${pl.sku ?? pl.description}`, ...pl.notes);
+      p.hints.push(note.kind === "photo" ? `Photo shows ${pl.qty_text} for ${pl.sku ?? pl.description}` : `Note says "${pl.qty_text}" for ${pl.sku ?? pl.description}`, ...pl.notes);
+    }
+  }
+  if (photo && photo !== note) {
+    for (const pl of photo.lines.lines ?? []) {
+      const p = pl.line_id ? out.get(pl.line_id) : null;
+      if (!p) continue;
+      p.hints.push(`Photo shows ${pl.qty_text} for ${pl.sku ?? pl.description}`);
+      if (p.delivered !== null && pl.units !== null && pl.units !== p.delivered && !p.flags.includes("count_differs")) {
+        p.flags.push("count_differs");
+        p.hints.push("The photo and the note disagree on this line. Count it.");
+      }
     }
   }
   for (const e of exs) {
@@ -105,7 +126,7 @@ export async function proposalFor(q: Queryable, po: PO): Promise<{ lines: Map<st
       for (const d of e.lines.damage ?? []) {
         const p = d.line_id ? out.get(d.line_id) : null;
         if (!p) continue;
-        if (d.kind === "damaged" && d.source === "note" && d.units) p.damaged = Math.max(p.damaged, d.units);
+        if (d.kind === "damaged" && (d.source === "note" || e.lines?.door_photo) && d.units) p.damaged = Math.max(p.damaged, d.units);
         if (d.kind === "wrong" && d.units) p.wrong = Math.max(p.wrong, d.units);
         if (!p.flags.includes("possible_damage") && d.kind === "damaged") p.flags.push("possible_damage");
         p.hints.push(`${d.source === "photo" ? "Photo" : "Note"} (unverified): ${d.text}`);
@@ -116,7 +137,8 @@ export async function proposalFor(q: Queryable, po: PO): Promise<{ lines: Map<st
     p.flags = [...new Set(p.flags)];
     if (p.delivered === null && note) p.flags.push("not_on_note");
   }
-  return { lines: out, unmatched, notes: note?.lines.notes ?? [], instructions: note?.flags ?? [] };
+  const photoNotes = exs.filter((e) => e.kind === "photo" && e.lines?.door_photo && e !== note).flatMap((e) => e.lines.notes ?? []);
+  return { lines: out, unmatched, notes: [...(note?.lines.notes ?? []), ...photoNotes], instructions: note?.flags ?? [] };
 }
 
 /** People enter counts as "18 cs", "2", "6 ea". A bare number means packs. */

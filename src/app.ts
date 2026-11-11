@@ -23,6 +23,8 @@ import { buildServer } from "./mcp/tools.js";
 import { installChannelHandlers } from "./channels/handlers.js";
 import { uiRouter } from "./web/ui-api.js";
 import { askRouter } from "./web/ask.js";
+import { moneyRouter } from "./web/money.js";
+import { phoneRouter } from "./web/phone.js";
 import { protectedRouter } from "./web/protected.js";
 import { talksRouter } from "./web/talks.js";
 import { publicRouter } from "./web/public.js";
@@ -119,6 +121,8 @@ export function createApp() {
   app.use(askRouter());
   app.use(talksRouter());
   app.use(protectedRouter());
+  app.use(phoneRouter());
+  app.use(moneyRouter());
   app.use(uiRouter());
   app.use(merchantRouter());
   app.use(guardRouter());

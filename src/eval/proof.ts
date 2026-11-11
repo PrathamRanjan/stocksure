@@ -24,7 +24,9 @@ import { match, type RLine } from "../core/resolve.js";
 import { checkMessage } from "../safety/check.js";
 import { findDestinations } from "../safety/destinations.js";
 import { duplicateOf, invoiceNumber } from "../services/invoice-checks.js";
-import { demoIds, sampleInvoice } from "../services/seed.js";
+import { demoIds, sampleDeliveryNote, sampleInvoice } from "../services/seed.js";
+import { readDoorPhoto } from "../ai/door-photo.js";
+import { doorPhoto, screenPhoto } from "../demo/sample-photos.js";
 import { personById } from "../store.js";
 import { SCAM_CASES, SUPPLIER_CONTACT, TEN_NOV, type ScamCase } from "./scam-cases.js";
 import { demoCandidates, runSuite } from "./runner.js";
@@ -187,7 +189,21 @@ async function regressionSuite(): Promise<ProofCase[]> {
     const fresh = duplicateOf(sampleInvoice(poNumber, buyer, [{ ...sl[0], qty_packs: 18 }], { number: "INV-FRESH-1" }), asLines(exR.lines).map((l) => ({ ...l, billed_units: 216, line_cents: 216 * (l.unit_price_cents ?? 0) })), [{ id: "doc-earlier", po_number: poNumber, text: inv240, lines: asLines(ex240.lines) }]);
     out.push({ id: "invoice-duplicate-new-number", group: "invoice", input: resent, expected: "flagged as a duplicate of the earlier invoice; a different invoice is not", actual: `${dup ? "duplicate flagged" : "not flagged"}; a different invoice ${fresh ? "was also flagged (false alarm)" : "was not flagged"}`, pass: !!dup && !fresh, state: "run", detail: { flag: dup?.message ?? null, number_read: invoiceNumber(resent) } });
   }
-  out.push({ id: "photo-of-a-screen", group: "photo", input: "A photo of a screen showing a delivery note", expected: "flagged as a photo of a screen; not used as evidence", actual: "The photo_is_of_a_screen check is not built yet (spec B4, Wave 3).", pass: null, state: "not built" });
+  // Door photos (spec B4 item 4): generated drawings, read by the production door-photo reader.
+  const oatB = cands.find((c) => c.product.sku === "OAT-B12") ?? oat;
+  const photoCands = [{ ...oatB, line_id: "line-photo", ordered_units: 6 * oatB.product.pack_units }];
+  const noteForScreen = sampleDeliveryNote(poNumber, buyer, [{ sku: oatB.product.sku, name: oatB.product.name, qty_packs: 6, pack_label: oatB.product.pack_label, unit_price_cents: 1200 }]);
+  if (!hasOpenAI()) {
+    out.push({ id: "photo-of-a-screen", group: "photo", input: "Generated: a delivery note on a laptop screen", expected: "flagged as a photo of a screen; nothing counted from it", actual: "no model configured", pass: null, state: "not run" });
+    out.push({ id: "door-photo-two-crushed", group: "photo", input: "Generated: six cases at the door, two crushed", expected: "6 cases proposed, 2 flagged damaged, label matches", actual: "no model configured", pass: null, state: "not run" });
+  } else {
+    const sp = await readDoorPhoto({ mime: "image/jpeg", body: await screenPhoto(noteForScreen) }, photoCands);
+    out.push({ id: "photo-of-a-screen", group: "photo", input: "Generated: a delivery note on a laptop screen", expected: "flagged as a photo of a screen; nothing counted from it", actual: sp.failed ? "the photo reader did not answer" : `${sp.screen ? "flagged as a screen" : "not flagged"}; ${sp.lines.length} line${sp.lines.length === 1 ? "" : "s"} counted`, pass: !sp.failed && sp.screen && sp.lines.length === 0, state: "run", detail: { decisions: sp.decisions, notes: sp.notes } });
+    const dp = await readDoorPhoto({ mime: "image/jpeg", body: await doorPhoto([{ sku: oatB.product.sku, name: oatB.product.name, cases: 6 }], 2) }, photoCands);
+    const units = dp.lines.find((l) => l.line_id === "line-photo")?.units ?? null;
+    const dmg = dp.damage.find((d) => d.line_id === "line-photo")?.units ?? null;
+    out.push({ id: "door-photo-two-crushed", group: "photo", input: "Generated: six cases at the door, two crushed", expected: "6 cases proposed, 2 flagged damaged, label matches", actual: dp.failed ? "the photo reader did not answer" : `${units === null ? "no count" : `${units / oatB.product.pack_units} cases`}; ${dmg === null ? "no damage" : `${dmg / oatB.product.pack_units} damaged`}; label ${dp.decisions?.probabilities.label_matches_ordered_item ?? "?"}`, pass: !dp.failed && !dp.screen && units === 6 * oatB.product.pack_units && dmg === 2 * oatB.product.pack_units, state: "run", detail: { decisions: dp.decisions, notes: dp.notes, source: dp.source } });
+  }
   return out;
 }
 
@@ -225,7 +241,7 @@ export async function ensureFreshProof(wsId: string | null): Promise<{ ran: numb
 
 const NOT_MEASURED = [
   "Real supplier messages: every scam case is author-written and synthetic. Precision on real traffic is unknown.",
-  "Photos and handwriting: the receiving suite is typed delivery notes; no photographed or handwritten note is scored yet.",
+  "Photos and handwriting: the receiving suite is typed delivery notes. The two door-photo cases are generated drawings, not camera photos; no real photo or handwritten note is scored yet.",
   "Duplicate invoices: one labelled pair (the same invoice under a new number) and one different invoice; that is a rule check, not a rate.",
   "The on-device scam model in the browser is not part of these runs; its training summary is on the safety page.",
   "The payment-risk model is trained on synthetic payments; no fraud rate is claimed.",

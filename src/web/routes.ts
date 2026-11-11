@@ -24,6 +24,7 @@ import { catalog, fundingOf, getPo, linesOf, orgById, personById, poFor, setting
 import { authed, me, personByKey, signIn, signOut, whoOf } from "./auth.js";
 import { back, flashOf } from "./common.js";
 import { fmtDate, html, layout, pill, raw, type Raw } from "./html.js";
+import { doorPhoto, screenPhoto } from "../demo/sample-photos.js";
 import { agentCard, actionsCard, defectsCard, supplyCard, docsCard, fundingPanel, linesTable, messagesFor, paymentsCard, receiveView, resolutionCard, thread, timeline, treeNav } from "./po-view.js";
 import { readForm } from "./upload.js";
 
@@ -185,7 +186,10 @@ export function routes() {
     let n = 0;
     if (fields.sample && config.demoMode) {
       const sl = await samplesFor(po);
-      await uploadReceivingDoc(p, po.id, "delivery_note", textFile(`delivery-note-${po.number}.txt`, sampleDeliveryNote(po.number, po.buyer_name ?? "", sl, fields.sample === "damaged" ? { [sl[0].sku]: 2 } : {})));
+      // Generated drawings, labelled as such in the image and the file name (spec B4 item 4).
+      if (fields.sample === "photo") await uploadReceivingDoc(p, po.id, "photo", { filename: `generated-door-photo-${po.number}.jpg`, mime: "image/jpeg", body: await doorPhoto(sl.map((l) => ({ sku: l.sku, name: l.name, cases: l.qty_packs })), Math.min(2, sl[0]?.qty_packs ?? 0)) });
+      else if (fields.sample === "screen") await uploadReceivingDoc(p, po.id, "photo", { filename: `generated-screen-photo-${po.number}.jpg`, mime: "image/jpeg", body: await screenPhoto(sampleDeliveryNote(po.number, po.buyer_name ?? "", sl)) });
+      else await uploadReceivingDoc(p, po.id, "delivery_note", textFile(`delivery-note-${po.number}.txt`, sampleDeliveryNote(po.number, po.buyer_name ?? "", sl, fields.sample === "damaged" ? { [sl[0].sku]: 2 } : {})));
       n++;
     }
     for (const f of files.delivery_note ?? []) (await uploadReceivingDoc(p, po.id, "delivery_note", f), n++);

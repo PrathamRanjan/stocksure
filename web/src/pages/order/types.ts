@@ -98,6 +98,7 @@ export interface PoModel {
   paypal: { connected: boolean; payer: string | null; demo_wallet?: boolean } | null;
   delivery: { mode: string; part: { accepted_cents: number; status: string; packs: Record<string, number> } | null };
   funding: (FundingNums & { holds?: unknown[] }) | null;
+  hold?: { authorization_id: string; placed_at: string; best_charged_by: string; valid_until: string; honor_days: number; reauthorized_at: string | null; live: boolean } | null;
   approvals: ApprovalRow[];
   resolution: Resolution | null;
   agent: {

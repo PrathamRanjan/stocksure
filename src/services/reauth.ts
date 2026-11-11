@@ -22,10 +22,11 @@ export function scheduleReauthorize(q: Queryable, poId: string, from = Date.now(
   return enqueue(q, "reauthorize_hold", { poId }, new Date(from + config.guard.reauthorizeAfterDays * 864e5 + 60_000), `reauth:${poId}`);
 }
 
-export async function reauthorizeHold(poId: string): Promise<void> {
+export async function reauthorizeHold(poId: string, opts: { beforeCapture?: boolean } = {}): Promise<void> {
   const db = await getDb();
   const po = await getPo(db, poId);
-  if (!po.auth_id || !REAUTH_STATES.has(po.status) || (po as any).reauthorized_at) return;
+  // Settlement calls this just before a late capture, while the order is already settling.
+  if (!po.auth_id || !(REAUTH_STATES.has(po.status) || (opts.beforeCapture && po.status === "settling")) || (po as any).reauthorized_at) return;
   const holdOp = (await db.query<PaymentOp>("SELECT * FROM payment_ops WHERE paypal_id = $1 AND kind = 'authorize'", [po.auth_id])).rows[0];
   if (!holdOp) return;
   const run = await startRun({ actor: "code", subject: `reauthorize hold ${po.number}`, entity: "po", entityId: po.id }, db);

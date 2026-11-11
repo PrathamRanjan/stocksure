@@ -228,6 +228,7 @@ async function poModel(q: Queryable, po: PO, p: Person) {
     paypal: buyer ? { connected: !!org?.vault_token_id, payer: org?.vault_payer ?? null, demo_wallet: (org as any)?.vault_source === "demo_wallet" } : null,
     delivery: { mode: ctx.mode, part: part ? { accepted_cents: part.accepted_cents, status: part.status, packs: part.packs } : null },
     funding: hasMoney ? await fundingOf(q, po.root_id) : null,
+    hold: await holdDates(q, po),
     approvals: await approvalsFor(q, p, po.id),
     resolution,
     agent: {
@@ -257,6 +258,27 @@ async function poModel(q: Queryable, po: PO, p: Person) {
     events: events.map((e: any) => ({ ...e, summary: String(e.summary ?? "").replace(/\b(\d+) cents\b/g, (_m: string, n: string) => fmt(Number(n))) })),
     demo: { samples: config.demoMode },
     copy: { next: (supplier ? NEXT_SUPPLIER : NEXT_BUYER)[po.status] ?? null },
+  };
+}
+
+/**
+ * Spec B4 item 5: PayPal guarantees a held amount for 3 days (the honor period) and keeps the hold valid for 29.
+ * The order shows when it is best charged by and that StockSure refreshes the hold before a later capture.
+ */
+async function holdDates(q: Queryable, po: PO) {
+  if (!po.auth_id) return null;
+  const op = (await q.query<{ created_at: Date; amount_cents: number; paypal_status: string | null }>("SELECT created_at, amount_cents, paypal_status FROM payment_ops WHERE paypal_id = $1 AND kind = 'authorize'", [po.auth_id])).rows[0];
+  if (!op) return null;
+  const placed = new Date(op.created_at).getTime();
+  const honor = config.guard.reauthorizeAfterDays;
+  return {
+    authorization_id: po.auth_id,
+    placed_at: new Date(placed).toISOString(),
+    best_charged_by: new Date(placed + honor * 864e5).toISOString(),
+    valid_until: new Date(placed + 29 * 864e5).toISOString(),
+    honor_days: honor,
+    reauthorized_at: (po as any).reauthorized_at ? new Date((po as any).reauthorized_at).toISOString() : null,
+    live: ["funded", "dispatched", "in_review", "resolving", "settling"].includes(po.status),
   };
 }
 
@@ -315,7 +337,7 @@ async function receiveModel(q: Queryable, po: PO) {
         damage_flag: p.flags.includes("possible_damage"),
       };
     }),
-    extractions: exs.map((e) => ({ id: e.id, document_id: e.document_id, filename: e.filename, kind: e.kind, source: e.source, created_at: e.created_at, flags: e.flags, lines: e.lines?.lines ?? [], damage: e.lines?.damage ?? [], notes: e.lines?.notes ?? [], failed: !!e.lines?.failed })),
+    extractions: exs.map((e) => ({ id: e.id, document_id: e.document_id, filename: e.filename, kind: e.kind, source: e.source, created_at: e.created_at, flags: e.flags, lines: e.lines?.lines ?? [], damage: e.lines?.damage ?? [], notes: e.lines?.notes ?? [], failed: !!e.lines?.failed, door_photo: !!e.lines?.door_photo, screen: !!e.lines?.screen, description: e.lines?.description ?? null, decisions: e.lines?.decisions ?? null, counted: (e.lines?.lines ?? []).map((l: any) => ({ sku: l.sku, qty_text: l.qty_text })) })),
   };
 }
 

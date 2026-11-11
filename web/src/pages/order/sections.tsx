@@ -116,7 +116,18 @@ export function MoneyPanel({ m }: { m: PoModel }) {
     <Panel tour="money" label="money-title" id="money">
       <SectionTitle id="money-title" aside={m.po.kind === "replacement" ? "shared with the original order's limit" : undefined}>Where the money is</SectionTitle>
       {m.funding ? (
-        <SettlementBar f={m.funding} />
+        <>
+          <SettlementBar f={m.funding} />
+          {m.hold?.live && (
+            <p className="mt-3 text-sm" data-hold-dates>
+              {m.hold.reauthorized_at ? (
+                <>Hold <span className="mono">{m.hold.authorization_id}</span> was refreshed {day(m.hold.reauthorized_at)}; PayPal keeps it valid until {day(m.hold.valid_until)}.</>
+              ) : (
+                <>Best charged by <strong>{day(m.hold.best_charged_by)}</strong>: PayPal guarantees the held amount for {m.hold.honor_days} days and keeps the hold valid until {day(m.hold.valid_until)}. If the count is agreed later, StockSure refreshes the hold before charging.</>
+              )}
+            </p>
+          )}
+        </>
       ) : (
         <Empty title="Nothing held yet" art={<div className="sbar mx-auto mb-3 w-40 opacity-50" aria-hidden="true" />}>
           {m.quote_total_cents ? <>Accepting the quote places a PayPal hold for <span className="num font-semibold">{money(m.quote_total_cents)}</span>. A hold isn't a charge.</> : "Once the supplier quotes, accepting places a PayPal hold for the quote. A hold isn't a charge."}
@@ -333,12 +344,61 @@ export function PayPalPanel({ m, reload }: { m: PoModel; reload: () => void }) {
           The first call is the hold, when the quote is accepted. Every call is listed here with its PayPal id.
         </Empty>
       )}
+      {ops.some((o) => o.paypal_id) && (m.me.owner || m.me.side === "supplier") && <Reconcile poId={m.po.id} />}
       {canRetry && (
         <Button className="mt-4" variant="carbon" disabled={!!busy} onClick={() => run("retry", `/po/${m.po.id}/retry-settle`)}>
           {busy === "retry" ? <Spinner /> : <RotateCcw aria-hidden="true" />} Retry from the first unfinished step
         </Button>
       )}
     </Panel>
+  );
+}
+
+interface Recon { summary: string; ok: boolean; checked_at: string; rows: { paypal_id: string; kind: string; ours_cents: number; paypal_cents: number | null; paypal_status: string | null; verdict: "matched" | "differs" | "missing"; note: string | null }[]; extra: { kind: string; paypal_id: string; cents: number | null; status: string | null }[] }
+
+/** Spec B4 item 5: read every PayPal id back from PayPal and compare. GET calls only. */
+function Reconcile({ poId }: { poId: string }) {
+  const [r, setR] = useState<Recon | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function check() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/ui/po/${poId}/reconcile`, { method: "POST", headers: { "X-StockSure-UI": "1", Accept: "application/json" }, credentials: "same-origin" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.message ?? "PayPal couldn't be checked.");
+      setR(j);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-4 border-t border-dashed border-input pt-3" data-reconcile>
+      <Button size="sm" variant="outline" disabled={busy} onClick={check}>{busy ? <Spinner /> : <RotateCcw aria-hidden="true" />} Check against PayPal</Button>
+      <p className="mt-1 text-xs text-muted-foreground">Reads each PayPal id back from PayPal and compares amounts. Moves no money.</p>
+      <div aria-live="polite">
+        {err && <p className="mt-2 text-sm text-stop">{err}</p>}
+        {r && (
+          <div className="mt-2 text-sm">
+            <p className={cn("font-semibold", r.ok ? "text-paid" : "text-stop")} data-reconcile-summary>{r.summary}</p>
+            <ul className="mt-1 space-y-1">
+              {r.rows.map((x) => (
+                <li key={x.paypal_id} className="break-all">
+                  <Stamp tone={x.verdict === "matched" ? "paid" : "stop"}>{x.verdict}</Stamp> {(OP_LABEL as Record<string, string>)[x.kind] ?? x.kind} <span className="mono">{x.paypal_id}</span> · ours {money(x.ours_cents)} · PayPal {x.paypal_cents === null ? "—" : money(x.paypal_cents)} {x.paypal_status ?? ""}
+                  {x.note && <span className="block text-xs text-muted-foreground">{x.note}</span>}
+                </li>
+              ))}
+              {r.extra.map((x) => (
+                <li key={x.paypal_id} className="break-all"><Stamp tone="stop">extra</Stamp> {x.kind} <span className="mono">{x.paypal_id}</span> {x.cents === null ? "" : money(x.cents)} {x.status ?? ""}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
