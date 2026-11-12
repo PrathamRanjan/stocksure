@@ -270,6 +270,8 @@ const JORDAN_APPROVE: Step[] = [
     el: "[data-tour=related]",
     title: "The replacement is its own order",
     body: "The two replacement cases became an order of their own, already held on PayPal at $11 a case. Ana ships them, Sam counts them in, and the same loop runs again.",
+    // The replacement order appears once PayPal has settled, which takes a little longer on the live sandbox.
+    wait: 30000,
   },
 ];
 
