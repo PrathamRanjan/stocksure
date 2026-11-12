@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "StockSure",
+    "slug": "stocksure",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stocksure.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "StockSure uses the camera to photograph delivery dockets and damaged goods.",
+        "NSPhotoLibraryUsageDescription": "StockSure attaches photos of dockets and damaged goods to a delivery."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1B1A16",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.stocksure.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4EFE4",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 96,
+          "dark": {
+            "backgroundColor": "#14130F"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "StockSure uses the camera to photograph delivery dockets and damaged goods."
+        }
+      ]
+    ],
+    "scheme": "stocksure",
+    "backgroundColor": "#F4EFE4",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
