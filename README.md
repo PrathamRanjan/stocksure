@@ -403,3 +403,59 @@ Done for `MASTER_IMPROVEMENT_SPEC.md` Part C, Wave 4 item 14 and Wave 5 items 19
 - **Robot-judge token:** generate a random value. Run `gh secret set ROBOT_JUDGE_TOKEN --repo PrathamRanjan/stocksure` and paste it when asked, then set the same value as `ROBOT_JUDGE_TOKEN` on the Render service. Optional: the `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` secrets for failure alerts.
 - **AG Grid licence:** the key is a trial that expires on 9 Dec 2026. After that, the ledger shows AG Grid's watermark.
 - **Unchanged from Wave 2:** a public repository, a judge buyer login, an always-on Render plan, and an OpenAI budget.
+
+## Hands-free and four languages (12 Nov 2026)
+
+Extra features on top of the core flow. The core flow is unchanged in English; every existing test and live check was rerun (results below). Deployed from `main` at `d4e3276`.
+
+**Look and Say (hands-free).** The hand button in the header, or Alt+Shift+H.
+- **Pointing.** Point with your head (the default, steadier on a webcam) or your eyes. Google's MediaPipe face model runs in the browser tab; frames never leave the device.
+- **Calibration.** Nine dots, with settings chosen by cross-validation. Four unseen dots then measure the error in pixels and show it to you. Eye gaze is used only if it comes out within 110 px.
+- **Snapping.** The pointer snaps to the nearest control, without flicker. Controls grow to at least 44 px while hands-free is on.
+- **Voice commands** in English, Hindi, Indonesian and Portuguese: click, press a named button, scroll, back, "reorder this", and stop. "Stop", Esc, or looking away for two seconds stops everything. Without a camera or microphone it falls back to voice only, or to dwell with the mouse.
+- **The confirm card is enforced in code.** Anything that moves money, sends, cancels or disputes opens it. Only a spoken "yes" or a real click on Yes goes ahead. Looking at Yes, winking at it, or a script clicking it do nothing. An echoed "yes" from the app's own spoken prompt is dropped, while "no" and "stop" always cancel.
+- **PayPal hand-over.** PayPal's approval page is a separate site that hands-free can't drive, so it says so and waits for you to approve there.
+- **`/accessibility`** has a simulated-gaze demo that runs the real snapping code without a camera. Beside it is a table of how often snapping hits 30 px and 44 px controls at four noise levels, plus visitor-shared calibration results (none yet).
+
+**Languages: English, हिन्दी (hi-IN), Bahasa Indonesia (id-ID), Português (pt-BR).** The picker is in the header; your choice is remembered (cookie, device and account).
+- **Interface.** About 3000 strings, extracted from the code (`scripts/i18n-extract.mts`) and machine-translated by `gpt-6.1-sol` (`scripts/i18n-translate.mts`). The files say they are machine translations; no native speaker has reviewed them.
+- **Text written at run time** (agent negotiation moves, AI summaries): translated on the server and cached. Ask and the ledger's questions are answered in your language.
+- **Dates and money** are formatted for your language with `Intl`. Charges stay in USD; for example, Portuguese shows `US$ 200,00`. Hindi uses Noto Sans Devanagari.
+- **PayPal's approval page** opens in your language (locale on the vault setup token; accepted by the sandbox for all four). English sends no locale, as before.
+- **Telegram and WhatsApp messages** go out in the language the recipient picked. The stored copy and the in-app simulator keep the original. If the translation fails, the original is sent.
+- **Push-to-talk** now also works on the dispute reason, the message to the supplier and the new-order note.
+
+**Tests.**
+
+| Check | Result |
+|---|---|
+| Unit tests (vitest), including dictionaries complete with placeholders kept, endpoints, outbound language and hands-free logic | 153 of 153 |
+| `e2e/i18n.spec.ts`: 18 screens in four languages, failing on any untranslated interface English (`eval/i18n/misses.json`) | Pass, 0 untranslated. Screenshots in `docs/i18n-shots/` |
+| Portuguese and Hindi at 375 px | Pass, no sideways scroll |
+| Money flow (quote → hold → dispatch → count → agree → capture → receipt) driven in Hindi, Indonesian and Portuguese | 3 of 3 |
+| `e2e/handsfree.spec.ts`: voice on the PayPal hold opens the card with $200.00; a script click on Yes, "no" and "ruko" (stop) leave it unheld; a spoken yes places the hold; a mouse No sends nothing and a mouse Yes sends | 2 of 2 |
+| Existing e2e suite (screens, personas, tours, a11y and others) | 17 passed, 4 live-only skipped |
+| Live: Wave 4/5 check | 20 of 20 |
+| Live: Wave 2 check | 21 of 24. The 3 misses are the "ran today" rule on `/proof`: the suites last ran 11 Nov (7/7, 66/66, 27/27) and were not rerun |
+| Live: every `/judge` path in a browser | Pass: seed 48 s, A 40 s, B 20 s, invoice 29 s, agents 33 s, Ask 60 s |
+
+**Found while checking.**
+- In Hindi, "Approve v1" had split into "v मंज़ूर करें 1". It is now one template.
+- A spoken "no" said while the card's prompt was being read out was dropped as an echo. It now always cancels.
+
+**Not verified.**
+- Real camera head or eye tracking with a person. The camera and microphone are blocked in the test browsers, so the voice paths were driven through the module's command entry point.
+- Calibration accuracy on real faces.
+- Translation quality by a native speaker.
+- PayPal's approval page actually rendering in each language (the sandbox accepted the locale; nobody signed in to look).
+- Telegram in another language on a real phone.
+
+**Not done.**
+- Multiparty payments: needs a PayPal Platform sandbox app the owner creates.
+- Merging the mobile app (branch `mobile-app`, draft PR) into `main`, with its QR code and recording: waiting on the owner's decision.
+- A local-currency estimate (INR, IDR, BRL).
+- A screen recording of the simulated demo.
+
+**Owner actions.**
+- **Shared database.** The shared Render Postgres (free plan, 256 MB) was OOM-killed four times on 12 Nov (06:09, 06:19, 06:48, 06:50 UTC) while all eight apps were deploying and testing. Each time StockSure returned errors for about 10 seconds and then recovered. The free database also expires on 9 Dec 2026. Upgrading the plan fixes both.
+- **Unchanged:** `ROBOT_JUDGE_TOKEN`, a public repository, an OpenAI budget.
