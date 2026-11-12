@@ -9,5 +9,5 @@ export const PUBLIC_ROUTES = ["GET /api/public/accessibility", "POST /api/robot-
 /** Exercised over HTTP in test/invoice.test.ts. */
 export const INVOICE_ROUTES = ["GET /api/ui/protected", "POST /po/:id/invoice", "GET /api/ui/po/:id/phone-link", "GET /phone/:token", "POST /api/ui/po/:id/reconcile"];
 /** Covered by test/i18n.test.ts. */
-export const I18N_ROUTES = ["POST /api/ui/lang", "POST /api/ui/translate", "POST /api/public/handsfree"];
+export const I18N_ROUTES = ["POST /api/ui/lang", "POST /api/ui/translate", "POST /api/public/handsfree", "GET /api/public/fx"];
 export const SHORTFALL_ROUTES = ["GET /api/ui/po/:id/agents", "GET /negotiations/:id", "POST /api/ui/po/:id/agents"];

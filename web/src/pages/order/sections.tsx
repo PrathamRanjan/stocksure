@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PushToTalk } from "@/components/push-to-talk";
+import { LocalEstimate } from "@/components/local-estimate";
 import { Empty, PayPalStamp, SectionTitle, SettlementBar, Spinner, Stamp, Tally, TallyLegend } from "@/components/brand";
 import type { Op, PoModel, Resolution } from "./types";
 
@@ -119,6 +120,7 @@ export function MoneyPanel({ m }: { m: PoModel }) {
       {m.funding ? (
         <>
           <SettlementBar f={m.funding} />
+          <LocalEstimate cents={m.quote_total_cents ?? 0} />
           {m.hold?.live && (
             <p className="mt-3 text-sm" data-hold-dates>
               {m.hold.reauthorized_at ? (

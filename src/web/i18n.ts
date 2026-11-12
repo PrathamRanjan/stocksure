@@ -59,7 +59,35 @@ export function i18nRouter() {
     return { ok: true };
   }));
 
+  /**
+   * Spec B: a local-currency estimate beside USD amounts (INR, IDR, BRL). The rate is the European Central Bank's
+   * reference rate via frankfurter.dev, cached for six hours; no rate means no estimate, never a guessed one.
+   * PayPal still charges USD.
+   */
+  r.get("/api/public/fx", wrap(async () => ({ fx: await usdRates() })));
+
   return r;
+}
+
+let fx: { at: number; v: { date: string; source: string; rates: Record<string, number> } | null } | null = null;
+let fxFetch: typeof fetch = (i, init) => fetch(i, init);
+export function setFxFetch(f: typeof fetch | null) {
+  fxFetch = f ?? ((i, init) => fetch(i, init));
+  fx = null;
+}
+export async function usdRates() {
+  if (fx && Date.now() - fx.at < (fx.v ? 6 : 0.25) * 3600_000) return fx.v;
+  let v: NonNullable<typeof fx>["v"] = null;
+  try {
+    const res = await fxFetch("https://api.frankfurter.dev/v1/latest?from=USD&to=INR,IDR,BRL", { signal: AbortSignal.timeout(4000) });
+    const d = (await res.json()) as { date?: string; rates?: Record<string, unknown> };
+    const rates = Object.fromEntries(["INR", "IDR", "BRL"].map((c) => [c, Number(d.rates?.[c])]).filter(([, n]) => Number.isFinite(n as number) && (n as number) > 0));
+    if (res.ok && d.date && Object.keys(rates).length) v = { date: d.date, source: "European Central Bank reference rate (frankfurter.dev)", rates: rates as Record<string, number> };
+  } catch {
+    /* no estimate */
+  }
+  fx = { at: Date.now(), v };
+  return v;
 }
 
 /** What visitors shared about their calibration, for /accessibility. */

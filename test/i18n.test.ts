@@ -12,6 +12,7 @@ import { demoIds } from "../src/services/seed.js";
 import { Client } from "./client.js";
 import { serveTracked } from "./journey-coverage.js";
 import { langOf, replyIn, withLang, currentLang, PAYPAL_LOCALE } from "../src/lib/lang.js";
+import { setFxFetch } from "../src/web/i18n.js";
 
 const en = JSON.parse(readFileSync("public/i18n/en.json", "utf8")).strings as Record<string, string>;
 const ph = (s: string) => (s.match(/\{\d\}/g) ?? []).sort().join();
@@ -99,6 +100,15 @@ describe("endpoints", () => {
     expect(t.json.texts).toEqual(["The supplier offers a credit."]);
     expect((await c.postJson("/api/public/handsfree", { mode: "head", head_px: 48, gaze_px: 130 })).status).toBe(200);
     expect((await c.postJson("/api/public/handsfree", {})).status).toBe(400);
+    // Local-currency estimate: the published rate with its date, or nothing at all when the source fails.
+    setFxFetch((async () => new Response(JSON.stringify({ date: "2026-11-11", rates: { INR: 93.69, IDR: 18175, BRL: 5.5565, EUR: 0.9 } }))) as typeof fetch);
+    const fx = (await c.get("/api/public/fx")).json.fx;
+    expect(fx.date).toBe("2026-11-11");
+    expect(fx.rates).toEqual({ INR: 93.69, IDR: 18175, BRL: 5.5565 });
+    expect(fx.source).toMatch(/European Central Bank/);
+    setFxFetch((async () => { throw new Error("offline"); }) as typeof fetch);
+    expect((await c.get("/api/public/fx")).json.fx).toBeNull();
+    setFxFetch(null);
     const a = (await c.get("/api/public/accessibility")).json;
     expect(a.handsfree.shared_runs).toBe(1);
     expect(a.handsfree.median_head_px).toBe(48);
