@@ -452,10 +452,17 @@ Extra features on top of the core flow. The core flow is unchanged in English; e
 
 **Not done.**
 - Multiparty payments: needs a PayPal Platform sandbox app the owner creates.
-- Merging the mobile app (branch `mobile-app`, draft PR) into `main`, with its QR code and recording: waiting on the owner's decision.
-- A local-currency estimate (INR, IDR, BRL).
-- A screen recording of the simulated demo.
+- A QR code that opens the mobile app on a phone: needs an Expo (EAS) project the owner creates (see below).
+
+**Added later on 12 Nov.**
+- **Mobile app merged into `main`** (`mobile/`, Expo SDK 58). Render builds only `src/` and `web/`, so it does not affect the server. Since private demos arrived (11 Nov), the live server lists nobody until a demo is started, so the app showed an empty sign-in. Its sign-in screen now starts a private demo and shows the sample holds being placed. Checked through the app's web build against the live server: started a demo, Jordan and then Ana approved the agreed fix on SS-1011, and PayPal captured $48.00 (`0YN32826KY5191239`) and placed the $24.00 replacement hold (`0KC69606SG8132332`). The app's own checks pass (typecheck, 15 of 15 tests). Not run on a real phone or a native simulator.
+- **Local-currency estimate.** In Hindi, Indonesian or Portuguese, the order's money panel adds one line: the quote in rupees, rupiah or reais, at the European Central Bank reference rate with its date (`/api/public/fx`, via frankfurter.dev, cached for six hours). For example: "Cerca de R$ 489 (US$ 88,00 … de 11 de nov. de 2026). O PayPal cobra em dólares americanos." If the rate can't be fetched, the line doesn't appear. Nothing changes in English.
+- **Recordings** in `docs/recordings/`, made by `web/e2e/record.spec.ts` (`RECORD=1`):
+  - `handsfree-confirm-card.webm` (33 s): voice on the PayPal hold. The voice is simulated and the captions say so; the hold is on the test server's fake PayPal.
+  - `handsfree-simulated-gaze.webm` (29 s).
+  - `mobile-app.webm` (18 s).
 
 **Owner actions.**
 - **Shared database.** The shared Render Postgres (free plan, 256 MB) was OOM-killed four times on 12 Nov (06:09, 06:19, 06:48, 06:50 UTC) while all eight apps were deploying and testing. Each time StockSure returned errors for about 10 seconds and then recovered. The free database also expires on 9 Dec 2026. Upgrading the plan fixes both.
+- **Mobile QR code:** in `mobile/`, run `npx eas init` and then `npx eas update`. Expo then gives a link and QR code that open the app in Expo Go.
 - **Unchanged:** `ROBOT_JUDGE_TOKEN`, a public repository, an OpenAI budget.
