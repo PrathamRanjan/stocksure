@@ -132,9 +132,8 @@ test("the landing page explains the problem and the people, then the tour follow
   // The real thing happened: the order was counted, agreed, approved by both and charged on PayPal. (Read from the
   // order itself: the checklist ignores events while a brand-new demo is still placing its first holds, which on
   // production can outlast the walk to the count.)
-  const j = await (await p.request.get("/api/public/judge")).json();
-  const to = (j.paths as { steps: { key: string; to: string }[] }[]).flatMap((x) => x.steps).find((s) => s.key === "counted")!.to;
-  const poId = to.match(/\/po\/([^/?#]+)/)![1];
+  // The order is the one the tour showed the money on (the checklist's "count" link moves on to the next delivery).
+  const poId = seen.find((s) => s.title === "Where the money is")!.path.match(/\/po\/([^/?#]+)/)![1];
   // PayPal settles in the background; on the live sandbox it can still be in flight when the tour reaches the money.
   await expect
     .poll(async () => (await (await p.request.get(`/api/ui/po/${poId}`)).json()).funding.captured_cents, { message: "captured on PayPal", timeout: 120_000, intervals: [3000] })
