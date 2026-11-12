@@ -100,7 +100,7 @@ export function TalkMoves({ t }: { t: TalkModel }) {
               <b>Round {m.round} · {m.side === "buyer" ? "café's agent" : "wholesaler's agent"}</b>
               <span>{terms(m, t)}</span>
             </div>
-            {m.message && <p className="mt-1">“{m.message}”</p>}
+            {m.message && <p className="mt-1">“<span data-i18n-ai>{m.message}</span>”</p>}
             <p className={cn("mt-1 flex items-start gap-1.5 text-xs", m.allowed ? "text-muted-foreground" : "font-semibold text-stop")}>
               <Gavel className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               {m.allowed ? <span>Referee: allowed{m.model ? ` · written by ${m.model}` : ""}</span> : <span>Referee refused it{m.attempt > 1 ? " (second try)" : ""}: {m.reasons.join("; ")}</span>}

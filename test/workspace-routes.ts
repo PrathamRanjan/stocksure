@@ -8,4 +8,6 @@ export const PUBLIC_ROUTES = ["GET /api/public/accessibility", "POST /api/robot-
 /** Spec B4 item 3: agents settling a shortfall, walked over HTTP in test/shortfall.test.ts. */
 /** Exercised over HTTP in test/invoice.test.ts. */
 export const INVOICE_ROUTES = ["GET /api/ui/protected", "POST /po/:id/invoice", "GET /api/ui/po/:id/phone-link", "GET /phone/:token", "POST /api/ui/po/:id/reconcile"];
+/** Covered by test/i18n.test.ts. */
+export const I18N_ROUTES = ["POST /api/ui/lang", "POST /api/ui/translate", "POST /api/public/handsfree"];
 export const SHORTFALL_ROUTES = ["GET /api/ui/po/:id/agents", "GET /negotiations/:id", "POST /api/ui/po/:id/agents"];

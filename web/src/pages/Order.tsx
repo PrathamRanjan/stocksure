@@ -110,7 +110,7 @@ function NextStep({ m, reload }: { m: PoModel; reload: () => void }) {
     return box(
       "Settled",
       <>Paid as counted{m.resolution ? <>: <span className="num font-semibold">{money(m.resolution.totals.accepted_cents)}</span> for the accepted goods</> : ""}. The PayPal record is below.</>,
-      buyer && owner && <Button variant="outline" disabled={!!busy} onClick={() => run("reorder", `/po/${id}/reorder`)}>{busy === "reorder" ? <Spinner /> : <Repeat aria-hidden="true" />} Order the same again</Button>,
+      buyer && owner && <Button variant="outline" disabled={!!busy} data-ls-action="reorder" data-ls-amount={m.resolution ? `${money(m.resolution.totals.accepted_cents)} last time; a new draft, nothing is charged until you accept a quote` : "a new draft; nothing is charged until you accept a quote"} data-ls-to={m.po.supplier_name} onClick={() => run("reorder", `/po/${id}/reorder`)}>{busy === "reorder" ? <Spinner /> : <Repeat aria-hidden="true" />} Order the same again</Button>,
       "done",
     );
   if (st === "cancelled") return box("Cancelled", "Any hold was released.", undefined, "wait");

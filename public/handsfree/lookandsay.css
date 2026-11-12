@@ -1,0 +1,38 @@
+/* Look and Say: the bar, the highlight ring with its dwell progress, the confirm card and calibration. */
+.ls-bar { position: fixed; left: 12px; bottom: 84px; z-index: 2147483000; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: min(560px, calc(100vw - 24px)); padding: 8px; border-radius: 12px; background: #14130f; color: #f4efe4; box-shadow: 0 8px 30px rgb(0 0 0 / .3); font: 600 14px/1.3 system-ui, sans-serif; }
+@media (min-width: 1024px) { .ls-bar { bottom: 16px; } }
+.ls-bar[hidden], .ls-debug[hidden] { display: none; }
+.ls-btn, .ls-select { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #5d584b; background: #23211b; color: inherit; font: inherit; cursor: pointer; }
+.ls-btn:focus-visible, .ls-select:focus-visible, .ls-fab:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+.ls-btn[aria-pressed="true"] { background: #f2b705; color: #14130f; border-color: #f2b705; }
+.ls-yes { background: #f2b705; color: #14130f; border-color: #f2b705; }
+.ls-cam { padding: 0 6px; font-weight: 500; }
+.ls-cam.on::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; background: #e5484d; vertical-align: middle; animation: ls-pulse 1.6s infinite; }
+@keyframes ls-pulse { 50% { opacity: .35; } }
+.ls-video { width: 72px; height: 54px; border-radius: 6px; object-fit: cover; transform: scaleX(-1); background: #000; }
+.ls-fab { position: fixed; left: 12px; bottom: 84px; z-index: 2147482999; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #5d584b; background: #14130f; color: #f4efe4; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+@media (min-width: 1024px) { .ls-fab { bottom: 16px; } }
+html.ls-on .ls-fab { display: none; }
+.ls-ring { position: fixed; display: none; z-index: 2147482998; pointer-events: none; border-radius: 10px; border: 3px solid #f2b705; box-shadow: 0 0 0 3px rgb(20 19 15 / .55); transition: left .08s, top .08s, width .08s, height .08s; }
+.ls-ring.dwell { border-color: transparent; background: conic-gradient(#f2b705 calc(var(--p) * 360deg), transparent 0) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); }
+.ls-dot { position: fixed; display: none; z-index: 2147482998; width: 10px; height: 10px; border-radius: 50%; background: rgb(242 183 5 / .7); pointer-events: none; }
+.ls-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ls-debug { position: fixed; right: 12px; bottom: 84px; z-index: 2147483000; width: min(440px, calc(100vw - 24px)); max-height: 40vh; overflow: auto; margin: 0; padding: 10px; border-radius: 10px; background: rgb(20 19 15 / .92); color: #d9f99d; font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; }
+#ls-confirm { position: fixed; inset: auto 50% 50% auto; transform: translate(50%, 50%); z-index: 2147483001; width: min(440px, calc(100vw - 32px)); padding: 20px; border-radius: 14px; background: #fffdf7; color: #14130f; border: 3px solid #14130f; box-shadow: 0 20px 60px rgb(0 0 0 / .4); font: 16px/1.45 system-ui, sans-serif; }
+#ls-confirm h2 { margin: 0 0 8px; font-size: 20px; }
+#ls-confirm p { margin: 6px 0; }
+#ls-confirm .ls-btn { background: #fff; color: #14130f; border-color: #14130f; }
+#ls-confirm .ls-yes { background: #14130f; color: #fffdf7; }
+.ls-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.ls-small { font-size: 14px; opacity: .85; }
+#ls-calib { position: fixed; inset: 0; z-index: 2147483002; background: #14130f; color: #f4efe4; font: 600 18px system-ui, sans-serif; }
+.ls-cdot { position: fixed; width: 28px; height: 28px; border-radius: 50%; background: #f2b705; box-shadow: 0 0 0 6px rgb(242 183 5 / .3); transition: left .35s, top .35s; }
+.ls-ctext { position: fixed; top: 46%; left: 0; right: 0; text-align: center; margin: 0; }
+.ls-chelp { position: fixed; top: calc(46% + 36px); left: 10%; right: 10%; text-align: center; margin: 0; font-weight: 400; font-size: 15px; opacity: .8; }
+@media (prefers-reduced-motion: reduce) { .ls-ring, .ls-cdot { transition: none; } .ls-cam.on::before { animation: none; } }
+
+/* Hands-free on: every control at least 44 px, and tight lists spread out (Peek's weak spot was 30 px targets). */
+html.ls-on :is(button, [role=button], [role=tab], [role=menuitem], [role=option], [role=checkbox], [role=radio], [role=switch], select, input:not([type=hidden]), summary, .btn) { min-height: 44px; min-width: 44px; }
+html.ls-on :is(nav, [role=menu], [role=listbox], [role=tablist], td, th, li) > a[href] { display: inline-flex; align-items: center; min-height: 44px; }
+html.ls-on :is(nav, [role=menu], [role=listbox]) > * + * { margin-top: 4px; }
+html.ls-on :is(input[type=checkbox], input[type=radio]) { min-height: 24px; min-width: 24px; }

@@ -64,7 +64,7 @@ const tools = () =>
 
 function head(b: Brand, title: string, extra = ""): string {
   const s = b.staticBase;
-  const css = [...(b.legacyCss ?? []), "ui.css", "theme.css", "a11y.css"].map((f) => `<link rel="stylesheet" href="${s}/${f}?v=${ASSET_V}">`).join("\n");
+  const css = [...(b.legacyCss ?? []), "ui.css", "theme.css", "a11y.css", "handsfree/lookandsay.css"].map((f) => `<link rel="stylesheet" href="${s}/${f}?v=${ASSET_V}">`).join("\n");
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -101,7 +101,8 @@ function sidebar(b: Brand, p: ShellPage): string {
 
 export function renderShell(b: Brand, p: ShellPage): string {
   const flash = flashOf(p.flash);
-  const tail = `${p.scripts ?? ""}<script src="${b.staticBase}/a11y.js?v=${ASSET_V}" defer></script></body></html>`;
+  // B1 language layer first, then the a11y kit and the hands-free module (A).
+  const tail = `${p.scripts ?? ""}<script src="${b.staticBase}/i18n.js?v=${ASSET_V}" defer></script><script src="${b.staticBase}/a11y.js?v=${ASSET_V}" defer></script></body></html>`;
   if (p.mode === "app") {
     return `${head(b, `${p.title} · ${b.name}`, p.head)}
 <body>

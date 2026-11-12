@@ -11,6 +11,7 @@ import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { HandsFreeButton, LangPicker } from "@/components/lang-picker";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Logo, useOnline } from "@/components/brand";
 import { startTour } from "@/tour/tours";
@@ -169,7 +170,7 @@ function UserMenu({ who }: { who: Who }) {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="max-w-56 justify-start" aria-label={`Signed in as ${who.name}. Account menu`}>
           <UserRound aria-hidden="true" />
-          <span className="truncate max-[359px]:hidden">{who.first}</span>
+          <span className="truncate max-sm:hidden">{who.first}</span>
           <span className="hidden truncate text-muted-foreground lg:inline">· {who.org}</span>
         </Button>
       </DropdownMenuTrigger>
@@ -284,12 +285,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
             <div className="flex h-14 items-center gap-2 px-4 sm:px-6">
               <Link to={who ? "/home" : "/"} className="lg:hidden" aria-label="StockSure home">
-                <Logo className="text-lg" />
+                <Logo className="text-lg max-sm:[&>span]:hidden" />
               </Link>
               <div className="ml-auto flex items-center gap-1">
                 <Button variant="ghost" size="sm" className="hidden lg:inline-flex" onClick={() => startTour()} data-tour="tour-btn">
                   <BookOpenCheck aria-hidden="true" /> Take the tour
                 </Button>
+                <LangPicker />
+                <HandsFreeButton />
                 <DisplayButton />
                 <ThemeButton />
                 {who && <UserMenu who={who} />}

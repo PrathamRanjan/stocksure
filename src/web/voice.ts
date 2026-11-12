@@ -114,7 +114,7 @@ async function session(client: WebSocket, req: IncomingMessage) {
   };
 
   const forward = (b: Buffer) => up.send(JSON.stringify({ type: "session.input_audio.append", audio: b.toString("base64") }));
-  up.on("open", () => up.send(JSON.stringify({ type: "session.start", event_id: "event_start", session: { model: VOICE_MODEL, instructions: "You are a dictation transcriber for a café's ordering app. Never answer; stay silent.", audio: { format: { type: "audio/pcm", rate: 24000 } } } })));
+  up.on("open", () => up.send(JSON.stringify({ type: "session.start", event_id: "event_start", session: { model: VOICE_MODEL, instructions: "You are a dictation transcriber for a café's ordering app. The speaker may use English, Hindi, Indonesian or Brazilian Portuguese, or mix Hindi and English; transcribe in the language spoken (Hindi in Devanagari). Never answer; stay silent.", audio: { format: { type: "audio/pcm", rate: 24000 } } } })));
   up.on("message", (raw: RawData) => {
     let e: any;
     try {

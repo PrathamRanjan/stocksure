@@ -27,6 +27,7 @@ import { demoIds } from "../services/seed.js";
 import { setting } from "../store.js";
 import { proofView } from "../eval/proof.js";
 import { me } from "./auth.js";
+import { handsfreeStats } from "./i18n.js";
 
 const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response) =>
   fn(req, res)
@@ -272,7 +273,7 @@ export function publicRouter() {
   r.get("/api/public/accessibility", wrap(async () => {
     const f = "eval/a11y/latest.json";
     const last = existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null;
-    return { last, voice: { model: "gpt-live-1", ready: hasOpenAI(), where: ["Ask box", "Receive page: say what arrived"] } };
+    return { last, voice: { model: "gpt-live-1", ready: hasOpenAI(), where: ["Ask box", "Receive page: say what arrived", "Dispute reason", "Message to the supplier"] }, handsfree: await handsfreeStats(), languages: ["en", "hi-IN", "id-ID", "pt-BR"] };
   }));
 
   return r;

@@ -4,6 +4,7 @@ import { useSession } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { Logo, useOnline } from "@/components/brand";
 import { DemoRibbon, DisplayButton, ThemeButton } from "@/components/shell";
+import { HandsFreeButton, LangPicker } from "@/components/lang-picker";
 import { WifiOff } from "lucide-react";
 
 /** Frame for pages anyone can open: landing, sign-in, demo controls, judge mode. */
@@ -20,7 +21,7 @@ export function PublicShell({ children, wide = false }: { children: ReactNode; w
       <header className="border-b border-border">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:px-6">
           <Link to="/" className="text-xl" aria-label="StockSure home">
-            <Logo />
+            <Logo className="max-[420px]:[&>span]:hidden" />
           </Link>
           <nav aria-label="Site" className="ml-6 hidden items-center gap-5 text-[0.95rem] font-semibold md:flex">
             <a href="/#how" className="hover:underline">How it works</a>
@@ -28,6 +29,8 @@ export function PublicShell({ children, wide = false }: { children: ReactNode; w
             <a href="/evidence" className="hover:underline">Evidence</a>
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            <LangPicker />
+            <HandsFreeButton />
             <DisplayButton />
             <ThemeButton />
             {who ? (

@@ -73,7 +73,7 @@ export function NegotiationDetail() {
       ) : (
         <ol className="space-y-2 text-sm">
           {t.moves.map((m, i) => (
-            <li key={i} className="rounded-md border border-border p-3"><b>Round {m.round} · {m.side}</b> {m.message} <span className="text-muted-foreground">({m.allowed ? "within the rules" : `adjusted: ${m.reasons.join("; ")}`})</span></li>
+            <li key={i} className="rounded-md border border-border p-3"><b>Round {m.round} · {m.side}</b> <span data-i18n-ai>{m.message}</span> <span className="text-muted-foreground">({m.allowed ? "within the rules" : `adjusted: ${m.reasons.join("; ")}`})</span></li>
           ))}
         </ol>
       )}

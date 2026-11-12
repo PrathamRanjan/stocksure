@@ -1,3 +1,4 @@
+import { HandsFreeDemo, HandsFreeIntro, SnapTable } from "@/components/handsfree-demo";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Check, Copy, Minus, X } from "lucide-react";
@@ -220,7 +221,7 @@ export function WhoCanMoveMoney() {
 }
 
 /* ---------------- /accessibility ---------------- */
-interface A11yData { last: { at: string; runner: string; results: { check: string; pass: boolean; detail: string }[] } | null; voice: { model: string; ready: boolean; where: string[] } }
+interface A11yData { last: { at: string; runner: string; results: { check: string; pass: boolean; detail: string }[] } | null; voice: { model: string; ready: boolean; where: string[] }; handsfree?: { shared_runs: number; median_gaze_px: number | null; median_head_px: number | null; last_at: string | null } }
 export function Accessibility() {
   return (
     <Load<A11yData> path="/api/public/accessibility" title="Accessibility" sub="What StockSure offers, what was tested and how, and what was not tested.">
@@ -236,11 +237,40 @@ export function Accessibility() {
               <li>Tours start only from a button, cover one page, and end when you move to another page.</li>
             </ul>
           </section>
+          <section className="mt-8" aria-labelledby="a-hands"><h2 id="a-hands" className="text-2xl">Hands-free: head, eye gaze and voice</h2>
+            <HandsFreeIntro />
+            <ul className="mt-2 list-disc pl-6 text-sm">
+              <li>The camera is read in this browser tab by Google's MediaPipe face model. Frames never leave the device; a red dot and “Camera on” show while it runs, with a one-tap off switch.</li>
+              <li>Calibration: nine dots, settings chosen by cross-validation, then four check dots it has not seen; you are shown the error in pixels. If eye gaze is rougher than 110 px, head pointing becomes the default. Calibration is kept on this device, with a three-dot top-up when your head moves.</li>
+              <li>Voice commands in English, हिन्दी, Bahasa Indonesia and Português: “Peek” to wake, “click”, “scroll down”, “go back”, “press …”, “reorder this”, and “stop” (stop / ruko / berhenti / pare). Stop is decided in code and never goes through an AI. A noise gate learns the room's level and ignores what the app says itself.</li>
+              <li>With no camera, voice alone works; with no network, the pointer and dwell click still work and voice says it is unavailable.</li>
+            </ul>
+            <h3 className="mt-4 text-lg">Try it without a camera</h3>
+            <HandsFreeDemo />
+            <h3 className="mt-4 text-lg">How often snapping picks the right control (simulated)</h3>
+            <p className="text-sm text-muted-foreground">300 simulated fixations per cell, the person's gaze scattered by the noise shown plus a fixed drift that each confirmed click corrects. These are simulations of the code, not measurements of people.</p>
+            <SnapTable />
+            <p className="mt-2 text-sm">The 30 px limit: below about 44 px, a webcam's noise makes neighbouring controls hard to tell apart. Hands-free mode therefore raises every control to at least 44 px and spreads out tight lists while it is on.</p>
+            <h3 className="mt-4 text-lg">Measured by visitors</h3>
+            <p className="text-sm">{d.handsfree && d.handsfree.shared_runs > 0 ? <>{d.handsfree.shared_runs} calibration{d.handsfree.shared_runs === 1 ? "" : "s"} shared (only the two numbers): median eye-gaze error {d.handsfree.median_gaze_px ?? "—"} px, head pointing {d.handsfree.median_head_px ?? "—"} px, on check dots. Last {d.handsfree.last_at ? new Date(d.handsfree.last_at).toLocaleDateString() : "—"}.</> : "No visitor has shared a calibration result yet, so there is no measured accuracy to publish. It is shown here once someone ticks “share” after calibrating."}</p>
+            <h3 className="mt-4 text-lg">Enforced in code, not by asking the AI</h3>
+            <ul className="mt-1 list-disc pl-6 text-sm">
+              <li>Anything that pays, approves, captures, releases, refunds, cancels, deletes, sends or disputes opens a confirm card with the amount and recipient. Only a spoken “yes” or a real click on Yes goes ahead; looking at Yes, dwelling or winking does not.</li>
+              <li>Stop, Esc and looking away for two seconds stop everything at once and cancel any open confirm card.</li>
+              <li>A button's state is read before pressing it: a turned-off button is not pressed, an already selected one is not pressed again.</li>
+              <li>Voice commands are a fixed list matched in code. No free-form browser or shell actions; each command is one step.</li>
+              <li>Spoken names (“press Ledger”) are matched to buttons by spelling, in code.</li>
+              <li>What the AI does: it writes Ask answers and negotiation messages, in your language. It never decides whether an action runs or is confirmed.</li>
+            </ul>
+            <h3 className="mt-4 text-lg">PayPal's own page</h3>
+            <p className="text-sm">PayPal's approval page is a separate site that this page can't drive. Hands-free brings you to the PayPal button and then says “Approve on PayPal's page; I'll wait here.” For hands-free control on PayPal's page too, a desktop tool such as Peek (macOS) works across every app.</p>
+          </section>
           <section className="mt-8" aria-labelledby="a-tested"><h2 id="a-tested" className="text-2xl">Tested</h2>
             {d.last ? (
               <>
                 <p className="mt-1 text-sm text-muted-foreground">Last run {new Date(d.last.at).toLocaleString()} · {d.last.runner}</p>
-                <ul className="mt-2 space-y-2" data-a11y-results>
+                <p className="mt-1 text-sm text-muted-foreground">Test names and details below are written by the test run, in English.</p>
+                <ul className="mt-2 space-y-2" data-a11y-results lang="en" translate="no">
                   {d.last.results.map((r) => (
                     <li key={r.check} className="rounded-md border border-border p-3"><span className={r.pass ? "font-semibold text-paid" : "font-semibold text-stop"}>{r.pass ? "Passed" : "Failed"}</span> · {r.check}<span className="block text-sm text-muted-foreground">{r.detail}</span></li>
                   ))}
@@ -260,6 +290,7 @@ export function Accessibility() {
               <li>Push-to-talk has not been tried by people with speech differences, or on Safari on a phone.</li>
               <li>The server-rendered control pages (Guard, Safety, Ledger) are covered by fewer automated checks than the React pages; the ledger's grids and chart come from AG Grid and were not checked with a screen reader.</li>
               <li>The phone app is a separate, unreleased branch and is not covered here.</li>
+              <li>Hands-free mode has been tested with the simulated gaze and in a headless browser with a fake camera, not yet by a person with a motor impairment or on a real webcam session recorded here.</li>
             </ul>
           </section>
         </>

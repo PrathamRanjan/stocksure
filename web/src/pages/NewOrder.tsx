@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PushToTalk } from "@/components/push-to-talk";
 import { ErrorBlock, LoadingBlock, PageHeader, Spinner } from "@/components/brand";
 import { localInput, toUtcInput } from "./order/sections";
 
@@ -129,7 +130,7 @@ export default function NewOrder() {
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="note">Note to the supplier (optional)</Label>
-          <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+          <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} /><PushToTalk label="Hold to speak" onText={(t) => setNote((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />
         </div>
         <div className="sticky bottom-20 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4 lg:bottom-4">
           <p>

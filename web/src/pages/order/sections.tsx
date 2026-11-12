@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PushToTalk } from "@/components/push-to-talk";
 import { Empty, PayPalStamp, SectionTitle, SettlementBar, Spinner, Stamp, Tally, TallyLegend } from "@/components/brand";
 import type { Op, PoModel, Resolution } from "./types";
 
@@ -79,7 +80,7 @@ export function Lines({ m, reload }: { m: PoModel; reload: () => void }) {
                     }}
                   >
                     <Label htmlFor={`dn-${l.id}`}>What's wrong with this count? The café sees your note.</Label>
-                    <Textarea id={`dn-${l.id}`} required value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Driver's photo shows 7 cases at the door" />
+                    <Textarea id={`dn-${l.id}`} required value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Driver's photo shows 7 cases at the door" /><PushToTalk label="Hold to speak" onText={(t) => setNote((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />
                     <div className="flex gap-2">
                       <Button type="submit" variant="destructive" disabled={!!busy}>{busy === `d${l.id}` && <Spinner />} Send dispute</Button>
                       <Button type="button" variant="ghost" onClick={() => setDispute(null)}>Cancel</Button>
@@ -235,7 +236,7 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
         <div className="mt-4 flex flex-wrap gap-2 border-t border-dashed border-input pt-4">
           {r.can_approve && (
             <Button variant="paid" size="lg" disabled={!!busy} onClick={() => run("approve", `/po/${m.po.id}/resolution/approve`, { version: String(r.version), hash: r.hash })}>
-              {busy === "approve" ? <Spinner /> : <Check aria-hidden="true" />} Approve v{r.version}
+              {busy === "approve" ? <Spinner /> : <Check aria-hidden="true" />} {`Approve v${r.version}`}
             </Button>
           )}
           {r.i_approved && <p className="self-center text-sm font-semibold">You approved this version. Waiting for the other side.</p>}
@@ -525,7 +526,7 @@ export function Messages({ m, reload }: { m: PoModel; reload: () => void }) {
           }}
         >
           <Label htmlFor="msg">Write to {m.me.side === "buyer" ? m.po.supplier_name : m.po.buyer_name}</Label>
-          <Textarea id="msg" value={body} onChange={(e) => setBody(e.target.value)} rows={2} maxLength={2000} />
+          <Textarea id="msg" value={body} onChange={(e) => setBody(e.target.value)} rows={2} maxLength={2000} /><PushToTalk label="Hold to speak" onText={(t) => setBody((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-sm">
               About
@@ -673,7 +674,7 @@ export function DefectsPanel({ m, reload }: { m: PoModel; reload: () => void }) 
             </select>
           </div>
           <div className="grid gap-1.5"><Label htmlFor="dunits">Units ({L?.product.base_unit ?? "each"})</Label><Input id="dunits" inputMode="numeric" value={units} onChange={(e) => setUnits(e.target.value)} required /></div>
-          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="dnote">What's wrong</Label><Textarea id="dnote" value={note} onChange={(e) => setNote(e.target.value)} required rows={2} /></div>
+          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="dnote">What's wrong</Label><Textarea id="dnote" value={note} onChange={(e) => setNote(e.target.value)} required rows={2} /><PushToTalk label="Hold to speak" onText={(t) => setNote((x) => (x.trim() ? `${x.trim()} ${t}` : t))} /></div>
           <Button type="submit" variant="outline" className="sm:w-fit" disabled={!!busy}>{busy === "def" && <Spinner />} Report a problem</Button>
         </form>
       )}

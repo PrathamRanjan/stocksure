@@ -15,6 +15,7 @@ import type { Person } from "../store.js";
 import { Run, startRun } from "../trace.js";
 import { tick } from "../demo/checklist.js";
 import { AGENT_TOOLS, type Proposal } from "./agent-tools.js";
+import { replyIn } from "../lib/lang.js";
 import { connectPayPalMcp, type PayPalMcp } from "./paypal-mcp.js";
 import { assertSafeSchema, audit, estimateCost, hasOpenAI, NoModelError, providerFetch, strictify } from "./provider.js";
 
@@ -129,7 +130,8 @@ export async function runQuestion(p: Person, id: string): Promise<AskResult> {
     result.tools_offered = tools.map((t) => t.name);
     assertSafeSchema(ANSWER_SCHEMA);
     const format = { format: { type: "json_schema", name: "answer", strict: true, schema: strictify(ANSWER_SCHEMA) } };
-    const input: any[] = [{ role: "user", content: [{ type: "input_text", text: `${p.name} (${p.role} at ${p.org_name ?? p.org_id}) asks:\n${row.question}` }] }];
+    const lang = replyIn();
+    const input: any[] = [{ role: "user", content: [{ type: "input_text", text: `${p.name} (${p.role} at ${p.org_name ?? p.org_id}) asks:\n${row.question}${lang ? `\n\n(Language: ${lang})` : ""}` }] }];
     const calls: { id: string; name: string }[] = [];
     let answer: any = null;
     for (let turn = 0; turn < config.ai.agentMaxSteps && !answer; turn++) {

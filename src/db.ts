@@ -671,6 +671,7 @@ CREATE TABLE IF NOT EXISTS carts (
 );
 -- S7: PayPal depth on orders and ops.
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS reauthorized_at TIMESTAMPTZ;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS dispute_id TEXT;
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS paypal_invoice_id TEXT;
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS negotiation_id TEXT;
@@ -715,6 +716,23 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS checks JSONB;
 
 /** Tables shared by every workspace. They live in the base schema only. */
 export const SHARED_SCHEMA = `
+CREATE TABLE IF NOT EXISTS translations (
+  lang TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  src TEXT NOT NULL,
+  out TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (lang, hash)
+);
+CREATE TABLE IF NOT EXISTS handsfree_runs (
+  id BIGSERIAL PRIMARY KEY,
+  mode TEXT NOT NULL,
+  gaze_px INTEGER,
+  head_px INTEGER,
+  width INTEGER,
+  height INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS webhook_events (
   id TEXT PRIMARY KEY,
   event_type TEXT NOT NULL,

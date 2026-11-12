@@ -1,3 +1,4 @@
+import { currentLang, PAYPAL_LOCALE } from "../lib/lang.js";
 import { paypalBaseUrl } from "../config.js";
 import { CaptureInput, HoldInput, InvoiceInput, PayoutInput, PayPalApi, PayPalError, PPAuthorization, PPBalance, PPCapture, PPDispute, PPOrder, PPRefund, PPSetupToken, PPTransaction, toValue, TrackingInput, UnknownOutcomeError } from "./types.js";
 
@@ -104,7 +105,8 @@ export class PayPalClient implements PayPalApi {
             usage_type: "MERCHANT",
             customer_type: "CONSUMER",
             permit_multiple_payment_tokens: true,
-            experience_context: { brand_name: "StockSure", return_url: input.returnUrl, cancel_url: input.cancelUrl, shipping_preference: "NO_SHIPPING", vault_instruction: "ON_PAYER_APPROVAL" },
+            // Spec B: PayPal's approval page in the person's language; English sends no locale, as before.
+            experience_context: { brand_name: "StockSure", ...(currentLang() !== "en" ? { locale: PAYPAL_LOCALE[currentLang()] } : {}), return_url: input.returnUrl, cancel_url: input.cancelUrl, shipping_preference: "NO_SHIPPING", vault_instruction: "ON_PAYER_APPROVAL" },
           },
         },
       },

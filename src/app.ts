@@ -23,6 +23,8 @@ import { buildServer } from "./mcp/tools.js";
 import { installChannelHandlers } from "./channels/handlers.js";
 import { uiRouter } from "./web/ui-api.js";
 import { askRouter } from "./web/ask.js";
+import { i18nRouter } from "./web/i18n.js";
+import { langMiddleware } from "./lib/lang.js";
 import { moneyRouter } from "./web/money.js";
 import { phoneRouter } from "./web/phone.js";
 import { protectedRouter } from "./web/protected.js";
@@ -69,6 +71,8 @@ export function createApp() {
   app.use(express.json({ limit: "200kb" }));
   app.use(express.urlencoded({ extended: false, limit: "200kb" }));
   app.use(cookieParser());
+  // B1/B3: the person's language rides along with the request, so AI replies come back in it.
+  app.use(langMiddleware);
   // Spec A1: every request below runs inside the visitor's private workspace (or the base schema).
   app.use(workspaceMiddleware());
   app.use(refuseShowcaseWrites());
@@ -119,6 +123,7 @@ export function createApp() {
   app.use(demoRouter());
   app.use(publicRouter());
   app.use(askRouter());
+  app.use(i18nRouter());
   app.use(talksRouter());
   app.use(protectedRouter());
   app.use(phoneRouter());

@@ -1,9 +1,18 @@
 /** Money is integer cents everywhere; this only formats it. */
 export const money = (c: number | null | undefined) => (c === null || c === undefined ? "—" : `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
-const dtf = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-const df = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" });
-const tf = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+// Spec B5: dates in the chosen language's format (the language layer sets window.ssI18n.locale).
+const fmts = new Map<string, Intl.DateTimeFormat>();
+const fmt = (k: string, o: Intl.DateTimeFormatOptions) => {
+  const loc = (typeof window !== "undefined" && (window as any).ssI18n?.lang !== "en" ? (window as any).ssI18n?.locale : undefined) as string | undefined;
+  const key = `${k}:${loc ?? ""}`;
+  let f = fmts.get(key);
+  if (!f) fmts.set(key, (f = new Intl.DateTimeFormat(loc, o)));
+  return f;
+};
+const dtf = { format: (d: Date) => fmt("dt", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(d) };
+const df = { format: (d: Date) => fmt("d", { weekday: "short", day: "numeric", month: "short" }).format(d) };
+const tf = { format: (d: Date) => fmt("t", { hour: "numeric", minute: "2-digit" }).format(d) };
 
 /** Dates shown in the viewer's own time zone, with the zone named once on screens that need it. */
 export const when = (d: string | Date | null | undefined) => (d ? dtf.format(new Date(d)) : "—");

@@ -46,9 +46,15 @@ export async function deliver(messageId: string): Promise<void> {
   const db = await getDb();
   const m = (await db.query("SELECT * FROM channel_messages WHERE id = $1 AND direction = 'out' AND status = 'queued'", [messageId])).rows[0] as any;
   if (!m) return;
-  const buttons: Button[] = m.buttons ?? [];
+  let buttons: Button[] = m.buttons ?? [];
   try {
     let externalId: string | null = null;
+    // Spec B: a message to a real phone goes out in the language its recipient picked in StockSure (the stored copy
+    // and the simulator keep the original). Any failure sends the original text, so delivery never waits on it.
+    if ((m.channel === "telegram" && telegramReady()) || (m.channel === "whatsapp" && whatsappReady())) {
+      const t = await localise(db, m, buttons).catch(() => null);
+      if (t) (m.body = t.body), (buttons = t.buttons);
+    }
     if (m.channel === "telegram" && telegramReady()) {
       const res = await fetchImpl(`https://api.telegram.org/bot${config.channels.telegramToken}/sendMessage`, {
         method: "POST",
@@ -77,6 +83,19 @@ export async function deliver(messageId: string): Promise<void> {
     await db.query("UPDATE channel_messages SET status = 'failed' WHERE id = $1", [messageId]);
     throw e;
   }
+}
+
+/** The language of the person behind a message's address: their own choice, owners first, else English. */
+async function localise(db: Queryable, m: { channel: string; address: string; body: string }, buttons: Button[]): Promise<{ body: string; buttons: Button[] } | null> {
+  const party = (await db.query<{ party_id: string }>("SELECT party_id FROM channel_links WHERE channel = $1 AND address = $2", [m.channel, m.address])).rows[0];
+  if (!party) return null;
+  const row = (await db.query<{ lang: string | null }>("SELECT lang FROM people WHERE org_id = $1 AND lang IS NOT NULL ORDER BY (role = 'owner') DESC LIMIT 1", [party.party_id])).rows[0];
+  const { langOf } = await import("../lib/lang.js");
+  const lang = langOf(row?.lang ?? "en");
+  if (lang === "en") return null;
+  const { translateTexts } = await import("../ai/translate.js");
+  const out = await translateTexts(lang, [m.body, ...buttons.map((b) => b.label)]);
+  return { body: out[0] ?? m.body, buttons: buttons.map((b, i) => ({ ...b, label: out[i + 1] || b.label })) };
 }
 
 export type InboundHandler = (msg: { channel: Channel; address: string; text: string; buttonId: string | null; replyTo: string | null; party: { party: string; party_id: string } | null }) => Promise<string | null>;

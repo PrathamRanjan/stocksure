@@ -52,7 +52,7 @@ interface HomeData {
 
 function OrderCard({ o, supplierView, tour }: { o: OrderCardData; supplierView: boolean; tour?: boolean }) {
   return (
-    <li data-tour={tour ? "order-card" : undefined}>
+    <li data-tour={tour ? "order-card" : undefined} data-ls-reorder={!supplierView && o.status === "closed" ? o.id : undefined} data-ls-name={o.number}>
       <Link
         to={`/po/${o.id}`}
         className="group block rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground focus-visible:border-foreground sm:p-5"
