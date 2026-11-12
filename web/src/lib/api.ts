@@ -65,6 +65,10 @@ export function useView<T>(path: string | null, opts: { poll?: number | false } 
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
   const seq = useRef(0);
+  // The newest request whose answer is on screen. An answer is applied unless a newer one already was: dropping
+  // every superseded answer left the old data showing while a slow newer request was still out (a background poll
+  // starting just after a sign-in refresh made the app think nobody was signed in).
+  const applied = useRef(0);
   const load = useCallback(
     async (quiet = false) => {
       if (!path) return;
@@ -72,7 +76,8 @@ export function useView<T>(path: string | null, opts: { poll?: number | false } 
       if (!quiet) setLoading(true);
       try {
         const d = await getJSON<T>(path);
-        if (n === seq.current) {
+        if (n > applied.current) {
+          applied.current = n;
           setData(d);
           setError(null);
         }
@@ -85,6 +90,8 @@ export function useView<T>(path: string | null, opts: { poll?: number | false } 
     [path],
   );
   useEffect(() => {
+    // A new path: answers still out for the old one must never be shown.
+    applied.current = seq.current;
     setData(null);
     load();
   }, [load]);
