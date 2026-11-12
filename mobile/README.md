@@ -16,7 +16,7 @@ It uses the same contract as the web front end, so there is no second API:
 - actions are the existing form handlers, sent with `X-StockSure-UI: 1` so the server answers `{ ok, message, to }` instead of redirecting (`src/lib/client.ts`);
 - the session is the server's cookie. Money is never computed in the app: every amount on screen comes from the server.
 
-The server address defaults to the live sandbox (`https://pph-stocksure.onrender.com`). Set `EXPO_PUBLIC_STOCKSURE_URL` or change it from Account → Server.
+On the live server each visitor gets a private demo. The sign-in screen starts it ("Start the demo", the same request as the website's Start button), shows the sample PayPal holds being placed, then lists the people. The server address defaults to the live sandbox (`https://pph-stocksure.onrender.com`). Set `EXPO_PUBLIC_STOCKSURE_URL` or change it from Account → Server.
 
 ## Run it
 
@@ -62,3 +62,4 @@ The "Docket" system from the website, rebuilt natively (`src/components/`):
 - The whole loop was driven through the app's web build against the hermetic server, switching between the three people: quote, accept (hold), dispatch with the injected-instruction invoice, count with the "two crushed" docket, supplier agrees, both approve, then capture, release and a replacement hold.
 - Screenshots of that run are in `docs/screenshots/`.
 - Not run on a physical device or a native simulator: this machine has no Xcode or Android SDK. Native-only paths (camera, photo library, haptics, the native header and blur) are written to the Expo SDK 58 APIs but are untested here.
+- 12 Nov 2026, against the live server (`TARGET=https://pph-stocksure.onrender.com node scripts/web-preview.mjs`): started a private demo from the app, signed in as Jordan, approved the agreed fix on SS-1011, signed out, signed in as Ana and approved it too. PayPal captured $48.00 (`0YN32826KY5191239`) and placed the $24.00 replacement hold (`0KC69606SG8132332`). Before this change the app showed nobody to sign in as on the live server, because it predated private demos.

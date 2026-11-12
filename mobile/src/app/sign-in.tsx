@@ -1,7 +1,7 @@
 import { Redirect, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
-import { ArrowRight, ChevronDown, KeyRound } from "lucide-react-native";
+import { ArrowRight, ChevronDown, KeyRound, Play } from "lucide-react-native";
 import { ActivityIndicator } from "react-native";
 import { Button } from "@/components/button";
 import { Card } from "@/components/card";
@@ -26,8 +26,48 @@ export default function SignIn() {
   const router = useRouter();
   const toast = useToast();
   const { session, loading, refresh } = useSession();
-  const people = useView<{ people: Person[] }>("/api/ui/people");
+  const people = useView<{ people: Person[]; needs_workspace?: boolean }>("/api/ui/people");
   const [busy, setBusy] = useState<string | null>(null);
+  const [seed, setSeed] = useState<string | null>(null);
+
+  // The live server gives each visitor a private demo (its own people, orders and PayPal holds). Until one is
+  // open, there is nobody to sign in as: start it here, the same request as the website's "Start" button, and
+  // wait for its people and seeded orders.
+  async function startDemo() {
+    haptics.tap();
+    setBusy("demo");
+    const r = await api.act("/demo/start", {});
+    if (!r.ok) {
+      setBusy(null);
+      haptics.warn();
+      return toast.error(r.message || "The demo didn't start.");
+    }
+    setSeed("Setting up your demo…");
+  }
+  useEffect(() => {
+    if (!seed) return;
+    let stop = false;
+    (async () => {
+      for (let i = 0; i < 90 && !stop; i++) {
+        const w = await api.get<{ seed: { expected: number; confirmed: number; done: boolean; stopped: string | null } | null }>("/api/ui/workspace").catch(() => null);
+        const s = w?.seed;
+        if (s?.stopped) {
+          setSeed(null);
+          setBusy(null);
+          return toast.error(`The demo stopped while setting up: ${s.stopped}`);
+        }
+        if (s?.done) break;
+        if (s) setSeed(s.expected ? `Placing sample PayPal holds: ${s.confirmed} of ${s.expected}` : "Setting up your demo…");
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+      if (stop) return;
+      setSeed(null);
+      setBusy(null);
+      haptics.success();
+      people.reload();
+    })();
+    return () => void (stop = true);
+  }, [seed !== null]); // eslint-disable-line react-hooks/exhaustive-deps
   const [key, setKey] = useState("");
   const [more, setMore] = useState(false);
 
@@ -72,7 +112,15 @@ export default function SignIn() {
         <Txt v="label" muted>{list.length ? "Sign in as" : "Sign in"}</Txt>
         {people.error && !people.data ? <ErrorState message={people.error.message} status={people.error.status} retry={() => people.reload()} /> : null}
         {people.loading && !people.data ? <Loading label="Loading people" cards={3} /> : null}
-        {people.data && !list.length ? <Empty title="Demo sign-in is off on this server">Use the access key your organisation gave you.</Empty> : null}
+        {people.data && !list.length && people.data.needs_workspace ? (
+          <Card style={{ gap: 12 }}>
+            <Txt v="h3">Start your private demo</Txt>
+            <Txt v="small" muted>You get your own café, wholesaler and orders, with real PayPal sandbox holds. Nobody else sees them, and they are cleared after two days without use.</Txt>
+            <Button disabled={!!busy} loading={busy === "demo"} onPress={startDemo} icon={Play}>Start the demo</Button>
+            {seed ? <Txt v="small" accessibilityLiveRegion="polite">{seed}</Txt> : null}
+          </Card>
+        ) : null}
+        {people.data && !list.length && !people.data.needs_workspace ? <Empty title="Demo sign-in is off on this server">Use the access key your organisation gave you.</Empty> : null}
         {main.map((x) => (
           <Pressable
             key={x.id}
