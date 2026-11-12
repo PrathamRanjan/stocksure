@@ -13,7 +13,7 @@ import { ErrorBlock, LoadingBlock, Stamp } from "@/components/brand";
 function Page({ title, sub, children }: { title: string; sub: ReactNode; children: ReactNode }) {
   return (
     <PublicShell wide>
-      <p className="text-sm"><Link to="/judge" className="underline">← For judges</Link></p>
+      <p className="text-sm"><Link to="/#pick" className="underline">← Guided tour</Link></p>
       <h1 className="mt-2 text-4xl">{title}</h1>
       <div className="mt-2 max-w-3xl text-muted-foreground">{sub}</div>
       <div className="mt-6">{children}</div>

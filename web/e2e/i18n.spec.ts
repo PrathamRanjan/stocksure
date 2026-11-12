@@ -29,13 +29,14 @@ async function settle(page: Page) {
 }
 
 test("main screens in four languages: screenshots, and no interface English left", async ({ browser }) => {
+  test.setTimeout(180_000); // four languages × full-page screenshots, including the longer landing page
   const misses = new Map<string, Set<string>>();
   const owner = await as(browser, "Jordan");
   await resetDemo(owner.page);
   const po = await demoPo(owner.page);
   await owner.ctx.close();
   const plan: { who: Who | null; paths: [string, string][] }[] = [
-    { who: null, paths: [["landing", "/"], ["start", "/start"], ["judge", "/judge"], ["accessibility", "/accessibility"], ["agents", "/agents"]] },
+    { who: null, paths: [["landing", "/"], ["start", "/start"], ["checklist", "/checklist"], ["accessibility", "/accessibility"], ["agents", "/agents"]] },
     { who: "Jordan", paths: [["owner-home", "/home"], ["order", `/po/${po.id}`], ["new-order", "/orders/new"], ["stock", "/stock"], ["approvals", "/approvals"], ["ask", "/ask"], ["negotiations", "/negotiations"], ["performance", "/performance"]] },
     { who: "Sam", paths: [["receiver-home", "/home"], ["receive", `/po/${po.id}/receive`]] },
     { who: "Ana", paths: [["supplier-home", "/home"], ["supplier-order", `/po/${po.id}`], ["catalog", "/catalog"]] },

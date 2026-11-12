@@ -51,8 +51,8 @@ export default function Judge() {
 
   return (
     <PublicShell wide>
-      <h1 className="text-4xl">For judges</h1>
-      <p className="mt-2 max-w-3xl text-muted-foreground">Three short paths through your own private demo. Each step opens the exact screen as the right person; the tick appears when the server records that it happened. No PayPal login is needed: holds and captures use the demo's saved sandbox wallet.</p>
+      <h1 className="text-4xl">Step-by-step checklist</h1>
+      <p className="mt-2 max-w-3xl text-muted-foreground">The guided tour on the <Link to="/#pick" className="font-semibold text-foreground underline underline-offset-2">home page</Link> explains everything as you go. This page is the bare checklist behind it, for checking a path quickly: three short paths through your own private demo. Each step opens the exact screen as the right person; the tick appears when the server records that it happened. No PayPal login is needed: holds and captures use the demo's saved sandbox wallet.</p>
 
       {!d.workspace ? (
         <div className="mt-6 rounded-lg border-2 border-foreground bg-card p-5">

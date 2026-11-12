@@ -101,10 +101,10 @@ export function guardRouter() {
       const agentKills = kills.filter((k: any) => k.scope.startsWith("agent:"));
       res.send(
         layout(
-          { title: "Guard", who: whoOf(p), flash: flashOf(req), scripts: raw(`<script>${PASSKEY_JS}</script><script src="/static/guard.js" defer></script>`) },
+          { title: "Spending rules", who: whoOf(p), flash: flashOf(req), scripts: raw(`<script>${PASSKEY_JS}</script><script src="/static/guard.js" defer></script>`) },
           html`
-<h1>Guard</h1>
-<p class="sub">Your purchasing mandate in your own words becomes the rules every agent orders under. Code enforces them before any PayPal request. You can stop everything with one switch.</p>
+<h1>Spending rules</h1>
+<p class="sub">The owner's rules for money: how much an order may cost, how much per day, and above what amount a payment waits for the owner's approval. Write them in your own words; code turns them into rules and checks every PayPal request against them. One switch stops all payments.</p>
 
 <div class="grid g2">
 <div class="card">

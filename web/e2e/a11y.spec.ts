@@ -63,7 +63,7 @@ test("axe finds no serious or critical issue on the new Wave 4 and 5 screens", a
   const { ctx, page } = await as(browser, "Jordan");
   const po = await demoPo(page);
   const out: string[] = [];
-  for (const path of ["/", "/ask", "/negotiations", `/po/${po.id}`, "/home", "/accessibility", "/judge"]) {
+  for (const path of ["/", "/ask", "/negotiations", `/po/${po.id}`, "/home", "/accessibility", "/checklist"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     out.push(...(await axe(page, path)));
@@ -76,7 +76,7 @@ test("axe finds no serious or critical issue on the new Wave 4 and 5 screens", a
   const r = await axe(s.page, "/po/:id/receive");
   expect(r).toEqual([]);
   await s.ctx.close();
-  record("axe (WCAG 2.2 AA): no serious or critical issue", true, "landing, Ask, negotiations, order, home, accessibility, judge (as the owner); receive (as the receiver)");
+  record("axe (WCAG 2.2 AA): no serious or critical issue", true, "landing, Ask, negotiations, order, home, accessibility, checklist (as the owner); receive (as the receiver)");
 });
 
 test("with reduced motion, nothing on the landing page keeps moving", async ({ browser }) => {

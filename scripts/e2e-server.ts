@@ -26,6 +26,11 @@ async function connect() {
   fake.approveSetup(st.id);
   const t = await fake.createPaymentToken(st.id, `pt-${Date.now()}`);
   await db.query("UPDATE orgs SET vault_token_id = $2, vault_payer = 'sb-a1b2c3d4e5f6g7@personal.example.com' WHERE id = $1", [ids.laneway, t.id]);
+  // The same fake token is the "saved demo wallet", so a private demo opened here gets paid orders, as on production.
+  config.demo.vaultToken = t.id;
+  config.demo.vaultPayer = "sb-a1b2c3d4e5f6g7@personal.example.com";
+  // Every spec that opens a private demo comes from 127.0.0.1; production keeps its own per-address limit.
+  config.demo.perAddressPerHour = 1000;
 }
 await connect();
 const app = createApp();

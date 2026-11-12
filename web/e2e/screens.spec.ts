@@ -40,8 +40,8 @@ test("screenshots", async ({ browser }) => {
     await shot(p, "01-landing", c.w, c.t, c.w === 1440 && c.t === "light");
     await p.goto("/login");
     await shot(p, "02-sign-in", c.w, c.t);
-    await p.goto("/judge");
-    await expect(p.getByRole("heading", { name: "For judges" })).toBeVisible();
+    await p.goto("/checklist");
+    await expect(p.getByRole("heading", { name: "Step-by-step checklist" })).toBeVisible();
     await shot(p, "08-judge", c.w, c.t);
     await ctx.close();
     // Sam counting the delivery.

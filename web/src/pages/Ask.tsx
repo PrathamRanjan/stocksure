@@ -156,6 +156,7 @@ export default function Ask() {
           <h2 id="ask-title" className="sr-only">Your question</h2>
           <form
             className="grid gap-2"
+            data-tour="ask-form"
             onSubmit={(e) => {
               e.preventDefault();
               void ask(question);
@@ -165,7 +166,7 @@ export default function Ask() {
             <Textarea id="ask-q" rows={3} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Which supplier short-delivers most, and what did it cost?" maxLength={600} />
             {d.ready && <PushToTalk label="Hold to ask by voice" onText={(t) => setQuestion((q) => (q.trim() ? `${q.trim()} ${t}` : t).slice(0, 600))} />}
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" disabled={busy || !d.ready || d.left_today <= 0}>{busy ? <Spinner className="size-4" /> : <Send aria-hidden="true" />} Ask</Button>
+              <Button type="submit" data-tour="ask-go" disabled={busy || !d.ready || d.left_today <= 0}>{busy ? <Spinner className="size-4" /> : <Send aria-hidden="true" />} Ask</Button>
               <span className="text-sm text-muted-foreground">{d.left_today} of {d.per_day} questions left today in this demo</span>
               <Button type="button" variant="outline" className="ml-auto lg:hidden" onClick={() => setSheet(true)} disabled={!state}><ListChecks aria-hidden="true" /> AI work ({calls})</Button>
             </div>
@@ -178,7 +179,7 @@ export default function Ask() {
           </div>
 
           {state && (
-            <article className="mt-6 rounded-lg border-2 border-foreground bg-card p-5" aria-live="polite" aria-labelledby="answer-title">
+            <article className="mt-6 rounded-lg border-2 border-foreground bg-card p-5" aria-live="polite" aria-labelledby="answer-title" data-tour="ask-answer" data-ask-status={state.status}>
               <p className="text-sm text-muted-foreground">You asked</p>
               <h2 id="answer-title" className="text-xl">{state.question}</h2>
               {running && <p className="mt-3 flex items-center gap-2"><Spinner className="size-4" /> Looking it up ({calls} tool call{calls === 1 ? "" : "s"} so far)…</p>}
@@ -227,7 +228,7 @@ export default function Ask() {
           )}
         </section>
 
-        <aside className="hidden lg:block" aria-labelledby="rail-title">
+        <aside className="hidden lg:block" aria-labelledby="rail-title" data-tour="ask-rail">
           <h2 id="rail-title" className="mb-2 flex items-center gap-2 text-lg"><ListChecks className="size-5" aria-hidden="true" /> AI work</h2>
           {rail}
         </aside>

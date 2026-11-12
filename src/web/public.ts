@@ -55,7 +55,7 @@ export async function liveTable() {
   return [
     { area: "PayPal holds, captures, voids, reauthorizations (Orders v2, Payments v2)", ...sim(pp, `PayPal ${config.paypal.env}; every write carries a PayPal-Request-Id and is read back`, "no PayPal credentials: nothing can be held or charged") },
     { area: "PayPal refunds", ...sim(pp, `PayPal ${config.paypal.env}, on credits after a capture`, "off") },
-    { area: "Saved demo wallet (Vault payment token)", state: w ? (w.status === "ok" || w.status === "unchecked" ? "live" : "not working") : "off", detail: w ? `sandbox buyer wallet, status ${w.status}${w.checkedAt ? `, checked with PayPal ${new Date(w.checkedAt).toISOString().slice(0, 10)}` : ""}` : "not configured: buyers approve on PayPal's own page" },
+    { area: "Saved demo wallet (Vault payment token)", state: w ? (w.status === "ok" || w.status === "unchecked" ? "live" : "not working") : "off", detail: w ? (w.checkedAt ? `sandbox buyer wallet, status ${w.status}, checked with PayPal on ${new Date(w.checkedAt).toISOString().slice(0, 10)}` : `sandbox buyer wallet, status ${w.status}`) : "not configured: buyers approve on PayPal's own page" },
     { area: "PayPal webhooks", ...sim(!!config.paypal.webhookId, "signature verified with PayPal, then the resource is read back", "no webhook id: state comes from read-backs only") },
     { area: "PayPal disputes, tracking, invoicing", ...sim(pp, `PayPal ${config.paypal.env}`, "off") },
     { area: "PayPal's MCP server (agent reads)", ...sim(pp && !!config.ai.paypalMcpUrl && config.paypal.env === "sandbox", `${config.ai.paypalMcpUrl}, ${READ_TOOLS.length} read tools; no write tool is offered`, "off") },

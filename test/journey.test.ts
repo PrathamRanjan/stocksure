@@ -66,7 +66,7 @@ describe("StockSure acceptance journey", () => {
     expect((await anon.get("/")).status).toBeLessThan(400);
     expect((await anon.get("/login")).status).toBe(200);
     // Front-end pages are served by the app shell; their data comes from /api/ui/* (JSON, read-only).
-    for (const u of ["/demo", "/about", "/favicon.svg"]) expect((await anon.get(u)).status, u).toBe(200);
+    for (const u of ["/demo", "/about", "/checklist", "/favicon.svg"]) expect((await anon.get(u)).status, u).toBe(200);
     expect((await anon.get("/no-such-page", { accept: "text/html" })).status).toBe(404);
     expect((await anon.get("/api/ui/no-such-view")).status).toBe(404);
     expect((await anon.get("/api/ui/home")).status).toBe(401);

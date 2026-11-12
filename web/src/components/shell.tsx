@@ -15,6 +15,7 @@ import { HandsFreeButton, LangPicker } from "@/components/lang-picker";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Logo, useOnline } from "@/components/brand";
 import { startTour } from "@/tour/tours";
+import { journeyActive, resumeJourney, takeTour } from "@/tour/journey";
 
 export interface NavItem {
   to: string;
@@ -23,6 +24,22 @@ export interface NavItem {
   server?: boolean;
   badge?: number;
   tour?: string;
+}
+
+/** The demo ribbon's link: back into the guided tour if one is under way, otherwise to "Pick who you are". */
+function GuidedTourLink() {
+  const cls = "inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8";
+  if (journeyActive())
+    return (
+      <button type="button" className={cls} data-tour="take-tour" onClick={() => void resumeJourney()}>
+        Back to the guided tour
+      </button>
+    );
+  return (
+    <Link to="/#pick" className={cls} data-tour="take-tour">
+      Guided tour
+    </Link>
+  );
 }
 
 /** What each person can open. Server pages (server: true) are full page loads in the same identity. */
@@ -79,7 +96,10 @@ export function navFor(who: Who | null, counts: { needs: number; approvals: numb
   };
 }
 
+export const navKey = (label: string) => label.toLowerCase().replace(/\(.*?\)/g, "").trim().replace(/[^a-z]+/g, "-");
+
 function NavEntry({ n, onClick, compact = false }: { n: NavItem; onClick?: () => void; compact?: boolean }) {
+  const tourKey = compact ? undefined : `nav-${navKey(n.label)}`;
   const cls = (active: boolean) =>
     cn(
       "group flex min-h-11 items-center gap-3 rounded-md px-3 text-[0.95rem] font-semibold transition-colors sm:min-h-10",
@@ -96,12 +116,12 @@ function NavEntry({ n, onClick, compact = false }: { n: NavItem; onClick?: () =>
   );
   if (n.server)
     return (
-      <a href={n.to} className={cls(false)} onClick={onClick} data-tour={n.tour}>
+      <a href={n.to} className={cls(false)} onClick={onClick} data-tour={tourKey}>
         {inner}
       </a>
     );
   return (
-    <NavLink to={n.to} end={n.to === "/home"} className={({ isActive }) => cls(isActive)} onClick={onClick} data-tour={n.tour}>
+    <NavLink to={n.to} end={n.to === "/home"} className={({ isActive }) => cls(isActive)} onClick={onClick} data-tour={tourKey}>
       {inner}
     </NavLink>
   );
@@ -132,9 +152,7 @@ export function DemoRibbon() {
         </span>
         <span className="text-muted-foreground sm:hidden">Sandbox · no real money</span>
         <span className="ml-auto flex items-center gap-3">
-          <Link to="/judge" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8" data-tour="take-tour">
-            Judge paths
-          </Link>
+          <GuidedTourLink />
           <Link to="/demo" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 sm:min-h-8">
             Reset & setup
           </Link>
@@ -221,8 +239,8 @@ function Palette({ open, setOpen, items }: { open: boolean; setOpen: (b: boolean
           <CommandItem value="Tour this page" onSelect={() => { setOpen(false); setTimeout(startTour, 50); }}>
             <BookOpenCheck aria-hidden="true" /> Tour this page
           </CommandItem>
-          <CommandItem value="Judge paths" onSelect={() => { setOpen(false); nav("/judge"); }}>
-            <BookOpenCheck aria-hidden="true" /> Judge paths
+          <CommandItem value="Guided tour: pick who you are" onSelect={() => { setOpen(false); nav("/#pick"); }}>
+            <BookOpenCheck aria-hidden="true" /> Guided tour: pick who you are
           </CommandItem>
         </CommandGroup>
       </CommandList>
@@ -263,13 +281,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link to={who ? "/home" : "/"} className="mb-5 px-2 text-xl">
             <Logo />
           </Link>
-          <nav aria-label="Main" className="flex flex-col gap-0.5">
+          <nav aria-label="Main" className="flex flex-col gap-0.5" data-tour="nav-main">
             {main.map((n) => <NavEntry key={n.to} n={n} />)}
           </nav>
           {tools.length > 0 && (
             <>
               <p className="mb-1 mt-6 px-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Controls and records</p>
-              <nav aria-label="Controls and records" className="flex flex-col gap-0.5">
+              <nav aria-label="Controls and records" className="flex flex-col gap-0.5" data-tour="nav-tools">
                 {tools.map((n) => <NavEntry key={n.to} n={n} />)}
               </nav>
             </>
@@ -288,7 +306,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Logo className="text-lg max-sm:[&>span]:hidden" />
               </Link>
               <div className="ml-auto flex items-center gap-1">
-                <Button variant="ghost" size="sm" className="hidden lg:inline-flex" onClick={() => startTour()} data-tour="tour-btn">
+                <Button variant="ghost" size="sm" className="hidden lg:inline-flex" onClick={() => void takeTour(who?.first, startTour)} data-tour="tour-btn">
                   <BookOpenCheck aria-hidden="true" /> Take the tour
                 </Button>
                 <LangPicker />
@@ -333,7 +351,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </SheetHeader>
           <nav aria-label="More" className="flex flex-col gap-0.5 px-4 pb-6">
             {[...main.slice(4), ...tools].map((n) => <NavEntry key={n.to} n={n} onClick={() => setSheet(false)} />)}
-            <button type="button" className="flex min-h-11 items-center gap-3 rounded-md px-3 font-semibold hover:bg-accent" onClick={() => { setSheet(false); setTimeout(startTour, 300); }}>
+            <button type="button" className="flex min-h-11 items-center gap-3 rounded-md px-3 font-semibold hover:bg-accent" onClick={() => { setSheet(false); setTimeout(() => void takeTour(who?.first, startTour), 300); }}>
               <BookOpenCheck className="size-[18px]" aria-hidden="true" /> Take the tour
             </button>
           </nav>

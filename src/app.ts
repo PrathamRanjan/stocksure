@@ -37,7 +37,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const spaDir = join(root, "web", "dist");
 
 /** Pages the React front end owns. Everything else (guard, ledger, deliveries, dock, safety, evidence…) stays server-rendered in the same identity. */
-export const SPA_PATHS = ["/", "/start", "/login", "/home", "/approvals", "/po/new", "/po/:id", "/po/:id/receive", "/stock", "/catalog", "/performance", "/demo", "/judge", "/about", "/ask", "/proof", "/ai", "/paypal", "/who-can-move-money", "/accessibility", "/agents", "/negotiations", "/negotiations/:id"];
+export const SPA_PATHS = ["/", "/start", "/login", "/home", "/approvals", "/po/new", "/po/:id", "/po/:id/receive", "/stock", "/catalog", "/performance", "/demo", "/judge", "/checklist", "/about", "/ask", "/proof", "/ai", "/paypal", "/who-can-move-money", "/accessibility", "/agents", "/negotiations", "/negotiations/:id"];
 
 /**
  * The front end posts to the same handlers as the old forms, with `X-StockSure-UI: 1`. For those requests a redirect

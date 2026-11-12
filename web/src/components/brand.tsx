@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, Bot, Code2, Landmark, Loader2, RefreshCw, WifiOff } from "lucide-react";
+import { AlertTriangle, Bot, Code2, Inbox, Landmark, Loader2, RefreshCw, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { money, PP, STATUS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -50,58 +50,31 @@ export interface TallyNums {
   short: number | null;
 }
 
-/** The signature: one mark per pack. Ink = accepted, struck red = damaged, dashed = short or wrong, grey = ordered, not yet counted. */
-export function Tally({ t, size = "md", label, className }: { t: TallyNums; size?: "sm" | "md"; label?: string; className?: string }) {
-  const r = (n: number | null) => Math.max(0, Math.round(n ?? 0));
+/** What arrived, in plain words: "6 accepted · 2 damaged", or "8 ordered, not counted yet". */
+export function Tally({ t, label, className }: { t: TallyNums; size?: "sm" | "md"; label?: string; className?: string }) {
   const counted = t.accepted !== null;
-  const marks: string[] = [];
-  if (!counted) for (let i = 0; i < t.ordered; i++) marks.push("ordered");
-  else {
-    for (let i = 0; i < r(t.accepted); i++) marks.push("accepted");
-    for (let i = 0; i < r(t.damaged); i++) marks.push("damaged");
-    for (let i = 0; i < r(t.wrong); i++) marks.push("wrong");
-    for (let i = 0; i < r(t.short); i++) marks.push("short");
-  }
-  const text = !counted
-    ? `${t.ordered} ordered, not counted yet`
-    : [`${fmtN(t.accepted)} accepted`, t.damaged ? `${fmtN(t.damaged)} damaged` : "", t.wrong ? `${fmtN(t.wrong)} wrong` : "", t.short ? `${fmtN(t.short)} short` : "", `of ${t.ordered} ordered`].filter(Boolean).join(", ");
-  const too = marks.length > 48;
+  const parts: [string, string][] = !counted
+    ? [["ordered", `${t.ordered} ordered · not counted yet`]]
+    : ([
+        ["accepted", `${fmtN(t.accepted)} accepted`],
+        ...(t.damaged ? [["damaged", `${fmtN(t.damaged)} damaged`]] : []),
+        ...(t.wrong ? [["wrong", `${fmtN(t.wrong)} wrong item`]] : []),
+        ...(t.short ? [["short", `${fmtN(t.short)} missing`]] : []),
+      ] as [string, string][]);
+  const text = parts.map((p) => p[1]).join(", ") + (counted ? ` of ${t.ordered} ordered` : "");
   return (
-    <span className={cn("inline-flex items-center", className)} role="img" aria-label={label ? `${label}: ${text}` : text} title={text}>
-      {too ? (
-        <span className="sbar w-40" aria-hidden="true">
-          {(["accepted", "damaged", "wrong", "short", "ordered"] as const).map((k) => {
-            const n = marks.filter((m) => m === k).length;
-            return n ? <span key={k} style={{ width: `${(n / marks.length) * 100}%`, background: k === "accepted" ? "var(--foreground)" : k === "damaged" ? "var(--stop)" : k === "ordered" ? "var(--input)" : "var(--paper-2)" }} /> : null;
-          })}
-        </span>
-      ) : (
-        <span className={cn("tally", size === "sm" && "sm")} aria-hidden="true">
-          {marks.map((k, i) => (
-            <i key={i} data-k={k} style={i > 0 && i % 5 === 0 ? { marginLeft: 4 } : undefined} />
-          ))}
-        </span>
-      )}
+    <span className={cn("counts", className)} aria-label={label ? `${label}: ${text}` : text}>
+      {parts.map(([k, l]) => (
+        <span key={k} data-k={k}>{l}</span>
+      ))}
     </span>
   );
 }
 const fmtN = (n: number | null) => (n === null ? "—" : Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-export function TallyLegend({ className }: { className?: string }) {
-  const item = (k: string, l: string) => (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="tally sm" aria-hidden="true"><i data-k={k} /></span>
-      {l}
-    </span>
-  );
-  return (
-    <p className={cn("flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground", className)}>
-      {item("accepted", "accepted")}
-      {item("damaged", "damaged")}
-      {item("short", "short or wrong")}
-      {item("ordered", "not counted yet")}
-    </p>
-  );
+/** Kept for older call sites; the counts now say what they are, so there is no legend. */
+export function TallyLegend(_: { className?: string }) {
+  return null;
 }
 
 export interface FundingNums {
@@ -215,11 +188,7 @@ export function SectionTitle({ children, aside, id }: { children: ReactNode; asi
 export function Empty({ title, children, action, art }: { title: string; children?: ReactNode; action?: ReactNode; art?: ReactNode }) {
   return (
     <div className="rounded-lg border border-dashed border-input bg-card/60 px-5 py-8 text-center">
-      {art ?? (
-        <div className="mx-auto mb-3 w-fit opacity-60">
-          <Tally t={{ ordered: 5, accepted: null, damaged: null, wrong: null, short: null }} />
-        </div>
-      )}
+      {art ?? <Inbox className="mx-auto mb-3 size-8 opacity-50" aria-hidden="true" />}
       <p className="font-heading text-lg font-bold">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-prose text-muted-foreground">{children}</div>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}

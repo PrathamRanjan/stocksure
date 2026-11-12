@@ -13,7 +13,7 @@ export function ProtectedThisMonth() {
   const d = v.data;
   const any = d.rows.some((r) => r.items.length);
   return (
-    <section aria-labelledby="protected-title" data-protected className="mb-6 rounded-lg border-2 border-foreground bg-card p-4 sm:p-5">
+    <section aria-labelledby="protected-title" data-protected data-tour="protected" className="mb-6 rounded-lg border-2 border-foreground bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <ShieldCheck className="size-6 shrink-0 self-center" aria-hidden="true" />
         <h2 id="protected-title" className="font-heading text-lg font-bold">Protected this month</h2>

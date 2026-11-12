@@ -267,7 +267,7 @@ export default function Order() {
         kicker={
           <span className="flex flex-wrap items-center gap-2">
             <StatusStamp status={m.po.status} />
-            {m.po.kind === "replacement" && <Stamp tone="carbon">Replacement</Stamp>}
+            {m.po.kind === "replacement" && <Stamp tone="carbon">Replacement order</Stamp>}
             {m.po.sample && <Stamp tone="carbon">Sample</Stamp>}
             {moving && <Stamp tone="held"><Spinner className="size-3" /> PayPal working</Stamp>}
           </span>

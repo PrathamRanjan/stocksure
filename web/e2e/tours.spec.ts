@@ -3,12 +3,19 @@ import { as, quietContext, resetDemo } from "./helpers";
 
 /** Spec A3.3: no tour starts by itself; a tour starts from a button, stays on its page and ends on any route change. */
 const pop = (p: import("@playwright/test").Page) => p.locator(".driver-popover");
+/** The one-page tour lives in the command palette; the header's "Take the tour" starts the guided story (story.spec.ts). */
+async function tourThisPage(p: import("@playwright/test").Page) {
+  await p.getByRole("button", { name: /Go to/ }).first().click();
+  const box = p.getByPlaceholder(/Go to/);
+  await box.fill("Tour this page");
+  await box.press("Enter");
+}
 
-test("no tour opens by itself on the landing, judge or home page", async ({ browser }) => {
+test("no tour opens by itself on the landing, checklist or home page", async ({ browser }) => {
   const ctx = await quietContext(browser, { tours: true });
   const p = await ctx.newPage();
   await resetDemo(p);
-  for (const path of ["/", "/judge", "/?tour=judge"]) {
+  for (const path of ["/", "/#pick", "/checklist", "/?tour=judge"]) {
     await p.goto(path);
     await p.waitForTimeout(1500);
     await expect(pop(p)).toHaveCount(0);
@@ -20,17 +27,17 @@ test("no tour opens by itself on the landing, judge or home page", async ({ brow
   await c2.close();
 });
 
-test("the tour button tours this page; moving to another page ends it without bouncing back", async ({ browser }) => {
+test("Tour this page tours this page; moving to another page ends it without bouncing back", async ({ browser }) => {
   const { ctx, page } = await as(browser, "Jordan");
-  await page.getByRole("button", { name: /Take the tour/ }).first().click();
+  await tourThisPage(page);
   await expect(pop(page)).toBeVisible();
-  await expect(pop(page).locator(".driver-popover-title")).toHaveText("What needs you");
+  await expect(pop(page).locator(".driver-popover-title")).toHaveText("Waiting on you");
   await pop(page).getByRole("button", { name: /Next/ }).click();
   await expect(pop(page).locator(".driver-popover-progress-text")).toContainText(/^2 of/);
   await page.keyboard.press("Escape");
   await expect(pop(page)).toHaveCount(0);
   // Start again, then navigate: the tour ends and the URL stays where the person went.
-  await page.getByRole("button", { name: /Take the tour/ }).first().click();
+  await tourThisPage(page);
   await expect(pop(page)).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(pop(page).locator(".driver-popover-progress-text")).toContainText(/^2 of/);

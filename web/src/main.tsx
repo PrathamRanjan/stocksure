@@ -78,7 +78,8 @@ function Authed({ children }: { children: ReactNode }) {
   if (!session?.who) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   return (
     <AppShell>
-      <Suspense fallback={<LoadingBlock />}>{children}</Suspense>
+      {/* Keyed by person: switching person (the guided tour does it) remounts the page with their data. */}
+      <Suspense key={session.who.id} fallback={<LoadingBlock />}>{children}</Suspense>
     </AppShell>
   );
 }
@@ -105,7 +106,8 @@ function App() {
         <Route path="/performance" element={<Authed><Performance /></Authed>} />
         <Route path="/ask" element={<Authed><Ask /></Authed>} />
         <Route path="/demo" element={<Lazy><Demo /></Lazy>} />
-        <Route path="/judge" element={<Lazy><Judge /></Lazy>} />
+        <Route path="/judge" element={<Navigate to="/#pick" replace />} />
+        <Route path="/checklist" element={<Lazy><Judge /></Lazy>} />
         <Route path="/proof" element={<Lazy><Proof /></Lazy>} />
         <Route path="/ai" element={<Lazy><AiCalls /></Lazy>} />
         <Route path="/paypal" element={<Lazy><PayPalApis /></Lazy>} />

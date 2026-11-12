@@ -51,7 +51,7 @@ export function safetyRouter() {
     const holds = await safetyHolds(p.org_id, db);
     const prot = await protectedMode(p.org_id, db);
     res.send(layout({ title: "Scam and fraud protection", who: whoOf(p), flash: flashOf(req), scripts: raw(`<script src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.22.0/ort.min.js"></script><script type="module" src="/static/safety.js"></script>`) }, html`<h1>Scam and fraud protection</h1>
-<p class="muted">Rules in code, a scam text model that runs in your browser, and a payment-risk model. Strictest wins; none of them can approve a payment. Anything held waits for you on <a href="/guard">Guard</a>. <a href="/safety/model-card">How it was tested</a>.</p>
+<p class="muted">Rules in code, a scam text model that runs in your browser, and a payment-risk model. Strictest wins; none of them can approve a payment. Anything held waits for the owner on <a href="/approvals">Approvals</a> (rules: <a href="/guard">Spending rules</a>). <a href="/safety/model-card">How it was tested</a>.</p>
 <div class="grid2">
 <div class="card" id="how"><h3>What is checked before money moves</h3><ul>
 <li><b>No payee, ever.</b> StockSure's PayPal calls never take a payee: settlement goes to the account PayPal already knows for the order. A message or invoice cannot redirect it.</li>

@@ -91,7 +91,7 @@ export default function Receive() {
         </Empty>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <section aria-labelledby="up-title" className="rounded-lg border border-border bg-card p-4 sm:p-5">
+          <section aria-labelledby="up-title" data-tour="paperwork" className="rounded-lg border border-border bg-card p-4 sm:p-5">
             <SectionTitle id="up-title" aside={<span className="inline-flex items-center gap-1"><Bot className="size-4" aria-hidden="true" /> {m.reader}</span>}>1. Add the paperwork</SectionTitle>
             <p className="text-muted-foreground">The docket and photos are read into suggested counts. You check them in step 2. The reader can't change prices or who gets paid.</p>
             <div className="mt-4 grid gap-4">
@@ -110,11 +110,11 @@ export default function Receive() {
               </div>
               <Button onClick={() => upload()} disabled={!!busy}>{busy === "upload" ? <Spinner /> : <Upload aria-hidden="true" />} Read these</Button>
               {m.demo.samples && (
-                <div className="rounded-md bg-paper-2 p-3">
+                <div className="rounded-md bg-paper-2 p-3" data-tour="sample-docket">
                   <p className="text-sm font-semibold">Demo: use a sample docket</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("clean")}>{busy === "s-clean" && <Spinner />} Everything arrived</Button>
-                    <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("damaged")}>{busy === "s-damaged" && <Spinner />} Driver notes two crushed</Button>
+                    <Button size="sm" variant="outline" disabled={!!busy} onClick={() => upload("damaged")} data-sample="damaged">{busy === "s-damaged" && <Spinner />} Driver notes two crushed</Button>
                   </div>
                   <p className="mt-3 text-sm font-semibold">Demo: count from a door photo</p>
                   <p className="text-xs text-muted-foreground">Generated drawings, not camera photos. Or take a real one above.</p>
@@ -182,7 +182,7 @@ export default function Receive() {
               {m.lines.map((l) => {
                 const c = counts[l.id] ?? l.prefill;
                 return (
-                  <li key={l.id} className={cn("rounded-md border p-3 sm:p-4", l.unsure || l.disputed ? "border-held" : "border-border")}>
+                  <li key={l.id} data-tour={l.proposal.delivered_text ? "ai-suggest" : "count-line"} className={cn("rounded-md border p-3 sm:p-4", l.unsure || l.disputed ? "border-held" : "border-border")}>
                     <p className="font-semibold"><span className="mono mr-1 text-xs text-muted-foreground">{l.line_no}</span> {l.product.name}</p>
                     <p className="text-sm text-muted-foreground">Expected {l.expected_text} ({l.expected_packs} × {l.product.pack_label}){l.part1_accepted ? ` · part 1 accepted ${l.part1_accepted}` : ""}</p>
                     {l.disputed && <p className="mt-2 rounded-md bg-stop-soft px-3 py-2 text-sm"><span className="font-semibold">Supplier disputed:</span> {l.disputed}</p>}
@@ -212,13 +212,13 @@ export default function Receive() {
                 );
               })}
             </ol>
-            <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 rounded-md bg-paper-2 p-3">
-              <input type="checkbox" className="mt-1 size-5" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+            <div data-tour="confirm"><label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 rounded-md bg-paper-2 p-3">
+              <input type="checkbox" data-tour="confirm-check" className="mt-1 size-5" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
               <span>I checked the goods. These counts are what we accept. <span className="text-muted-foreground">The supplier sees them and can dispute a line.</span></span>
             </label>
-            <Button type="submit" size="lg" className="mt-4 w-full sm:w-auto" disabled={!checked || !!busy}>
+            <Button type="submit" size="lg" data-tour="confirm-btn" className="mt-4 w-full sm:w-auto" disabled={!checked || !!busy}>
               {busy === "confirm" ? <Spinner /> : <Check aria-hidden="true" />} Confirm counts
-            </Button>
+            </Button></div>
           </form>
         </div>
       )}

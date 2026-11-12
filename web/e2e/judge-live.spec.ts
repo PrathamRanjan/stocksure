@@ -10,13 +10,13 @@ test.setTimeout(900_000);
 
 const step = (p: Page, key: string) => p.locator(`[data-step="${key}"]`);
 async function openStep(p: Page, key: string) {
-  await p.goto("/judge");
+  await p.goto("/checklist");
   const b = step(p, key).getByRole("button");
   await expect(b).toBeEnabled({ timeout: 60_000 });
-  await Promise.all([p.waitForURL((u) => !u.pathname.startsWith("/judge"), { timeout: 30_000 }), b.click()]);
+  await Promise.all([p.waitForURL((u) => !u.pathname.startsWith("/checklist"), { timeout: 30_000 }), b.click()]);
 }
 async function ticked(p: Page, key: string, timeout = 60_000) {
-  await p.goto("/judge");
+  await p.goto("/checklist");
   await expect(step(p, key)).toHaveAttribute("data-done", "1", { timeout });
 }
 
@@ -30,8 +30,8 @@ test("a judge completes every path from /judge", async ({ browser }) => {
   const p = await ctx.newPage();
   const times: Record<string, number> = {};
 
-  // Start a private demo from the judge page.
-  await p.goto("/judge");
+  // Start a private demo from the checklist page.
+  await p.goto("/checklist");
   await p.getByRole("link", { name: /Start your own demo/ }).click();
   await expect(p).toHaveURL(/\/start/);
   const t0 = Date.now();

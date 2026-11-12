@@ -145,12 +145,12 @@ export function ShortfallAgents({ poId, onSettled }: { poId: string; onSettled?:
   const t = d.latest;
   if (!t && !d.can_start) return null;
   return (
-    <section id="agents" aria-labelledby="sa-title" className="scroll-mt-20 rounded-lg border border-border bg-card p-4 sm:p-5">
+    <section id="agents" data-tour="agents" data-agents-status={t?.status ?? "none"} aria-labelledby="sa-title" className="scroll-mt-20 rounded-lg border border-border bg-card p-4 sm:p-5">
       <h2 id="sa-title" className="mb-2 text-xl">Let the agents settle it</h2>
       {d.can_start && (!t || t.status !== "open") && (
         <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
           <span>Instead of choosing the fix yourself, send in two agents: yours, inside your mandate, and the wholesaler's, inside its floor. You both still approve what they agree.</span>
-          <Button size="sm" disabled={!!busy} onClick={async () => { const r = await run("agents", `/api/ui/po/${poId}/agents`, {}, { stay: true, quiet: true }); if (r.ok) { setPoll(1500); v.reload(); } }}>
+          <Button size="sm" data-tour="agents-go" disabled={!!busy} onClick={async () => { const r = await run("agents", `/api/ui/po/${poId}/agents`, {}, { stay: true, quiet: true }); if (r.ok) { setPoll(1500); v.reload(); } }}>
             {busy === "agents" && <Spinner />} Send the agents in
           </Button>
         </div>

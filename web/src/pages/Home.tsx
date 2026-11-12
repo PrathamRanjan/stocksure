@@ -6,7 +6,7 @@ import { useSession } from "@/lib/session";
 import { useAction } from "@/lib/useAction";
 import { Button } from "@/components/ui/button";
 import { ProtectedThisMonth } from "@/components/protected";
-import { Empty, ErrorBlock, LoadingBlock, PageHeader, SectionTitle, Spinner, Stamp, StatusStamp, Tally, TallyLegend, type TallyNums } from "@/components/brand";
+import { Empty, ErrorBlock, LoadingBlock, PageHeader, SectionTitle, Spinner, Stamp, StatusStamp, Tally, type TallyNums } from "@/components/brand";
 
 export interface OrderCardData {
   id: string;
@@ -52,7 +52,7 @@ interface HomeData {
 
 function OrderCard({ o, supplierView, tour }: { o: OrderCardData; supplierView: boolean; tour?: boolean }) {
   return (
-    <li data-tour={tour ? "order-card" : undefined} data-ls-reorder={!supplierView && o.status === "closed" ? o.id : undefined} data-ls-name={o.number}>
+    <li data-po={o.id} data-tour={tour ? "order-card" : undefined} data-ls-reorder={!supplierView && o.status === "closed" ? o.id : undefined} data-ls-name={o.number}>
       <Link
         to={`/po/${o.id}`}
         className="group block rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground focus-visible:border-foreground sm:p-5"
@@ -60,7 +60,7 @@ function OrderCard({ o, supplierView, tour }: { o: OrderCardData; supplierView: 
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-heading text-lg font-bold">{o.number}</span>
-          {o.kind === "replacement" && <Stamp tone="carbon">Replacement</Stamp>}
+          {o.kind === "replacement" && <Stamp tone="carbon">Replacement order</Stamp>}
           {o.sample && <Stamp tone="carbon">Sample</Stamp>}
           <StatusStamp status={o.status} />
           {o.late && <Stamp tone="stop"><Clock className="size-3" aria-hidden="true" /> Running late</Stamp>}
@@ -154,8 +154,9 @@ export default function Home() {
 
       <section aria-labelledby="needs-title" data-tour="needs">
         <SectionTitle id="needs-title" aside={needs.length ? plural(needs.length, "order") : undefined}>
-          Needs you
+          Waiting on you
         </SectionTitle>
+        <p className="-mt-2 mb-3 text-sm text-muted-foreground">Orders where the next step is yours. Each card says what that step is.</p>
         {needs.length ? (
           <ul className="grid gap-3 lg:grid-cols-2">
             {needs.map((o, i) => <OrderCard key={o.id} o={o} supplierView={supplierView} tour={i === 0} />)}
@@ -170,14 +171,13 @@ export default function Home() {
 
       {rest.length > 0 && (
         <section aria-labelledby="rest-title">
-          <SectionTitle id="rest-title" aside={plural(rest.length, "order")}>Everything else</SectionTitle>
+          <SectionTitle id="rest-title" aside={plural(rest.length, "order")}>Waiting on someone else, or done</SectionTitle>
           <ul className="grid gap-3 lg:grid-cols-2">
             {rest.map((o, i) => <OrderCard key={o.id} o={o} supplierView={supplierView} tour={!needs.length && i === 0} />)}
           </ul>
         </section>
       )}
 
-      {live.some((o) => o.lines.some((l) => l.tally.accepted !== null)) && <TallyLegend className="mt-4" />}
 
       {history.length > 0 && (
         <details className="mt-8 rounded-lg border border-border bg-card px-4">

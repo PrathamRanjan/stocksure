@@ -145,7 +145,7 @@ export default function Login() {
         </div>
       </form>
       <p className="mt-6 text-sm text-muted-foreground">
-        Want the walk-through instead? <Link to="/judge" className="font-semibold text-foreground underline underline-offset-2">Judge mode</Link> signs you in and shows each step.
+        Want it explained as you go? The <Link to="/#pick" className="font-semibold text-foreground underline underline-offset-2">guided tour</Link> signs you in and switches between the people for you.
       </p>
     </PublicShell>
   );

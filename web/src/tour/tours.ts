@@ -1,10 +1,11 @@
 import { driver, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
+import { PAGES } from "./people";
 
 /**
  * Spec A3.3: a tour starts only from a button, covers the page it was started on, ends on any route change
- * (TourRunner in tour/runner.tsx) and never navigates or signs anyone in. The judge walk-through is the /judge page,
- * where each step is a link the visitor follows themselves.
+ * (TourRunner in tour/runner.tsx) and never navigates or signs anyone in. The guided story across pages and people
+ * is tour/journey.ts; this one explains the page in front of you (the palette's "Tour this page").
  */
 export interface Step {
   el: string;
@@ -12,18 +13,28 @@ export interface Step {
   body: string;
 }
 
+const nav = (key: string, title?: string): Step => ({ el: `[data-tour=nav-${key}]`, title: title ?? PAGES[key].name, body: PAGES[key].what });
+
 /** Every step that can appear; a tour shows the ones whose element is on the current page, in this order. */
 export const STEPS: Step[] = [
-  { el: "[data-tour=needs]", title: "What needs you", body: "Orders waiting on you come first. Everything else is below." },
-  { el: "[data-tour=order-card]", title: "Read a delivery at a glance", body: "The tally strip shows packs ordered, then accepted, damaged or short once the delivery is counted." },
+  { el: "[data-tour=needs]", title: "Waiting on you", body: "Orders where the next step is yours, each card saying what that step is. Everything below is waiting on someone else, or done." },
+  { el: "[data-tour=order-card]", title: "Read a delivery at a glance", body: "Each card shows where the order is (waiting for a quote, out for delivery, being agreed, paid) and, once it's counted, how many cases were accepted, damaged, short or wrong." },
   { el: "[data-tour=next-step]", title: "One next step at a time", body: "The order page leads with the single thing you can do now." },
-  { el: "[data-tour=lines]", title: "The tally strip", body: "One mark per case. Ink is accepted, struck red is damaged, dashed is short or wrong. The receiver confirms these counts; the AI only proposes them." },
-  { el: "[data-tour=money]", title: "Where the money is", body: "The spend limit split into charged, still held, being released (not spendable until PayPal confirms) and left." },
-  { el: "[data-tour=resolution]", title: "Agree once, pay exactly that", body: "Pay = quote price × accepted units, in whole cents. Both sides approve the same fingerprinted version." },
+  { el: "[data-tour=lines]", title: "What arrived, line by line", body: "Ordered, accepted, damaged, missing and wrong item for each product. The person at the door confirms these counts; the AI only suggests them. Only accepted cases are paid for." },
+  { el: "[data-tour=money]", title: "Where the money is", body: "The spending limit split into charged, still held by PayPal, being released (not spendable until PayPal confirms) and left." },
+  { el: "[data-tour=resolution]", title: "The agreement: what gets paid", body: "Pay = quote price × accepted cases, in whole cents. Problem cases are credited or sent again. Both sides approve the same fingerprinted version." },
   { el: "[data-tour=paypal-ops]", title: "Live PayPal sandbox", body: "Every PayPal call with its PayPal id and request id. Retries reuse the request id, so nothing is charged twice." },
-  { el: "[data-tour=approvals]", title: "Held for the owner", body: "Captures or refunds above your threshold, or flagged by the scam check, wait here with the reasons." },
-  { el: "[data-tour=nav-approvals]", title: "Approvals", body: "Payments held for you. Nothing above your threshold moves without you." },
-  { el: "[data-tour=nav-ask]", title: "Ask", body: "Ask about your orders and PayPal records. Every tool call shows as it runs; no tool can move money." },
+  { el: "[data-tour=approvals]", title: "Held for the owner", body: "Charges or refunds above your threshold, or flagged by the scam check, wait here with the reasons." },
+  nav("orders"),
+  nav("deliveries"),
+  nav("approvals"),
+  nav("stock"),
+  nav("record"),
+  nav("performance"),
+  nav("ask"),
+  nav("spending-rules"),
+  nav("scam-check"),
+  nav("ledger"),
   { el: "[data-tour=display]", title: "Display and help", body: "Bigger text, high contrast, an easier font, read-aloud and voice typing. Your choice stays on this device." },
 ];
 

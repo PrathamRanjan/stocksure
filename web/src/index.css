@@ -186,36 +186,43 @@ html.dark[data-a11y-contrast="high"] {
 .mono { font-family: var(--font-mono); font-size: 0.8125em; }
 .prose-width { max-width: 68ch; }
 
-/* Stamps: PayPal money states. */
+/* Status pills: plain words, no stamp. */
 .stamp {
   display: inline-flex;
   align-items: center;
-  gap: 0.3em;
-  font-family: var(--font-heading);
-  font-variation-settings: "wdth" 125;
-  font-weight: 800;
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1;
-  padding: 0.35em 0.55em 0.3em;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
+  gap: 0.35em;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.2;
+  padding: 0.2em 0.65em;
+  border: 1px solid transparent;
+  border-radius: 999px;
   white-space: nowrap;
-  transform: rotate(-2deg);
 }
 .stamp[data-tone="held"] { color: var(--held); background: var(--held-soft); }
 .stamp[data-tone="paid"] { color: var(--paid); background: var(--paid-soft); }
 .stamp[data-tone="stop"] { color: var(--stop); background: var(--stop-soft); }
-.stamp[data-tone="released"] { color: var(--released); background: var(--released-soft); border-style: dashed; }
+.stamp[data-tone="released"] { color: var(--released); background: var(--released-soft); }
 .stamp[data-tone="carbon"] { color: var(--carbon); background: var(--carbon-soft); }
-.stamp[data-tone="ink"] { color: var(--foreground); background: transparent; }
-.stamp[data-tone="quiet"] { color: var(--muted-foreground); background: transparent; border-width: 1px; transform: none; }
+.stamp[data-tone="ink"] { color: var(--foreground); background: var(--paper-2); }
+.stamp[data-tone="quiet"] { color: var(--muted-foreground); background: transparent; border-color: var(--border); }
 .stamp-in { animation: stamp-in var(--dur-stamp) var(--ease-docket) both; }
 @keyframes stamp-in {
-  from { transform: rotate(-8deg) scale(1.35); opacity: 0; }
-  to { transform: rotate(-2deg) scale(1); opacity: 1; }
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
+
+/* Count summary: plain words per line, a small dot for the kind. */
+.counts { display: inline-flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; font-size: 0.875rem; }
+.counts > span { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.counts > span::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--muted-foreground); }
+.counts > [data-k="accepted"]::before { background: var(--paid); }
+.counts > [data-k="damaged"]::before { background: var(--stop); }
+.counts > [data-k="short"]::before, .counts > [data-k="wrong"]::before { background: var(--held); }
+.counts > [data-k="ordered"]::before { background: var(--input); }
 
 /* Tally strip: one mark per pack. */
 .tally { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
@@ -256,10 +263,8 @@ html.dark[data-a11y-contrast="high"] {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
-  .stamp { transform: none; }
 }
 html[data-a11y-motion="off"] *, html[data-a11y-motion="off"] *::before, html[data-a11y-motion="off"] *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
-html[data-a11y-motion="off"] .stamp { transform: none; }
 
 /* driver.js tour, in the docket identity. */
 .driver-popover.ss-tour {
@@ -289,3 +294,49 @@ html[data-a11y-motion="off"] .stamp { transform: none; }
 .driver-popover.ss-tour button:disabled { opacity: 0.45; }
 .driver-popover.ss-tour button:focus-visible { outline: 3px solid var(--carbon); outline-offset: 2px; }
 
+
+/* Guided journey (tour/journey.ts): who you are on every step, the switch card, the paused pill. */
+.driver-popover.ss-journey { max-width: min(27rem, calc(100vw - 24px)); }
+.driver-popover.ss-journey-card { max-width: min(34rem, calc(100vw - 24px)); }
+.driver-popover.ss-journey .driver-popover-description p + p { margin-top: 0.5rem; }
+.ss-j-who { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; padding-bottom: 0.55rem; border-bottom: 1px dashed var(--input); font-size: 0.8125rem; color: var(--muted-foreground); }
+.ss-j-who b { color: var(--foreground); }
+.ss-j-av, .ss-switch-av { display: inline-grid; place-items: center; flex: none; width: 1.6rem; height: 1.6rem; border-radius: 999px; font-family: var(--font-heading); font-weight: 800; font-size: 0.8rem; color: #fff; background: var(--foreground); }
+[data-p="jordan"].ss-j-av, [data-p="jordan"] .ss-switch-av { background: #1d6b3b; }
+[data-p="sam"].ss-j-av, [data-p="sam"] .ss-switch-av { background: #8a5300; }
+[data-p="ana"].ss-j-av, [data-p="ana"] .ss-switch-av { background: #2f4aa8; }
+.ss-j-list { margin: 0.4rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; }
+.ss-j-list b { display: block; }
+.driver-popover.ss-journey .ss-j-do { background: var(--paid); color: #fff; border-color: var(--paid); }
+.ss-j-more { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
+.driver-popover.ss-journey .ss-j-more button { display: grid; gap: 0.15rem; text-align: left; white-space: normal; padding: 10px 12px; }
+.ss-j-more button span { font-weight: 400; font-size: 0.875rem; color: var(--muted-foreground); }
+
+.ss-switch { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; padding: 16px; background: color-mix(in oklab, var(--background) 70%, transparent); backdrop-filter: blur(6px); animation: ss-fade 220ms ease-out both; }
+.ss-switch[data-out] { animation: ss-fade-out 320ms ease-in both; }
+.ss-switch-card { width: min(30rem, 100%); text-align: center; padding: 28px 24px 22px; border-radius: 16px; background: var(--card); border: 1px solid var(--border); box-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.45); animation: ss-card-in 620ms cubic-bezier(0.19, 1, 0.22, 1) both; transform-origin: 50% 60%; }
+.ss-switch-kicker { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.ss-switch-av { width: 4.5rem; height: 4.5rem; font-size: 2rem; margin: 14px auto 10px; animation: ss-pop 520ms 160ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.ss-switch-name { font-family: var(--font-heading); font-weight: 800; font-size: 1.75rem; letter-spacing: -0.02em; }
+.ss-switch-role { margin-top: 2px; color: var(--muted-foreground); }
+.ss-switch-side { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--paper-2); color: var(--foreground); }
+.ss-switch-why { margin-top: 14px; font-size: 1rem; line-height: 1.45; }
+.ss-switch-bar { display: block; height: 3px; margin-top: 18px; border-radius: 3px; background: var(--paper-2); overflow: hidden; }
+.ss-switch-bar i { display: block; height: 100%; width: 100%; background: var(--foreground); transform-origin: 0 50%; animation: ss-bar 1800ms linear both; }
+.ss-switch[data-calm] .ss-switch-card, .ss-switch[data-calm] .ss-switch-av, .ss-switch[data-calm] .ss-switch-bar i { animation: none; }
+@keyframes ss-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ss-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ss-card-in { from { opacity: 0; transform: perspective(900px) rotateY(-28deg) translateX(60px) scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes ss-pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes ss-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.ss-j-pill { position: fixed; z-index: 99999; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; max-width: calc(100vw - 24px); padding: 8px 8px 8px 16px; border-radius: 999px; background: var(--foreground); color: var(--background); box-shadow: 0 16px 40px -16px rgb(0 0 0 / 0.5); font-size: 0.9rem; font-weight: 600; }
+.ss-j-pill button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--background) 40%, transparent); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.ss-j-pill button[data-primary] { background: var(--background); color: var(--foreground); border-color: var(--background); }
+@media (max-width: 1023px) { .ss-j-pill { bottom: calc(76px + env(safe-area-inset-bottom)); } }
+
+/* Landing: rows rise in one after another */
+.ss-rise { animation: ss-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes ss-rise { from { transform: translateY(12px); } to { transform: none; } } /* no fade: text keeps full contrast throughout */
+@media (prefers-reduced-motion: reduce) { .ss-rise { animation: none; } }
+html[data-calm] .ss-rise { animation: none; }

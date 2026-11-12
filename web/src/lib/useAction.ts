@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { act } from "./api";
 import { useSession } from "./session";
 
-const SPA = [/^\/$/, /^\/login$/, /^\/home$/, /^\/approvals$/, /^\/po\/new$/, /^\/po\/[^/]+$/, /^\/po\/[^/]+\/receive$/, /^\/stock$/, /^\/catalog$/, /^\/performance$/, /^\/demo$/, /^\/judge$/, /^\/about$/, /^\/negotiations(\/[^/]+)?$/, /^\/ask$/, /^\/proof$/];
+const SPA = [/^\/$/, /^\/login$/, /^\/home$/, /^\/approvals$/, /^\/po\/new$/, /^\/po\/[^/]+$/, /^\/po\/[^/]+\/receive$/, /^\/stock$/, /^\/catalog$/, /^\/performance$/, /^\/demo$/, /^\/judge$/, /^\/checklist$/, /^\/about$/, /^\/negotiations(\/[^/]+)?$/, /^\/ask$/, /^\/proof$/];
 export const isSpaPath = (to: string) => SPA.some((r) => r.test(to.split(/[?#]/)[0]));
 
 /**

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useLocation } from "react-router";
 import { AlertTriangle, Check, CircleDashed, FileText, MessageSquare, RotateCcw, ShieldAlert, X } from "lucide-react";
 import { ago, day, money, plural, when } from "@/lib/format";
 import { useAction } from "@/lib/useAction";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PushToTalk } from "@/components/push-to-talk";
 import { LocalEstimate } from "@/components/local-estimate";
-import { Empty, PayPalStamp, SectionTitle, SettlementBar, Spinner, Stamp, Tally, TallyLegend } from "@/components/brand";
+import { Empty, PayPalStamp, SectionTitle, SettlementBar, Spinner, Stamp, Tally } from "@/components/brand";
 import type { Op, PoModel, Resolution } from "./types";
 
 /** datetime-local values are the viewer's local time; the server reads "YYYY-MM-DDTHH:mm" as UTC, so convert first. */
@@ -89,7 +89,7 @@ export function Lines({ m, reload }: { m: PoModel; reload: () => void }) {
                   </form>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="paid" disabled={!!busy} onClick={() => run(`a${l.id}`, `/po/${m.po.id}/lines/${l.id}/review`, { action: "agree", note: "", seen: l.receipt!.fingerprint })}>
+                    <Button variant="paid" data-tour="agree-line" disabled={!!busy} onClick={() => run(`a${l.id}`, `/po/${m.po.id}/lines/${l.id}/review`, { action: "agree", note: "", seen: l.receipt!.fingerprint })}>
                       {busy === `a${l.id}` ? <Spinner /> : <Check aria-hidden="true" />} Agree with line {l.line_no}
                     </Button>
                     <Button variant="outline" onClick={() => { setNote(""); setDispute(l.id); }}>
@@ -103,7 +103,6 @@ export function Lines({ m, reload }: { m: PoModel; reload: () => void }) {
         ))}
       </ol>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-input pt-3">
-        <TallyLegend />
         <p className="text-sm">
           Quote total <span className="num font-heading text-lg font-bold">{money(m.quote_total_cents || null)}</span> · limit <span className="num">{money(m.po.limit_cents)}</span>
         </p>
@@ -185,7 +184,7 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
                 <th scope="row" className="py-2 pr-3 text-left font-semibold">{l.line_no}. {l.sku}</th>
                 <td className="num py-2 pr-3">{l.ordered_text}</td>
                 <td className="num py-2 pr-3">{l.paid_text}</td>
-                <td className="py-2 pr-3">{l.shortfall > 0 ? <><span className="num">{l.short_text}</span> <Stamp tone={l.remedy === "replace" ? "carbon" : "quiet"} className="ml-1">{l.remedy}</Stamp></> : "—"}</td>
+                <td className="py-2 pr-3">{l.shortfall > 0 ? <><span className="num">{l.short_text}</span> <Stamp tone={l.remedy === "replace" ? "carbon" : "quiet"} className="ml-1" title={l.remedy === "replace" ? "The supplier sends these again; a new PayPal hold covers them" : "You simply don't pay for these"}>{l.remedy === "replace" ? "sent again" : "not charged"}</Stamp></> : "—"}</td>
                 <td className="num py-2 text-right font-semibold">{money(l.accepted_cents)}</td>
               </tr>
             ))}
@@ -219,7 +218,7 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
         </div>
       )}
 
-      <div className="mt-4 rounded-md bg-foreground p-4 text-background" aria-label="What PayPal will do">
+      <div className="mt-4 rounded-md bg-foreground p-4 text-background" aria-label="What PayPal will do" data-tour="what-moves">
         <p className="font-heading font-bold">What moves when both approve</p>
         <ul className="mt-2 space-y-1 text-[0.95rem]">
           <li>Capture <span className="num font-bold">{money((t.payable_cents ?? t.accepted_cents) - (r.part_charged_cents || 0))}</span> from the hold to {m.po.supplier_name}{r.part_charged_cents ? ` (part 1 already charged ${money(r.part_charged_cents)})` : ""}{t.early_discount_cents ? ` (${money(t.early_discount_cents)} early-payment discount taken off, per the invoice's terms)` : ""}</li>
@@ -237,7 +236,7 @@ export function ResolutionPanel({ m, reload }: { m: PoModel; reload: () => void 
       {r.open && (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-dashed border-input pt-4">
           {r.can_approve && (
-            <Button variant="paid" size="lg" disabled={!!busy} onClick={() => run("approve", `/po/${m.po.id}/resolution/approve`, { version: String(r.version), hash: r.hash })}>
+            <Button variant="paid" size="lg" data-tour="approve-fix" disabled={!!busy} onClick={() => run("approve", `/po/${m.po.id}/resolution/approve`, { version: String(r.version), hash: r.hash })}>
               {busy === "approve" ? <Spinner /> : <Check aria-hidden="true" />} {`Approve v${r.version}`}
             </Button>
           )}
@@ -458,12 +457,12 @@ export function DocsPanel({ m, reload }: { m: PoModel; reload?: () => void }) {
         </Empty>
       )}
       {m.can_send_invoice && (
-        <div className="mt-4 rounded-md border border-dashed border-input p-3 text-sm" id="send-invoice">
+        <div className="mt-4 rounded-md border border-dashed border-input p-3 text-sm" id="send-invoice" data-tour="send-invoice">
           <p className="font-semibold">Send an invoice for {m.po.number}</p>
           <p className="text-muted-foreground">StockSure checks every invoice: duplicates, prices above your last three deliveries, a new payee, lines written to an AI. Sample invoices for the demo:</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("inv-bad", `/po/${m.po.id}/invoice`, { sample: "bad" })}>{busy === "inv-bad" && <Spinner />} Send a bad invoice</Button>
-            <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("inv-dup", `/po/${m.po.id}/invoice`, { sample: "duplicate" })}>{busy === "inv-dup" && <Spinner />} Send the last invoice again, new number</Button>
+            <Button size="sm" variant="outline" data-tour="inv-bad" disabled={!!busy} onClick={() => run("inv-bad", `/po/${m.po.id}/invoice`, { sample: "bad" })}>{busy === "inv-bad" && <Spinner />} Send a bad invoice</Button>
+            <Button size="sm" variant="outline" data-tour="inv-dup" disabled={!!busy} onClick={() => run("inv-dup", `/po/${m.po.id}/invoice`, { sample: "duplicate" })}>{busy === "inv-dup" && <Spinner />} Send the last invoice again, new number</Button>
             <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("inv-early", `/po/${m.po.id}/invoice`, { sample: "discount" })}>{busy === "inv-early" && <Spinner />} Send one with a 2% early-payment discount</Button>
           </div>
           <form className="mt-2 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); run("inv-file", `/po/${m.po.id}/invoice`, f); }}>
@@ -481,10 +480,16 @@ export function DocsPanel({ m, reload }: { m: PoModel; reload?: () => void }) {
 export function Messages({ m, reload }: { m: PoModel; reload: () => void }) {
   const { run, busy } = useAction(reload);
   // The judge page links here with ?say= to prefill a message; the person still presses Send.
-  const [body, setBody] = useState(() => new URLSearchParams(location.search).get("say")?.slice(0, 2000) ?? "");
+  const { search } = useLocation();
+  const [body, setBody] = useState(() => new URLSearchParams(search).get("say")?.slice(0, 2000) ?? "");
+  // The guided tour can arrive here while the page is already open: pick up a new ?say= too.
+  useEffect(() => {
+    const say = new URLSearchParams(search).get("say");
+    if (say) setBody(say.slice(0, 2000));
+  }, [search]);
   const [line, setLine] = useState("");
   return (
-    <Panel label="msg-title" id="messages">
+    <Panel label="msg-title" id="messages" tour="messages">
       <SectionTitle id="msg-title" aside={m.messages.length ? plural(m.messages.length, "message") : undefined}>Messages</SectionTitle>
       {m.messages.length ? (
         <ol className="space-y-3">
@@ -500,7 +505,7 @@ export function Messages({ m, reload }: { m: PoModel; reload: () => void }) {
                 </p>
                 <p className="mt-1 whitespace-pre-wrap break-words">{x.body}</p>
                 {x.scan && (
-                  <div className={cn("mt-2 flex gap-2 rounded-md px-3 py-2 text-sm", x.scan.level === "hold" ? "bg-stop-soft" : "bg-held-soft")} role="note">
+                  <div className={cn("mt-2 flex gap-2 rounded-md px-3 py-2 text-sm", x.scan.level === "hold" ? "bg-stop-soft" : "bg-held-soft")} role="note" data-scan={x.scan.level}>
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                     <div>
                       <p><span className="font-semibold">{x.scan.level === "hold" ? "Scam check: don't pay on this." : "Scam check: check first."}</span> {x.scan.advice ?? "This reads like a common payment scam. Bank details can't change here; check by calling a number you already have."}</p>
@@ -537,7 +542,7 @@ export function Messages({ m, reload }: { m: PoModel; reload: () => void }) {
                 {m.lines.map((l) => <option key={l.id} value={l.id}>line {l.line_no}: {l.product.sku}</option>)}
               </select>
             </label>
-            <Button type="submit" className="ml-auto" disabled={!body.trim() || !!busy}>{busy === "post" && <Spinner />} Send</Button>
+            <Button type="submit" data-tour="msg-send" className="ml-auto" disabled={!body.trim() || !!busy}>{busy === "post" && <Spinner />} Send</Button>
           </div>
         </form>
       )}
@@ -724,7 +729,7 @@ function NegotiateButton({ poId }: { poId: string }) {
 
 export const Related =({ m }: { m: PoModel }) =>
   m.tree.length > 1 ? (
-    <nav aria-label="Related orders" className="flex flex-wrap items-center gap-2 text-sm">
+    <nav aria-label="Related orders" data-tour="related" className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-muted-foreground">Related:</span>
       {m.tree.map((t) => (
         <Link key={t.id} to={`/po/${t.id}`} aria-current={t.id === m.po.id ? "page" : undefined} className={cn("rounded-md border px-2.5 py-1.5", t.id === m.po.id ? "border-foreground font-semibold" : "border-input hover:border-foreground")}>
