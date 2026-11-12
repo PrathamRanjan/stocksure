@@ -1,0 +1,85 @@
+=== risk Mon Nov  9 18:22:54 +08 2026
+risk model done: synthetic AUC 1.000, monotone violations 0
+=== text minilm-l6 Mon Nov  9 18:22:59 +08 2026
+model_head.pkl not found on HuggingFace Hub, initialising classification head with random weights. You should TRAIN this model on a downstream task to use it for predictions and inference.
+Map:   0%|          | 0/3000 [00:00<?, ? examples/s]Map: 100%|██████████| 3000/3000 [00:00<00:00, 81109.96 examples/s]
+[    6.8s] fine-tune start sentence-transformers/all-MiniLM-L6-v2 rows 3000
+***** Running training *****
+  Num unique pairs = 48000
+  Batch size = 32
+  Num epochs = 1
+  super().__init__(loader)
+{'embedding_loss': 0.4158, 'grad_norm': 2.2622334957122803, 'learning_rate': 0.0, 'epoch': 0.0}
+{'embedding_loss': 0.2001, 'grad_norm': 1.0303502082824707, 'learning_rate': 1.9274074074074076e-05, 'epoch': 0.13}
+{'embedding_loss': 0.0565, 'grad_norm': 0.8802537322044373, 'learning_rate': 1.6311111111111113e-05, 'epoch': 0.27}
+{'embedding_loss': 0.0206, 'grad_norm': 1.859797477722168, 'learning_rate': 1.334814814814815e-05, 'epoch': 0.4}
+{'embedding_loss': 0.0124, 'grad_norm': 0.555623471736908, 'learning_rate': 1.0385185185185188e-05, 'epoch': 0.53}
+{'embedding_loss': 0.0085, 'grad_norm': 0.029835013672709465, 'learning_rate': 7.422222222222223e-06, 'epoch': 0.67}
+{'embedding_loss': 0.0072, 'grad_norm': 0.19411823153495789, 'learning_rate': 4.45925925925926e-06, 'epoch': 0.8}
+{'embedding_loss': 0.0049, 'grad_norm': 0.03128295764327049, 'learning_rate': 1.4962962962962964e-06, 'epoch': 0.93}
+{'train_runtime': 273.0414, 'train_samples_per_second': 175.798, 'train_steps_per_second': 5.494, 'train_loss': 0.042027579466501874, 'epoch': 1.0}
+[  285.3s] fine-tune done
+[  285.4s] encoder saved
+[  322.5s] embedded train (79895, 384)
+[  324.1s] skip tactic (too few) overpay_refund 26
+[  324.2s] heads fit
+[  328.4s] val {'n': 4205, 'auc': 0.9816608581113364, 'catch_rate_at_thr': 0.6241699867197875, 'genuine_held_at_thr': 0.010003705075954057}
+[  331.8s] test_scamshield86 {'n': 8188, 'auc': 0.983564757817298, 'catch_rate_at_thr': 0.6352745424292845, 'genuine_held_at_thr': 0.009261045726413274}
+[  332.4s] test_scamshield_evals {'n': 1574, 'auc': 0.9704031014214848, 'catch_rate_at_thr': 0.5480984340044742, 'genuine_held_at_thr': 0.01064773735581189}
+[  332.4s] test_bec_seed {'n': 200, 'auc': 0.5091, 'catch_rate_at_thr': 0.16, 'genuine_held_at_thr': 0.23}
+[  332.9s] test_dialogue {'n': 640, 'auc': 0.7264453125, 'catch_rate_at_thr': 0.015625, 'genuine_held_at_thr': 0.0}
+[  333.1s] test_singlish_genuine {'n': 600, 'genuine_held_at_thr': 0.008333333333333333}
+[  334.4s] tactics {'impersonation': {'precision': 0.11477761836441894, 'recall': 0.933852140077821, 'f1': 0.20442930153321975, 'positives': 257, 'label_source': 'labelled'}, 'urgency_secrecy': {'precision': 0.2486610558530987, 'recall': 0.9572901325478645, 'f1': 0.3947767992711813, 'positives': 679, 'label_source': 'labelled'}, 'changed_details': {'precision': 0.02047082906857728, 'recall': 0.9090909090909091, 'f1': 0.04004004004004004, 'positives': 22, 'label_source': 'weak'}, 'off_platform': {'precision': 0.038821954484605084, 'recall': 0.90625, 'f1': 0.07445442875481387, 'positives': 32, 'label_source': 'weak'}, 'gift_cards_crypto': {'precision': 0.00706436420722135, 'recall': 0.8181818181818182, 'f1': 0.014007782101167316, 'positives': 11, 'label_source': 'weak'}, 'fee_to_release': {'precision': 0.16543846720707442, 'recall': 0.9532908704883227, 'f1': 0.28194662480376764, 'positives': 471, 'label_source': 'labelled'}, 'otp_or_link': {'precision': 0.4930662557781202, 'recall': 0.9467455621301775, 'f1': 0.6484295845997974, 'positives': 676, 'label_source': 'weak'}, 'too_good': {'precision': 0.3973120537589248, 'recall': 0.9623601220752798, 'f1': 0.5624256837098692, 'positives': 983, 'label_source': 'labelled'}}
+[  338.2s] heads.json written
+`torch_dtype` is deprecated! Use `dtype` instead!
+  onnx_export(
+  setup_onnx_logging(verbose) as log_ctx,
+  inverted_mask = torch.tensor(1.0, dtype=dtype) - expanded_mask
+[  340.5s] onnx int8 exported 22.862151 MB
+[  341.1s] done
+=== text multilingual Mon Nov  9 18:28:48 +08 2026
+  xet_get(
+model_head.pkl not found on HuggingFace Hub, initialising classification head with random weights. You should TRAIN this model on a downstream task to use it for predictions and inference.
+Map:   0%|          | 0/3000 [00:00<?, ? examples/s]Map: 100%|██████████| 3000/3000 [00:00<00:00, 79619.53 examples/s]
+[   15.6s] fine-tune start sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 rows 3000
+***** Running training *****
+  Num unique pairs = 48000
+  Batch size = 32
+  Num epochs = 1
+The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'eos_token_id': 2, 'bos_token_id': 0, 'pad_token_id': 1}.
+  super().__init__(loader)
+{'embedding_loss': 0.3864, 'grad_norm': 2.4018986225128174, 'learning_rate': 0.0, 'epoch': 0.0}
+{'embedding_loss': 0.176, 'grad_norm': 2.1964852809906006, 'learning_rate': 1.9274074074074076e-05, 'epoch': 0.13}
+{'embedding_loss': 0.0428, 'grad_norm': 6.589960098266602, 'learning_rate': 1.6311111111111113e-05, 'epoch': 0.27}
+{'embedding_loss': 0.0155, 'grad_norm': 0.0712324008345604, 'learning_rate': 1.334814814814815e-05, 'epoch': 0.4}
+{'embedding_loss': 0.0092, 'grad_norm': 0.26371338963508606, 'learning_rate': 1.0385185185185188e-05, 'epoch': 0.53}
+{'embedding_loss': 0.0028, 'grad_norm': 0.024572966620326042, 'learning_rate': 7.422222222222223e-06, 'epoch': 0.67}
+{'embedding_loss': 0.002, 'grad_norm': 0.0263143852353096, 'learning_rate': 4.45925925925926e-06, 'epoch': 0.8}
+{'embedding_loss': 0.0023, 'grad_norm': 0.010300369933247566, 'learning_rate': 1.4962962962962964e-06, 'epoch': 0.93}
+{'train_runtime': 512.6987, 'train_samples_per_second': 93.622, 'train_steps_per_second': 2.926, 'train_loss': 0.033701303253571194, 'epoch': 1.0}
+[  534.2s] fine-tune done
+[  534.4s] encoder saved
+[  590.4s] embedded train (79895, 384)
+[  592.2s] skip tactic (too few) overpay_refund 26
+[  592.3s] heads fit
+[  598.9s] val {'n': 4205, 'auc': 0.9823467646026984, 'catch_rate_at_thr': 0.6460823373173971, 'genuine_held_at_thr': 0.010003705075954057}
+[  606.3s] test_scamshield86 {'n': 8188, 'auc': 0.983293135147126, 'catch_rate_at_thr': 0.6409317803660566, 'genuine_held_at_thr': 0.009839861084314104}
+[  607.4s] test_scamshield_evals {'n': 1574, 'auc': 0.9650256367501772, 'catch_rate_at_thr': 0.5682326621923938, 'genuine_held_at_thr': 0.023070097604259095}
+[  607.6s] test_bec_seed {'n': 200, 'auc': 0.2947, 'catch_rate_at_thr': 0.02, 'genuine_held_at_thr': 0.07}
+[  608.5s] test_dialogue {'n': 640, 'auc': 0.739501953125, 'catch_rate_at_thr': 0.0, 'genuine_held_at_thr': 0.0}
+[  608.9s] test_singlish_genuine {'n': 600, 'genuine_held_at_thr': 0.013333333333333334}
+[  612.0s] tactics {'impersonation': {'precision': 0.12493599590373784, 'recall': 0.9494163424124513, 'f1': 0.22081447963800904, 'positives': 257, 'label_source': 'labelled'}, 'urgency_secrecy': {'precision': 0.24470850352766432, 'recall': 0.9705449189985272, 'f1': 0.39086595492289444, 'positives': 679, 'label_source': 'labelled'}, 'changed_details': {'precision': 0.023121387283236993, 'recall': 0.9090909090909091, 'f1': 0.04509582863585118, 'positives': 22, 'label_source': 'weak'}, 'off_platform': {'precision': 0.02587646076794658, 'recall': 0.96875, 'f1': 0.05040650406504065, 'positives': 32, 'label_source': 'weak'}, 'gift_cards_crypto': {'precision': 0.007716049382716049, 'recall': 0.9090909090909091, 'f1': 0.015302218821729151, 'positives': 11, 'label_source': 'weak'}, 'fee_to_release': {'precision': 0.1703590527119939, 'recall': 0.9469214437367304, 'f1': 0.28876659112981545, 'positives': 471, 'label_source': 'labelled'}, 'otp_or_link': {'precision': 0.4100126742712294, 'recall': 0.9571005917159763, 'f1': 0.5740905057675244, 'positives': 676, 'label_source': 'weak'}, 'too_good': {'precision': 0.3783676703645008, 'recall': 0.9715157680569685, 'f1': 0.5446250356429997, 'positives': 983, 'label_source': 'labelled'}}
+[  615.7s] heads.json written
+`torch_dtype` is deprecated! Use `dtype` instead!
+The tokenizer you are loading from 'models/multilingual-l12/encoder' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+The tokenizer you are loading from 'models/multilingual-l12/encoder' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+The tokenizer you are loading from 'models/multilingual-l12/encoder' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+The tokenizer you are loading from 'models/multilingual-l12/encoder' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+  onnx_export(
+  setup_onnx_logging(verbose) as log_ctx,
+  inverted_mask = torch.tensor(1.0, dtype=dtype) - expanded_mask
+The tokenizer you are loading from 'models/multilingual-l12/encoder' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+The tokenizer you are loading from 'models/multilingual-l12/encoder' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+[  621.5s] onnx int8 exported 118.086323 MB
+[  622.6s] done
+=== ALL DONE Mon Nov  9 18:39:21 +08 2026

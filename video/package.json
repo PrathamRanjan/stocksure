@@ -1,0 +1,30 @@
+{
+  "name": "stocksure-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource-variable/source-sans-3": "^5.3.1",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@remotion/bundler": "^4.0.543",
+    "@remotion/cli": "^4.0.543",
+    "@remotion/fonts": "^4.0.543",
+    "@remotion/layout-utils": "^4.0.543",
+    "@remotion/media": "^4.0.543",
+    "@remotion/motion-blur": "^4.0.543",
+    "@remotion/noise": "^4.0.543",
+    "@remotion/paths": "^4.0.543",
+    "@remotion/renderer": "^4.0.543",
+    "@remotion/shapes": "^4.0.543",
+    "@remotion/transitions": "^4.0.543",
+    "@types/react": "^19.3.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.543",
+    "typescript": "^7.0.2"
+  }
+}
